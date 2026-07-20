@@ -49,7 +49,7 @@ public sealed class PhysicalFileSystem : IFileSystem
         File.WriteAllText(tempPath, content, Utf8NoBom);
         try
         {
-            File.Move(tempPath, path, overwrite: true);
+            MoveWithRetry(tempPath, path);
         }
         catch
         {
@@ -63,6 +63,30 @@ public sealed class PhysicalFileSystem : IFileSystem
             }
 
             throw;
+        }
+    }
+
+    /// <summary>
+    /// Equalizer APO's file watcher briefly opens the config as it reloads, so an atomic
+    /// replace can hit a momentary sharing violation — surfaced by Windows as an
+    /// <see cref="IOException"/> or <see cref="UnauthorizedAccessException"/> ("Access to the
+    /// path … is denied"). These locks clear within a few milliseconds, so a short retry turns
+    /// what looked like a hard permission failure into a normal, successful write.
+    /// </summary>
+    private static void MoveWithRetry(string tempPath, string path)
+    {
+        const int attempts = 6;
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                File.Move(tempPath, path, overwrite: true);
+                return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException && attempt < attempts)
+            {
+                Thread.Sleep(25 * attempt); // 25, 50, … 125 ms — ~0.4 s of patience, then give up
+            }
         }
     }
 

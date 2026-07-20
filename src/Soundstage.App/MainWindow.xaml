@@ -70,6 +70,21 @@
                     <ui:Button Margin="12,0,0,0" Appearance="Primary" Command="{Binding OpenUpdateSettingsCommand}" Content="View update" />
                 </StackPanel>
             </Border>
+            <Border
+                Background="#33D8A401"
+                Padding="16,10"
+                Visibility="{Binding ShowWriteBlockedBanner, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <StackPanel HorizontalAlignment="Left" Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="#F0C000" Text="&#xE7BA;" />
+                        <TextBlock Margin="10,0,0,0" MaxWidth="700" VerticalAlignment="Center" Text="{Binding WriteBlockedText}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                        <ui:Button Command="{Binding OpenDiagnosticsCommand}" Content="See what to do" />
+                        <ui:Button Margin="8,0,0,0" Command="{Binding DismissWriteBlockedCommand}" Content="Dismiss" />
+                    </StackPanel>
+                </Grid>
+            </Border>
         </StackPanel>
 
         <!-- Nav rail + page -->

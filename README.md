@@ -27,9 +27,9 @@ layer is untouched.
 - Imports Peace exports and AutoEq ParametricEQ files (including comma-decimal EU locale files)
 
 **Effects** — each with one toggle and one intensity slider
-- **Night mode** — a low-shelf bass cut (bass is what travels through walls) plus dynamic range compression via a hosted VST 2 compressor; degrades honestly to shelf + extra headroom when no VST is configured
+- **Night mode** — a low-shelf bass cut (bass is what travels through walls) plus a gentle overall level reduction for late-night listening. 100% native — no plugins, so it can never interrupt your audio
 - **Loudness compensation** — Equalizer APO's volume-tracking equal-loudness correction; restores bass and treble at low volume, runs happily alongside night mode
-- **Stereo width** — mid/side widening with the safe zone made obvious; hard-guarded off on 5.1/7.1 outputs so it can never smear a surround mix
+- **Stereo width** — mid/side widening applied to the front left/right pair only, so it works on any layout (2.0/5.1/7.1) yet never touches your centre, LFE or surround channels; the safe zone is made obvious
 
 **Safety** — the reasons "APO made my audio crackle" won't happen here
 - **Clipping protection**: the exact filter math is analyzed before every apply and the preamp is auto-trimmed so cumulative boosts can't clip; live clip indicator in the status bar
@@ -59,21 +59,6 @@ Plus: instant A/B bypass (button + global hotkey `Ctrl+Alt+B`), system tray with
 > music plays. If the sound clearly muffles, APO is genuinely in your signal path with
 > Atmos active. If not, the same page walks you through APO's SFX/EFX install-mode fix.
 > Details in [docs/ATMOS-VALIDATION.md](docs/ATMOS-VALIDATION.md).
-
-### Night mode's compressor — one free download
-
-Full night mode uses a compressor plugin hosted by Equalizer APO. Compressor plugins are
-free to *use* but their licenses don't allow bundling one inside Soundstage, so it's a
-single download:
-
-1. Get **[LoudMax](https://loudmax.blogspot.com)** (free, by Thomas Mundt) — the
-   **64-bit Windows VST** version. No installer; it's just a DLL.
-2. In Soundstage: **Effects → Night mode → Advanced → Scan this PC.** Soundstage checks
-   the standard VST folders *and* your Downloads folder and wires the DLL up automatically
-   (or use **Choose DLL…** to point at it yourself).
-
-Until then, night mode still works in its lighter form — bass shelf + extra headroom — and
-says so right on the card.
 
 ## Staying up to date
 

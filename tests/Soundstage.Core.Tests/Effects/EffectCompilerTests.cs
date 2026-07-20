@@ -45,29 +45,13 @@ public class EffectCompilerTests
     }
 
     [Fact]
-    public void NightMode_WithoutVst_DegradesHonestly()
+    public void NightMode_AppliesLevelReduction_AndNeverHostsAPlugin()
     {
         var result = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 100));
-        Assert.NotNull(result.Note);
-        Assert.Equal(NightModeSettings.MaxDegradedHeadroomDb, result.ExtraHeadroomDb, 2);
+        // Native-only: a bass shelf + extra preamp headroom, and NOTHING external in the path.
+        Assert.Equal(NightModeSettings.MaxLevelReductionDb, result.ExtraHeadroomDb, 2);
         Assert.Empty(result.PostCommands);
-    }
-
-    [Fact]
-    public void NightMode_WithVst_EmitsCompressorAsPostCommand()
-    {
-        var settings = new NightModeSettings(
-            Enabled: true,
-            Intensity: 60,
-            UseVstCompressor: true,
-            VstLibraryPath: @"C:\VST\LoudMax64.dll");
-
-        var result = EffectCompilers.CompileNightMode(settings);
-
-        Assert.Null(result.Note);
-        Assert.Equal(0, result.ExtraHeadroomDb);
-        var vst = Assert.Single(result.PostCommands.OfType<VstPluginCommand>());
-        Assert.Equal(@"C:\VST\LoudMax64.dll", vst.LibraryPath);
+        Assert.DoesNotContain(result.Commands, c => c is VstPluginCommand);
     }
 
     [Fact]

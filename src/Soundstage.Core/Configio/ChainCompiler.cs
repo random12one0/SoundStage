@@ -22,7 +22,7 @@ public sealed record ChainCompilation(ApoDocument Document, string RenderedText,
 /// each section's preamp for clipping safety.
 ///
 /// Section order per device: preamp → preset EQ → night-mode shelf → stereo width →
-/// loudness correction → night-mode compressor (compressing the fully shaped signal last).
+/// loudness correction.
 /// </summary>
 public static class ChainCompiler
 {
@@ -145,9 +145,6 @@ public static class ChainCompiler
         AppendCommands(document, width.Commands);
         AppendCommands(document, ambience.Commands);
         AppendCommands(document, loudness.Commands);
-
-        // Compressor last: it should see the final, fully shaped signal.
-        AppendCommands(document, night.PostCommands);
 
         reports.Add(new DeviceChainReport(profile.EndpointId, profile.FriendlyName, preset?.Name, headroom, notes));
     }

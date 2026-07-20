@@ -30,9 +30,11 @@ public sealed record EffectCompilation(
 public static class EffectCompilers
 {
     /// <summary>
-    /// Night mode. The shelf handles what compression cannot (steady-state bass energy
-    /// through walls); the compressor tames peaks. Without a configured VST compressor we
-    /// degrade honestly: shelf + extra preamp headroom, flagged in the note.
+    /// Night mode — 100% native, no plugins. Equalizer APO has no built-in dynamics processor,
+    /// so night mode does the two things that reliably help at night without hosting anything:
+    /// a low-shelf <b>bass cut</b> (low frequencies are what travel through walls) plus a little
+    /// overall <b>level reduction</b> (extra preamp headroom) to take the edge off loud peaks.
+    /// Because nothing external is in the path, it can never fail to load and silence the stream.
     /// </summary>
     public static EffectCompilation CompileNightMode(NightModeSettings settings)
     {
@@ -49,24 +51,7 @@ public static class EffectCompilers
             commands.Add(new FilterCommand(FilterType.LowShelf, settings.EffectiveCornerHz, cut, 0.707));
         }
 
-        // Only host a VST when a plausible .dll path is set — an empty/garbage path makes
-        // Equalizer APO stall and drop the stream (the "audio cuts out" symptom).
-        var hasVst = settings.UseVstCompressor
-                     && !string.IsNullOrWhiteSpace(settings.VstLibraryPath)
-                     && settings.VstLibraryPath!.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
-        if (hasVst)
-        {
-            return new EffectCompilation(commands, PostCommandsOrNull:
-            [
-                new CommentCommand("Night mode: compressor (VST)"),
-                new VstPluginCommand(settings.VstLibraryPath!, settings.VstRawArguments),
-            ]);
-        }
-
-        return new EffectCompilation(
-            commands,
-            ExtraHeadroomDb: settings.EffectiveDegradedHeadroomDb,
-            Note: "Compression off — no VST compressor configured; using bass shelf + extra headroom.");
+        return new EffectCompilation(commands, ExtraHeadroomDb: settings.EffectiveLevelReductionDb);
     }
 
     public static EffectCompilation CompileLoudness(LoudnessSettings settings)

@@ -27,24 +27,22 @@ public static class IntensityCurve
 }
 
 /// <summary>
-/// Night mode: a low-shelf bass cut (low frequencies are what travel through walls) plus
-/// dynamic range compression via a hosted VST when configured. One intensity drives both;
-/// the advanced overrides split them.
+/// Night mode (native, plugin-free): a low-shelf bass cut (low frequencies are what travel
+/// through walls) plus a little overall level reduction so late-night peaks feel gentler. One
+/// intensity drives both; the advanced overrides split them. Nothing external sits in the audio
+/// path, so night mode can never fail to load and silence your audio.
 /// </summary>
 public sealed record NightModeSettings(
     bool Enabled = false,
     int Intensity = 50,
     double? BassCornerOverrideHz = null,
-    double? BassCutDbOverride = null,
-    bool UseVstCompressor = false,
-    string? VstLibraryPath = null,
-    string? VstRawArguments = null)
+    double? BassCutDbOverride = null)
 {
     /// <summary>Bass shelf cut at 100% intensity — deep enough to essentially remove low end.</summary>
     public const double MaxBassCutDb = 24.0;
 
-    /// <summary>Extra preamp headroom at 100% intensity when no compressor VST is available.</summary>
-    public const double MaxDegradedHeadroomDb = 6.0;
+    /// <summary>Overall level reduction at 100% intensity — takes the edge off loud peaks at night.</summary>
+    public const double MaxLevelReductionDb = 6.0;
 
     /// <summary>Corner frequency swept by intensity: gentle at low, taking out more of the bass band as it rises.</summary>
     public const double MinCornerHz = 60.0;
@@ -60,7 +58,7 @@ public sealed record NightModeSettings(
     // 50% ≈ −16 dB (clearly quieter bass), 100% = −24 dB with the corner up at 320 Hz (bass essentially gone).
     public double EffectiveBassCutDb => BassCutDbOverride ?? -IntensityCurve.Scale(MaxBassCutDb, Intensity);
 
-    public double EffectiveDegradedHeadroomDb => IntensityCurve.Scale(MaxDegradedHeadroomDb, Intensity);
+    public double EffectiveLevelReductionDb => IntensityCurve.Scale(MaxLevelReductionDb, Intensity);
 }
 
 /// <summary>

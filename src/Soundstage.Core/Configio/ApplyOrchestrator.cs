@@ -13,6 +13,19 @@ public sealed record ApplyResult(
     ChainCompilation Compilation);
 
 /// <summary>
+/// A config write couldn't complete (permission denied, or a lock that outlasted the retry
+/// window). Reported instead of thrown, so a failed background revert or a foreground toggle
+/// never crashes the app with a raw "Access to the path is denied" dialog.
+/// </summary>
+public sealed record ConfigWriteBlocked(string Path, Exception Error)
+{
+    public string FriendlyMessage =>
+        "Windows blocked writing to the Equalizer APO config folder, so your last change may not have taken effect. "
+        + "Fix it once by running Soundstage as administrator, or grant your Windows account write access to the "
+        + "EqualizerAPO\\config folder.";
+}
+
+/// <summary>
 /// The single entry point for changing what Equalizer APO does:
 /// compile → clamp → backup → atomic write → (maybe) arm the revert guard.
 ///
@@ -44,7 +57,30 @@ public sealed class ApplyOrchestrator
     /// <summary>Raised when a guarded apply's hash gets confirmed (persist the state!).</summary>
     public event Action<string>? ChainHashConfirmed;
 
+    /// <summary>Raised when a config write was blocked instead of throwing (see <see cref="ConfigWriteBlocked"/>).</summary>
+    public event Action<ConfigWriteBlocked>? WriteBlocked;
+
     public RevertGuard Guard => _guard;
+
+    /// <summary>
+    /// Writes a config file, converting a hard permission/lock failure into a
+    /// <see cref="WriteBlocked"/> signal rather than an exception. Every config write in this
+    /// class goes through here so nothing — foreground toggle or background revert timer — can
+    /// crash the app on "Access to the path is denied".
+    /// </summary>
+    private bool TryWrite(string path, string content)
+    {
+        try
+        {
+            _fs.WriteAllTextAtomic(path, content);
+            return true;
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            WriteBlocked?.Invoke(new ConfigWriteBlocked(path, ex));
+            return false;
+        }
+    }
 
     public ApplyResult Apply(
         SoundstageState state,
@@ -71,7 +107,7 @@ public sealed class ApplyOrchestrator
             _backups.Backup(BackupKind.Chain, currentText);
         }
 
-        _fs.WriteAllTextAtomic(_layout.ChainFilePath, newText);
+        TryWrite(_layout.ChainFilePath, newText);
 
         var shouldGuard = state.Settings.ConfirmNewSounds
                           && attribution.Source == AttributionSource.Manual
@@ -83,7 +119,7 @@ public sealed class ApplyOrchestrator
             var revertTo = currentText!;
             _guard.Arm(TimeSpan.FromSeconds(state.Settings.RevertGuardSeconds), () =>
             {
-                _fs.WriteAllTextAtomic(_layout.ChainFilePath, revertTo);
+                TryWrite(_layout.ChainFilePath, revertTo);
             });
 
             // Wire confirm → remember the hash. The handler detaches on the FIRST outcome
@@ -126,7 +162,7 @@ public sealed class ApplyOrchestrator
             return false;
         }
 
-        _fs.WriteAllTextAtomic(_layout.SwitchFilePath, desired);
+        TryWrite(_layout.SwitchFilePath, desired);
         return true;
     }
 
@@ -140,7 +176,7 @@ public sealed class ApplyOrchestrator
             _backups.Backup(BackupKind.Chain, current);
         }
 
-        _fs.WriteAllTextAtomic(_layout.ChainFilePath, content);
+        TryWrite(_layout.ChainFilePath, content);
     }
 
     /// <summary>
@@ -157,11 +193,11 @@ public sealed class ApplyOrchestrator
         {
             if (Interlocked.Exchange(ref restored, 1) == 0)
             {
-                _fs.WriteAllTextAtomic(_layout.ChainFilePath, original);
+                TryWrite(_layout.ChainFilePath, original);
             }
         }
 
-        _fs.WriteAllTextAtomic(_layout.ChainFilePath, chainText);
+        TryWrite(_layout.ChainFilePath, chainText);
         var handle = scheduler.Schedule(duration, Restore);
         return new TemporaryApplyHandle(handle, Restore);
     }
@@ -187,7 +223,7 @@ public sealed class ApplyOrchestrator
         var current = _fs.FileExists(_layout.SwitchFilePath) ? _fs.ReadAllText(_layout.SwitchFilePath) : null;
         if (current != desired)
         {
-            _fs.WriteAllTextAtomic(_layout.SwitchFilePath, desired);
+            TryWrite(_layout.SwitchFilePath, desired);
         }
     }
 

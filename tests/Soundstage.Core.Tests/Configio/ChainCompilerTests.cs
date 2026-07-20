@@ -116,23 +116,23 @@ public class ChainCompilerTests
     }
 
     [Fact]
-    public void NightModeCompressor_IsLastInSection()
+    public void NightShelf_ComesBeforeLoudness_AndNeverEmitsAPlugin()
     {
         var profile = SpeakerProfile();
         profile.Effects = EffectSettings.Default with
         {
-            NightMode = new NightModeSettings(Enabled: true, Intensity: 70, UseVstCompressor: true, VstLibraryPath: @"C:\v.dll"),
+            NightMode = new NightModeSettings(Enabled: true, Intensity: 70),
             Loudness = new LoudnessSettings(Enabled: true),
         };
 
         var text = ChainCompiler.Compile(StateWith(profile), _ => MusicPreset).RenderedText;
 
-        var vstIndex = text.IndexOf("VSTPlugin:", StringComparison.Ordinal);
         var loudnessIndex = text.IndexOf("LoudnessCorrection:", StringComparison.Ordinal);
         var shelfIndex = text.IndexOf("Night mode: bass shelf", StringComparison.Ordinal);
         Assert.True(shelfIndex > 0);
         Assert.True(loudnessIndex > shelfIndex);
-        Assert.True(vstIndex > loudnessIndex, "compressor must come after loudness correction");
+        // Night mode is 100% native — it must never host a plugin (that was the silence bug).
+        Assert.DoesNotContain("VSTPlugin:", text);
     }
 
     [Fact]
