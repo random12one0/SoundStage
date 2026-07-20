@@ -34,6 +34,10 @@ public class XamlSmokeTests
             _ = new DevicesPage(services);
             _ = new DiagnosticsPage(services);
             _ = new SettingsPage(services);
+
+            // Windows aren't in the page set — construct them too so their XAML is parsed.
+            _ = new RuleEditorWindow(services, existing: null);
+            _ = new InputDialog("t", "p", "v");
         });
     }
 

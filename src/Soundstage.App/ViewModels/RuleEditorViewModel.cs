@@ -44,6 +44,7 @@ public partial class ActionEditorViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsPresetKind))]
     [NotifyPropertyChangedFor(nameof(IsEnabledKind))]
     [NotifyPropertyChangedFor(nameof(IsIntensityKind))]
+    [NotifyPropertyChangedFor(nameof(Glyph))]
     private string _kind = ActionKinds[0];
 
     [ObservableProperty]
@@ -63,6 +64,9 @@ public partial class ActionEditorViewModel : ObservableObject
     public bool IsEnabledKind => Kind == ActionKinds[1];
 
     public bool IsIntensityKind => Kind == ActionKinds[2];
+
+    /// <summary>Segoe MDL2 glyph for this action kind (shown in the card chip).</summary>
+    public string Glyph => IsPresetKind ? "" : IsIntensityKind ? "" : "";
 
     public AutomationAction? Build()
     {
@@ -292,6 +296,38 @@ public partial class RuleEditorViewModel : ObservableObject
     partial void OnExactChannelsChanged(double value) => RecomputeSentence();
 
     partial void OnDevicePatternTextChanged(string value) => RecomputeSentence();
+
+    /// <summary>Suggestion chips shown under the app-trigger field.</summary>
+    public static IReadOnlyList<string> AppSuggestions { get; } = ["Spotify", "Chrome", "VLC", "Discord", "Steam"];
+
+    /// <summary>Suggestion chips shown under the device-trigger field.</summary>
+    public static IReadOnlyList<string> DeviceSuggestions { get; } = ["headphone", "speaker", "receiver", "HDMI"];
+
+    [RelayCommand]
+    private void AppendApp(string? app)
+    {
+        if (string.IsNullOrWhiteSpace(app))
+        {
+            return;
+        }
+
+        var existing = ProcessesText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (existing.Any(e => string.Equals(e, app, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        ProcessesText = existing.Length == 0 ? app : ProcessesText.TrimEnd().TrimEnd(',') + ", " + app;
+    }
+
+    [RelayCommand]
+    private void UseDeviceSuggestion(string? pattern)
+    {
+        if (!string.IsNullOrWhiteSpace(pattern))
+        {
+            DevicePatternText = pattern;
+        }
+    }
 
     [RelayCommand]
     private void AddAction() => Actions.Add(new ActionEditorViewModel(_presets));

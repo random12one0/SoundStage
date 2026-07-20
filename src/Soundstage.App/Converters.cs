@@ -26,3 +26,15 @@ public sealed class StringToVisibilityConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) => throw new NotSupportedException();
 }
+
+/// <summary>True when the bound enum/value equals the ConverterParameter — for chip/radio selection.</summary>
+public sealed class EnumEqualsConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value?.ToString() == parameter?.ToString();
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is true && parameter is not null
+            ? Enum.Parse(targetType, parameter.ToString()!)
+            : System.Windows.Data.Binding.DoNothing;
+}
