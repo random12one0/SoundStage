@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>Soundstage.Windows</RootNamespace>
+    <Description>Windows implementations of Soundstage core abstractions: WASAPI status, audio sessions, registry, autostart.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Soundstage.Core\Soundstage.Core.csproj" />
+  </ItemGroup>
+
+</Project>
