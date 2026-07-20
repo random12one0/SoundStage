@@ -155,7 +155,13 @@ public partial class DashboardViewModel : ObservableObject
         Presets = new ObservableCollection<EqPreset>(_services.Presets.All);
         SelectedPreset = Presets.FirstOrDefault(p => p.Id == (selectedId ?? _services.Controller?.ActiveProfile?.ActivePresetId));
         _syncing = false;
-        RebuildEditor();
+
+        // Rebuild the editor only when the selection actually changed — a refresh caused
+        // by saving our own live edits must not yank band rows out from under a drag.
+        if (SelectedPreset?.Id != selectedId)
+        {
+            RebuildEditor();
+        }
     }
 
     private void SyncFromState()
@@ -335,6 +341,35 @@ public partial class DashboardViewModel : ObservableObject
 
     // ---- EQ editing ----
 
+    /// <summary>
+    /// Editing a built-in preset transparently forks it into the user's own copy first —
+    /// nobody should meet a locked dial. The editor keeps its live state; only the target
+    /// of the debounced save changes.
+    /// </summary>
+    private EqPreset? EnsureEditablePreset()
+    {
+        var preset = SelectedPreset;
+        if (preset is null)
+        {
+            return null;
+        }
+
+        if (!preset.IsBuiltIn)
+        {
+            return preset;
+        }
+
+        var copy = _services.Presets.Duplicate(preset.Id, $"{preset.Name} (custom)");
+        _syncing = true;
+        Presets = new ObservableCollection<EqPreset>(_services.Presets.All);
+        SelectedPreset = Presets.FirstOrDefault(p => p.Id == copy.Id);
+        _syncing = false;
+        _services.Controller?.ApplyPreset(copy.Id);
+        IsEditable = true;
+        ImportStatus = $"Created “{copy.Name}” — built-in presets stay untouched.";
+        return copy;
+    }
+
     private void RebuildEditor()
     {
         _editDebounce?.Dispose();
@@ -366,7 +401,7 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void AddBand()
     {
-        if (!IsEditable)
+        if (EnsureEditablePreset() is null)
         {
             return;
         }
@@ -378,7 +413,7 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void RemoveBand(BandViewModel? band)
     {
-        if (band is null || !IsEditable)
+        if (band is null || EnsureEditablePreset() is null)
         {
             return;
         }
@@ -390,36 +425,43 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void SetMode(string? modeName)
     {
-        if (SelectedPreset is null || !IsEditable || !Enum.TryParse<EqMode>(modeName, out var mode) || SelectedPreset.Mode == mode)
+        if (!Enum.TryParse<EqMode>(modeName, out var mode) || SelectedPreset?.Mode == mode)
         {
             return;
         }
 
-        SelectedPreset.Mode = mode;
+        var preset = EnsureEditablePreset();
+        if (preset is null)
+        {
+            return;
+        }
+
+        preset.Mode = mode;
         if (mode != EqMode.Parametric)
         {
             var length = Core.Presets.GraphicBands.FrequenciesFor(mode).Length;
-            if (SelectedPreset.GraphicGains.Length != length)
+            if (preset.GraphicGains.Length != length)
             {
-                SelectedPreset.GraphicGains = new double[length];
+                preset.GraphicGains = new double[length];
             }
         }
 
-        _services.Presets.Save(SelectedPreset);
+        _services.Presets.Save(preset);
         RebuildEditor();
         _services.Controller?.NotifyPresetContentChanged();
     }
 
     private void OnGraphicChanged(int index, double value)
     {
-        if (SelectedPreset is null)
+        var preset = EnsureEditablePreset();
+        if (preset is null)
         {
             return;
         }
 
-        if (index < SelectedPreset.GraphicGains.Length)
+        if (index < preset.GraphicGains.Length)
         {
-            SelectedPreset.GraphicGains[index] = Math.Clamp(value, -15, 15);
+            preset.GraphicGains[index] = Math.Clamp(value, -15, 15);
         }
 
         OnEditorChanged();
@@ -429,8 +471,8 @@ public partial class DashboardViewModel : ObservableObject
     private void OnEditorChanged()
     {
         RecomputeCurve();
-        var preset = SelectedPreset;
-        if (preset is null || preset.IsBuiltIn)
+        var preset = EnsureEditablePreset();
+        if (preset is null)
         {
             return;
         }

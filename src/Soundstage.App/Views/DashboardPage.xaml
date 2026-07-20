@@ -106,8 +106,7 @@
                 <StackPanel>
                     <Grid>
                         <TextBlock FontWeight="SemiBold" Text="Equalizer" />
-                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal"
-                                    Visibility="{Binding IsEditable, Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                             <ui:Button Command="{Binding SetModeCommand}" CommandParameter="Parametric" Content="Parametric" FontSize="12" />
                             <ui:Button Margin="6,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Graphic10" Content="10-band" FontSize="12" />
                             <ui:Button Margin="6,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Graphic31" Content="31-band" FontSize="12" />
@@ -117,13 +116,13 @@
                     <TextBlock
                         Margin="0,10,0,0"
                         Opacity="0.7"
-                        Text="This is a built-in preset. Duplicate it to make changes — your copy applies live as you edit."
+                        Text="This is a built-in preset — tweak anything and your own editable copy is created automatically."
                         TextWrapping="Wrap"
                         Visibility="{Binding IsEditable, Converter={StaticResource BoolToVisibilityInverse}}" />
 
                     <!-- Parametric editor -->
                     <StackPanel Visibility="{Binding IsParametric, Converter={StaticResource BoolToVisibility}}">
-                        <ItemsControl Margin="0,8,0,0" IsEnabled="{Binding IsEditable}" ItemsSource="{Binding Bands}">
+                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Bands}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,3">
@@ -162,15 +161,13 @@
                         <ui:Button
                             Margin="0,10,0,0"
                             Command="{Binding AddBandCommand}"
-                            Content="Add band"
-                            Visibility="{Binding IsEditable, Converter={StaticResource BoolToVisibility}}" />
+                            Content="Add band" />
                     </StackPanel>
 
                     <!-- Graphic editor -->
                     <ItemsControl
                         Margin="0,12,0,0"
                         HorizontalAlignment="Center"
-                        IsEnabled="{Binding IsEditable}"
                         ItemsSource="{Binding GraphicBands}"
                         Visibility="{Binding IsParametric, Converter={StaticResource BoolToVisibilityInverse}}">
                         <ItemsControl.ItemsPanel>

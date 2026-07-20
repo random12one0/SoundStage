@@ -56,12 +56,14 @@
                             </Grid>
                             <TextBlock Margin="0,12,0,4" FontWeight="SemiBold" FontSize="13" Text="Compressor (VST)" />
                             <TextBlock FontSize="12" Opacity="0.65" TextWrapping="Wrap"
-                                       Text="Equalizer APO can host a free VST 2 compressor for real dynamic range control. A good free choice is LoudMax (Thomas Mundt) — point Soundstage at the 64-bit DLL." />
+                                       Text="Real dynamic range control uses a free VST 2 compressor hosted by Equalizer APO. Their licenses don't allow bundling one, but it's a single download: get LoudMax (free), then Scan — Soundstage checks the usual folders and Downloads for you." />
                             <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
-                                <ui:Button Command="{Binding PickVstCommand}" Content="Choose VST DLL…" />
+                                <ui:Button Appearance="Primary" Command="{Binding ScanForVstCommand}" Content="Scan this PC" />
+                                <ui:Button Margin="8,0,0,0" Command="{Binding OpenLoudMaxSiteCommand}" Content="Get LoudMax (free)" />
+                                <ui:Button Margin="8,0,0,0" Command="{Binding PickVstCommand}" Content="Choose DLL…" />
                                 <ui:Button Margin="8,0,0,0" Command="{Binding ClearVstCommand}" Content="Remove" />
-                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" Opacity="0.7" Text="{Binding NightVstPath}" />
                             </StackPanel>
+                            <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.7" Text="{Binding NightVstPath}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Expander>
                 </StackPanel>

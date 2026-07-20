@@ -166,6 +166,36 @@ public partial class EffectsViewModel : ObservableObject
     partial void OnAmbienceIntensityChanged(double value) => Push();
 
     [RelayCommand]
+    private void ScanForVst()
+    {
+        var found = Services.VstScanner.FindCompressors();
+        if (found.Count > 0)
+        {
+            NightVstPath = found[0];
+            NightUseVst = true;
+            Push(immediate: true);
+            NightStatus = $"Found {System.IO.Path.GetFileName(found[0])} and wired it up.";
+        }
+        else
+        {
+            NightStatus = "No compressor VST found in the usual folders. Click “Get LoudMax (free)”, download the 64-bit DLL, then scan again — Downloads is checked too.";
+        }
+    }
+
+    [RelayCommand]
+    private void OpenLoudMaxSite()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://loudmax.blogspot.com") { UseShellExecute = true });
+        }
+        catch
+        {
+            NightStatus = "Couldn't open the browser — visit loudmax.blogspot.com manually.";
+        }
+    }
+
+    [RelayCommand]
     private void PickVst()
     {
         var dialog = new OpenFileDialog

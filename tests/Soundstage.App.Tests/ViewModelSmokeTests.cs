@@ -54,6 +54,27 @@ public class ViewModelSmokeTests : IDisposable
     }
 
     [Fact]
+    public void EditingABuiltInPreset_AutoForksIntoAnEditableCopy()
+    {
+        var vm = new DashboardViewModel(_services);
+        vm.SelectedPreset = vm.Presets.First(p => p.Id == "music");
+        Assert.NotEmpty(vm.Bands);
+
+        // Grabbing a dial on a built-in must fork silently, never block.
+        vm.Bands[0].GainDb += 1.0;
+
+        Assert.NotNull(vm.SelectedPreset);
+        Assert.False(vm.SelectedPreset.IsBuiltIn);
+        Assert.StartsWith("music-custom", vm.SelectedPreset.Id);
+        Assert.True(vm.IsEditable);
+
+        // The built-in itself is untouched.
+        var original = _services.Presets.Get("music");
+        Assert.NotNull(original);
+        Assert.True(original.IsBuiltIn);
+    }
+
+    [Fact]
     public void RuleEditor_BuildsARule_FromDefaults()
     {
         var vm = new RuleEditorViewModel(_services.Presets.All, existing: null);
