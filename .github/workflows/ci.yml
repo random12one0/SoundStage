@@ -132,7 +132,7 @@ jobs:
           $notes = @"
           ## Soundstage $env:VERSION
 
-          A modern front-end and automation layer for Equalizer APO — system-wide EQ, night mode, loudness, automations, and 8,600+ bundled headphone corrections.
+          A modern front-end and automation layer for Equalizer APO — system-wide EQ, night mode, loudness, stereo width, automations, and 8,600+ bundled headphone corrections. Built for surround-sound speaker setups: it keeps your 5.1/7.1 intact and lets Dolby Atmos handle the upmixing.
 
           ### Getting started
           1. Install [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) on your output device and reboot (one-time).
@@ -140,9 +140,9 @@ jobs:
           3. In Soundstage, click **Take control** (your existing config is backed up first).
           4. Pick a preset. Done.
 
-          **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/main/docs/ATMOS-VALIDATION.md).
+          Night mode, loudness and the other effects are **100% native** — no plugins to install, and they can never interrupt your audio.
 
-          **Full night mode (compression):** one free download — [LoudMax](https://loudmax.blogspot.com) (64-bit VST DLL), then **Effects → Night mode → Advanced → Scan this PC** wires it up automatically. See the README for the 2-step guide.
+          **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/main/docs/ATMOS-VALIDATION.md).
           "@
           gh release create "$env:VERSION" `
             "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `
