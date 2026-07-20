@@ -7,6 +7,14 @@ on:
       - "claude/**"
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Optional: publish a GitHub Release with this version (e.g. v0.1.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -86,3 +94,57 @@ jobs:
         with:
           name: test-results-windows
           path: "**/TestResults/*.trx"
+
+  # Runs only when dispatched with a release_version input: cuts a GitHub
+  # Release with the portable EXE + installer attached. (The standalone
+  # release.yml workflow does the same on tag pushes once it lives on main.)
+  release:
+    name: Publish GitHub Release
+    if: github.event_name == 'workflow_dispatch' && inputs.release_version != ''
+    needs: windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish portable EXE
+        run: >
+          dotnet publish src/Soundstage.App/Soundstage.App.csproj
+          -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -o publish
+
+      - name: Build installer
+        shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\Soundstage.iss'
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.release_version }}
+        run: |
+          $notes = @"
+          ## Soundstage $env:VERSION
+
+          A modern front-end and automation layer for Equalizer APO — system-wide EQ, night mode, loudness, automations, and 8,600+ bundled headphone corrections.
+
+          ### Getting started
+          1. Install [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) on your output device and reboot (one-time).
+          2. Download **Soundstage-Setup.exe** below and run it — or grab the portable **Soundstage.exe** if you prefer no installer.
+          3. In Soundstage, click **Take control** (your existing config is backed up first).
+          4. Pick a preset. Done.
+
+          **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/main/docs/ATMOS-VALIDATION.md).
+          "@
+          gh release create "$env:VERSION" `
+            "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `
+            "installer/Output/Soundstage-Setup.exe#Soundstage-Setup.exe (installer)" `
+            --target "${{ github.sha }}" `
+            --title "Soundstage $env:VERSION" `
+            --notes $notes
