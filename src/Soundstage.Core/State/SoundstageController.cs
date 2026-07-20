@@ -54,6 +54,12 @@ public sealed class SoundstageController : IDisposable
 
     public AutomationCoordinator Coordinator => _coordinator;
 
+    /// <summary>
+    /// Resolves the ambience impulse-response path for a sample rate (writing the file if
+    /// needed). Provided by the app layer; null disables ambience compilation entirely.
+    /// </summary>
+    public Func<int, string?>? AmbienceIrResolver { get; set; }
+
     /// <summary>Raised after any state mutation + apply cycle. UI refreshes off this.</summary>
     public event Action? Changed;
 
@@ -180,7 +186,7 @@ public sealed class SoundstageController : IDisposable
         ApplyResult result;
         lock (_gate)
         {
-            result = _orchestrator.Apply(State, _presets.Get, attribution);
+            result = _orchestrator.Apply(State, _presets.Get, attribution, AmbienceIrResolver);
         }
 
         SaveState();

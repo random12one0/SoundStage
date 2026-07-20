@@ -101,7 +101,39 @@ public sealed class AppServices : IDisposable
         Takeover = new TakeoverService(FileSystem, Layout, Backups);
         Orchestrator = new ApplyOrchestrator(FileSystem, Layout, Backups, new RevertGuard(Scheduler));
         Coordinator = new AutomationCoordinator(Environment, Clock, Scheduler);
-        Controller = new SoundstageController(StateStore, Presets, Orchestrator, Environment, Coordinator);
+        Controller = new SoundstageController(StateStore, Presets, Orchestrator, Environment, Coordinator)
+        {
+            AmbienceIrResolver = ResolveAmbienceIr,
+        };
+    }
+
+    /// <summary>Writes (once) and returns the chain-relative path of the ambience IR for a sample rate.</summary>
+    private string? ResolveAmbienceIr(int sampleRate)
+    {
+        var layout = Layout;
+        var controller = Controller;
+        if (layout is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var intensity = controller?.ActiveProfile?.Effects.Ambience.Intensity ?? 30;
+            var fileName = Core.Effects.IrGenerator.FileNameFor(sampleRate, intensity);
+            var fullPath = Path.Combine(layout.IrDirectory, fileName);
+            if (!File.Exists(fullPath))
+            {
+                Directory.CreateDirectory(layout.IrDirectory);
+                File.WriteAllBytes(fullPath, Core.Effects.IrGenerator.BuildWav(sampleRate, intensity));
+            }
+
+            return $"ir\\{fileName}";
+        }
+        catch
+        {
+            return null; // ambience silently skips; the compiler notes it
+        }
     }
 
     public void Dispose()
