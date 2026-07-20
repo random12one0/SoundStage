@@ -142,6 +142,38 @@ public sealed class ApplyOrchestrator
         _fs.WriteAllTextAtomic(_layout.ChainFilePath, content);
     }
 
+    /// <summary>
+    /// Applies <paramref name="chainText"/> for <paramref name="duration"/>, then restores
+    /// what was there — used by the Atmos audibility diagnostic. Disposing the handle
+    /// restores early. Never guarded, never backed up (the original text is held in memory
+    /// and also still present in the regular backup history).
+    /// </summary>
+    public IDisposable ApplyTemporary(string chainText, TimeSpan duration, Abstractions.IDelayScheduler scheduler)
+    {
+        var original = _fs.FileExists(_layout.ChainFilePath) ? _fs.ReadAllText(_layout.ChainFilePath) : "";
+        var restored = 0;
+        void Restore()
+        {
+            if (Interlocked.Exchange(ref restored, 1) == 0)
+            {
+                _fs.WriteAllTextAtomic(_layout.ChainFilePath, original);
+            }
+        }
+
+        _fs.WriteAllTextAtomic(_layout.ChainFilePath, chainText);
+        var handle = scheduler.Schedule(duration, Restore);
+        return new TemporaryApplyHandle(handle, Restore);
+    }
+
+    private sealed class TemporaryApplyHandle(IDisposable timer, Action restore) : IDisposable
+    {
+        public void Dispose()
+        {
+            timer.Dispose();
+            restore();
+        }
+    }
+
     public static string ComputeHash(string chainText)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(chainText));

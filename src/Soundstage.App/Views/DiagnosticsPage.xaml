@@ -1,0 +1,79 @@
+<UserControl
+    x:Class="Soundstage.App.Views.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=vm:DiagnosticsViewModel}">
+
+    <UserControl.Resources>
+        <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <app:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverse" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="820" Margin="16,8,16,24">
+
+            <!-- APO health -->
+            <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="Equalizer APO" />
+                    <TextBlock Margin="0,8,0,0" FontSize="12" Opacity="0.7">
+                        <Run Text="Config folder: " /><Run Text="{Binding ConfigDirectory, Mode=OneWay}" />
+                    </TextBlock>
+                    <TextBlock Margin="0,6,0,0" Text="{Binding OwnershipText}" TextWrapping="Wrap" />
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <ui:Button Appearance="Primary" Command="{Binding TakeOwnershipCommand}" Content="Take control"
+                                   Visibility="{Binding NeedsTakeover, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Margin="0,0,0,0" Command="{Binding DisownCommand}" Content="Hand back control"
+                                   ToolTip="Restores your pre-Soundstage config.txt"
+                                   Visibility="{Binding NeedsTakeover, Converter={StaticResource BoolToVisibilityInverse}}" />
+                    </StackPanel>
+                    <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="#E6C19C00" Text="{Binding StatusMessage}" TextWrapping="Wrap"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Atmos validation -->
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="Is APO really in your signal path? (Dolby Atmos check)" />
+                    <TextBlock Margin="0,6,0,0" FontSize="12.5" Opacity="0.75" TextWrapping="Wrap">
+                        On some driver setups, Windows spatial audio (Dolby Atmos for Home Theater) bypasses Equalizer APO
+                        entirely — APO installs fine but silently does nothing. Only your ears can verify this. Play any
+                        music or video, then start the test: for 8 seconds Soundstage applies an extreme EQ that muffles
+                        everything above 1 kHz. If the sound clearly dulls, APO is working — including with Atmos on.
+                    </TextBlock>
+                    <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.6" Text="{Binding SpatialText}" TextWrapping="Wrap" />
+                    <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                        <ui:Button Appearance="Primary" Command="{Binding RunSweepCommand}" Content="Start 8-second test"
+                                   Visibility="{Binding SweepRunning, Converter={StaticResource BoolToVisibilityInverse}}" />
+                        <ui:Button Command="{Binding StopSweepCommand}" Content="Stop now"
+                                   Visibility="{Binding SweepRunning, Converter={StaticResource BoolToVisibility}}" />
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold"
+                                   Visibility="{Binding SweepRunning, Converter={StaticResource BoolToVisibility}}">
+                            <Run Text="Muffling active — reverting in " /><Run Text="{Binding SweepSecondsLeft, Mode=OneWay}" /><Run Text="s" />
+                        </TextBlock>
+                    </StackPanel>
+                    <Expander Margin="0,12,0,0" Header="I heard no change — what now?">
+                        <TextBlock Margin="0,8,0,0" FontSize="12.5" Opacity="0.8" TextWrapping="Wrap">
+                            1. Open Equalizer APO's Configurator (Start menu → Configurator), select your output device, and
+                            click "Troubleshooting options".&#10;
+                            2. Change the install mode to install as SFX/EFX instead of LFX/GFX — spatial formats bypass the
+                            default stage on many drivers, while SFX/EFX stays in the path.&#10;
+                            3. Reboot and run this test again.&#10;
+                            4. If it still fails, the last resort is turning off Dolby Atmos for Home Theater (set the
+                            speaker's spatial sound to Off) — then APO always works, but you lose Atmos upmixing. Most
+                            systems don't need this.
+                        </TextBlock>
+                    </Expander>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -101,6 +101,9 @@ public sealed class RevertGuard
         Resolved?.Invoke(RevertOutcome.Confirmed);
     }
 
+    /// <summary>User chose "revert now" instead of waiting out the countdown.</summary>
+    public void RevertNow() => OnTimeout();
+
     private void OnTimeout()
     {
         Action? revert;

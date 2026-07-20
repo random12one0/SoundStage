@@ -1,0 +1,65 @@
+<UserControl
+    x:Class="Soundstage.App.Views.DevicesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=vm:DevicesViewModel}">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <app:InverseBoolConverter x:Key="InverseBool" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="820" Margin="16,8,16,24">
+            <TextBlock Margin="0,8,0,0" FontSize="15" FontWeight="SemiBold" Text="Output devices" />
+            <TextBlock Margin="0,4,0,10" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                       Text="Each output device keeps its own presets, effects and automations. Soundstage follows the Windows default device automatically — plug in headphones and their profile takes over; switch back and the speakers pick up where they left off." />
+
+            <ItemsControl ItemsSource="{Binding Profiles}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,4" Padding="14,12" Background="#22000000" CornerRadius="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding FriendlyName}" />
+                                        <Border Margin="8,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#3350B050" CornerRadius="4"
+                                                Visibility="{Binding IsActive, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock FontSize="10" Text="CURRENT OUTPUT" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock FontSize="12" Opacity="0.7" Text="{Binding FormatText}" />
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontSize="12" Opacity="0.55" Text="{Binding PresetName}" />
+                                        <TextBlock Margin="10,0,0,0" FontSize="12" Opacity="0.55" Text="{Binding RulesText}" />
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <ui:ToggleSwitch IsChecked="{Binding Enabled}" ToolTip="Off = Soundstage leaves this device completely untouched" />
+                                </StackPanel>
+
+                                <ui:Button Grid.Column="2" VerticalAlignment="Center" Content="Remove"
+                                           IsEnabled="{Binding IsActive, Converter={StaticResource InverseBool}}"
+                                           Command="{Binding DataContext.RemoveProfileCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
