@@ -87,9 +87,9 @@ public class ChainCompilerTests
     }
 
     [Fact]
-    public void WidthOnSurroundProfile_EmitsNoCopy_AndExplains()
+    public void WidthOnSurroundProfile_EmitsFrontLRCopy_SurroundSafe()
     {
-        var profile = SpeakerProfile();
+        var profile = SpeakerProfile(); // 5.1
         profile.Effects = EffectSettings.Default with
         {
             StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 150),
@@ -97,9 +97,9 @@ public class ChainCompilerTests
 
         var compilation = ChainCompiler.Compile(StateWith(profile), _ => MusicPreset);
 
-        Assert.DoesNotContain("Copy:", compilation.RenderedText);
-        var report = Assert.Single(compilation.Devices);
-        Assert.Contains(report.Notes, n => n.Contains("stereo-only"));
+        // Now applies on surround too — but only touches L and R.
+        Assert.Contains("Copy: L=", compilation.RenderedText);
+        Assert.DoesNotContain("C=", compilation.RenderedText);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class ChainCompilerTests
         // curve is covered numerically in IntensityCurveTests / EffectCompilerTests.
         speakers.Effects = EffectSettings.Default with
         {
-            NightMode = new NightModeSettings(Enabled: true, Intensity: 50, BassCutDbOverride: -4.5),
+            NightMode = new NightModeSettings(Enabled: true, Intensity: 50, BassCornerOverrideHz: 90, BassCutDbOverride: -4.5),
             Loudness = new LoudnessSettings(Enabled: true, ReferenceLevelOverride: -22),
         };
 

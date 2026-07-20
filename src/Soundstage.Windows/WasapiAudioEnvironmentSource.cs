@@ -164,7 +164,9 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
                     }
 
                     using var process = Process.GetProcessById(pid);
-                    if (!string.IsNullOrEmpty(process.ProcessName))
+                    // Ignore background utilities (RGB software, system chimes) so they don't
+                    // masquerade as "what's playing" and mis-trigger automations.
+                    if (!string.IsNullOrEmpty(process.ProcessName) && !Core.Automation.AudioApps.IsNoise(process.ProcessName))
                     {
                         names.Add(process.ProcessName);
                     }

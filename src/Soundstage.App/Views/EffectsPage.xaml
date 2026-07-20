@@ -51,15 +51,20 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="60" />
+                                    <ColumnDefinition Width="58" />
+                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Bass shelf corner" />
-                                <Slider Grid.Column="1" Margin="12,0" Maximum="200" Minimum="40" Value="{Binding NightBassCorner}" />
+                                <Slider Grid.Column="1" Margin="12,0" Maximum="400" Minimum="40" Value="{Binding NightBassCorner}" />
                                 <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding NightBassCorner, StringFormat={}{0:0} Hz}" />
+                                <ui:Button Grid.Column="3" Margin="8,0,0,0" Padding="8,4" FontSize="11" Command="{Binding ResetBassCornerCommand}" Content="Reset"
+                                           ToolTip="Let the intensity slider control the corner again" />
                             </Grid>
+                            <TextBlock Margin="0,4,0,0" FontSize="11" Opacity="0.55"
+                                       Text="By default the intensity slider opens this up automatically — higher intensity removes more of the bass. Drag to pin it, or Reset to hand it back to intensity." TextWrapping="Wrap" />
                             <TextBlock Margin="0,12,0,4" FontWeight="SemiBold" FontSize="13" Text="Compressor (VST)" />
                             <TextBlock FontSize="12" Opacity="0.65" TextWrapping="Wrap"
-                                       Text="Real dynamic range control uses a free VST 2 compressor hosted by Equalizer APO. Their licenses don't allow bundling one, but it's a single download: get LoudMax (free), then Scan — Soundstage checks the usual folders and Downloads for you." />
+                                       Text="Real dynamic range control uses a free VST 2 compressor hosted by Equalizer APO. Licenses don't allow bundling one, but it's a single download: get LoudMax, unzip it, and Soundstage will find it. LoudMax includes several DLLs — you want the 64-bit one (LoudMaxWin64.dll); Scan picks it automatically." />
                             <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                                 <ui:Button Appearance="Primary" Command="{Binding ScanForVstCommand}" Content="Scan this PC" />
                                 <ui:Button Margin="8,0,0,0" Command="{Binding OpenLoudMaxSiteCommand}" Content="Get LoudMax (free)" />

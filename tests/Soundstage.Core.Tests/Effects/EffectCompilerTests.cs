@@ -20,22 +20,28 @@ public class EffectCompilerTests
     }
 
     [Fact]
-    public void NightMode_IntensityCurve_IsFrontLoaded_50PercentIsStrong()
+    public void NightMode_IntensityDrivesCutDepthAndCorner()
     {
         var half = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 50));
         var shelf = Assert.Single(half.Commands.OfType<FilterCommand>());
         Assert.Equal(FilterType.LowShelf, shelf.Type);
-        Assert.Equal(90, shelf.FrequencyHz);
-        // 50% already delivers a clearly-noticeable cut (~−10 dB), not a timid half-amount.
-        Assert.InRange(-shelf.GainDb, 9.0, 11.5);
+        // 50% already delivers a strong cut (~−16 dB) at a mid corner.
+        Assert.InRange(-shelf.GainDb, 14.0, 18.0);
+        Assert.InRange(shelf.FrequencyHz, 150, 260);
 
-        var full = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 100));
-        Assert.Equal(-NightModeSettings.MaxBassCutDb, Assert.Single(full.Commands.OfType<FilterCommand>()).GainDb, 2);
+        var full = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 100)).Commands.OfType<FilterCommand>().Single();
+        Assert.Equal(-NightModeSettings.MaxBassCutDb, full.GainDb, 2);
+        Assert.Equal(NightModeSettings.MaxCornerHz, full.FrequencyHz, 1); // corner opens all the way up
 
-        // Front-loaded: the jump from 0→50 is bigger than 50→100.
-        var quarterCut = -EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 25))
-            .Commands.OfType<FilterCommand>().Single().GainDb;
-        Assert.True(quarterCut > NightModeSettings.MaxBassCutDb * 0.25 * 1.3, "curve must rise fast early");
+        var low = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 10)).Commands.OfType<FilterCommand>().Single();
+        Assert.True(low.FrequencyHz < full.FrequencyHz, "corner rises with intensity");
+    }
+
+    [Fact]
+    public void NightMode_CornerOverride_PinsTheCorner_IgnoringIntensity()
+    {
+        var pinned = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 100, BassCornerOverrideHz: 80));
+        Assert.Equal(80, pinned.Commands.OfType<FilterCommand>().Single().FrequencyHz);
     }
 
     [Fact]
@@ -121,12 +127,26 @@ public class EffectCompilerTests
     }
 
     [Fact]
-    public void Width_OnSurroundDevice_IsHardBlocked()
+    public void Width_OnSurroundDevice_AppliesToFrontLR_LeavingOtherChannelsUntouched()
     {
+        // Surround-safe: width now works on 5.1/7.1 by only reassigning L and R.
         var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 160), Surround48);
+        var copy = Assert.Single(result.Commands.OfType<CopyCommand>());
+        var line = copy.Render();
+        Assert.Contains("L=", line);
+        Assert.Contains("R=", line);
+        // Only L and R are targets — centre/LFE/surrounds are never assigned, so they pass through.
+        Assert.DoesNotContain("C=", line);
+        Assert.DoesNotContain("SL=", line);
+    }
+
+    [Fact]
+    public void Width_OnMono_IsSkipped()
+    {
+        var mono = new DeviceCapabilities(1, 48000);
+        var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 160), mono);
         Assert.Empty(result.Commands);
         Assert.NotNull(result.Note);
-        Assert.Contains("stereo-only", result.Note);
     }
 
     // ---- Ambience ----

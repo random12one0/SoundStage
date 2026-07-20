@@ -26,10 +26,10 @@ public static class PrebuiltRules
         new AutomationRule
         {
             Id = "prebuilt-spotify",
-            Name = "Music preset when Spotify plays",
+            Name = "Music preset when a music app plays",
             Enabled = false,
             IsPrebuilt = true,
-            Trigger = new AudioAppTrigger(["Spotify"]),
+            Trigger = new AudioAppTrigger([.. AudioApps.MusicPlayers]),
             Actions = [new SwitchPresetAction("music")],
         },
         new AutomationRule
@@ -38,7 +38,7 @@ public static class PrebuiltRules
             Name = "Film preset when a browser plays audio",
             Enabled = false,
             IsPrebuilt = true,
-            Trigger = new AudioAppTrigger(["chrome", "msedge", "firefox", "brave", "opera"]),
+            Trigger = new AudioAppTrigger([.. AudioApps.Browsers]),
             Actions = [new SwitchPresetAction("film-dialogue")],
         },
         new AutomationRule

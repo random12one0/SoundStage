@@ -112,32 +112,20 @@ public partial class StatusBarViewModel : ObservableObject
     /// <summary>"♪ Spotify" / "♪ Spotify · Chrome" from the processes with active audio sessions.</summary>
     internal static string FormatNowPlaying(IReadOnlyList<string> processes)
     {
-        if (processes.Count == 0)
+        var pretty = processes
+            .Where(p => !Core.Automation.AudioApps.IsNoise(p))
+            .Select(Core.Automation.AudioApps.Pretty)
+            .Distinct()
+            .ToList();
+        if (pretty.Count == 0)
         {
             return "";
         }
 
-        var pretty = processes.Select(PrettyProcessName).Distinct().Take(2).ToList();
-        var extra = processes.Count - pretty.Count;
-        return "♪ " + string.Join(" · ", pretty) + (extra > 0 ? $" +{extra}" : "");
+        var shown = pretty.Take(2).ToList();
+        var extra = pretty.Count - shown.Count;
+        return "♪ " + string.Join(" · ", shown) + (extra > 0 ? $" +{extra}" : "");
     }
-
-    private static string PrettyProcessName(string processName) => processName.ToLowerInvariant() switch
-    {
-        "spotify" => "Spotify",
-        "chrome" => "Chrome",
-        "msedge" => "Edge",
-        "firefox" => "Firefox",
-        "brave" => "Brave",
-        "opera" => "Opera",
-        "vlc" => "VLC",
-        "steam" => "Steam",
-        "discord" => "Discord",
-        "foobar2000" => "foobar2000",
-        "itunes" => "iTunes",
-        "musicbee" => "MusicBee",
-        _ => processName,
-    };
 
     private void OnClipping()
     {

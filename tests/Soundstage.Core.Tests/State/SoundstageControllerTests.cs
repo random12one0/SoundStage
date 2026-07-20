@@ -122,22 +122,16 @@ public class SoundstageControllerTests : IDisposable
     }
 
     [Fact]
-    public void WidthEffect_IsGuardedOff_On51Device_ButCompilesOnStereoDevice()
+    public void WidthEffect_AppliesOnSurroundToFrontLR_SurroundSafe()
     {
-        _controller.Initialize();
-        _controller.UpdateEffects(e => e with { StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 140) });
-        Assert.DoesNotContain("Copy:", _fs.ReadAllText(_layout.ChainFilePath)); // 5.1 → guard
-
-        _environment.Snapshot = _environment.Snapshot with
-        {
-            DeviceId = "{0.0.0.00000000}.{cccc3333-0000-0000-0000-000000000003}",
-            DeviceName = "Headphones",
-            Channels = 2,
-        };
-        _environment.Raise();
+        _controller.Initialize(); // active device is 5.1
         _controller.UpdateEffects(e => e with { StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 140) });
 
-        Assert.Contains("Copy: L=1.2*L-0.2*R", _fs.ReadAllText(_layout.ChainFilePath));
+        var chain = _fs.ReadAllText(_layout.ChainFilePath);
+        // Now applies on 5.1 — but only remixes the front L/R pair.
+        Assert.Contains("Copy: L=1.2*L-0.2*R R=-0.2*L+1.2*R", chain);
+        Assert.DoesNotContain("C=", chain);
+        Assert.DoesNotContain("SL=", chain);
     }
 
     [Fact]

@@ -35,6 +35,12 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private string _updateBannerText = "";
 
+    [ObservableProperty]
+    private bool _canUndo;
+
+    [ObservableProperty]
+    private bool _isBypassed;
+
     public StatusBarViewModel StatusBar { get; }
 
     public RevertToastViewModel RevertToast { get; }
@@ -91,10 +97,15 @@ public partial class ShellViewModel : ObservableObject
                              && _services.Takeover?.GetOwnershipState() is not Core.Configio.OwnershipState.Owned;
         ShowUpdateBanner = _services.Update.IsUpdateAvailable;
         UpdateBannerText = _services.Update.Latest is { } latest ? $"{latest.Name} is available." : "An update is available.";
+        CanUndo = _services.Controller?.CanUndo ?? false;
+        IsBypassed = _services.Controller?.State.BypassActive ?? false;
     }
 
     [RelayCommand]
     private void OpenUpdateSettings() => NavigateTo("settings");
+
+    [RelayCommand]
+    private void ToggleBypass() => _services.Controller?.ToggleBypass();
 
     [RelayCommand]
     private void TakeOwnership()

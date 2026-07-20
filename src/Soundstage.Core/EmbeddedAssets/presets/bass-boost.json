@@ -1,0 +1,14 @@
+{
+  "id": "bass-boost",
+  "name": "Bass Boost",
+  "description": "Big, clean low end without turning the rest to mud. Great for electronic, hip-hop and action scenes.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": -6.0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 90, "gainDb": 5.5, "q": 0.707 },
+    { "type": "Peaking", "frequencyHz": 45, "gainDb": 3.0, "q": 0.9 },
+    { "type": "Peaking", "frequencyHz": 400, "gainDb": -1.5, "q": 1.0 }
+  ],
+  "isBuiltIn": true
+}

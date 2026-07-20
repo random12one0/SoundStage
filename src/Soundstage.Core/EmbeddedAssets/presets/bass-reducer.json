@@ -1,0 +1,12 @@
+{
+  "id": "bass-reducer",
+  "name": "Bass Reducer",
+  "description": "Tightens boomy rooms and late-night listening by trimming the low end.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": 0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 120, "gainDb": -5.0, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

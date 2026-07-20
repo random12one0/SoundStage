@@ -46,10 +46,14 @@ public static class EffectCompilers
         if (cut < -0.05)
         {
             commands.Add(new CommentCommand("Night mode: bass shelf"));
-            commands.Add(new FilterCommand(FilterType.LowShelf, settings.BassCornerHz, cut, 0.707));
+            commands.Add(new FilterCommand(FilterType.LowShelf, settings.EffectiveCornerHz, cut, 0.707));
         }
 
-        var hasVst = settings.UseVstCompressor && !string.IsNullOrWhiteSpace(settings.VstLibraryPath);
+        // Only host a VST when a plausible .dll path is set — an empty/garbage path makes
+        // Equalizer APO stall and drop the stream (the "audio cuts out" symptom).
+        var hasVst = settings.UseVstCompressor
+                     && !string.IsNullOrWhiteSpace(settings.VstLibraryPath)
+                     && settings.VstLibraryPath!.EndsWith(".dll", StringComparison.OrdinalIgnoreCase);
         if (hasVst)
         {
             return new EffectCompilation(commands, PostCommandsOrNull:
@@ -79,9 +83,11 @@ public static class EffectCompilers
     }
 
     /// <summary>
-    /// Stereo width as a channel matrix. Hard guard: only compiles for exactly 2 output
-    /// channels — on 5.1/7.1 the L/R matrix would corrupt the surround image, so it emits
-    /// nothing and says why.
+    /// Stereo width as a front-L/R matrix. The <c>Copy</c> command reassigns only the L and R
+    /// channels, so it is safe on any layout — a 5.1/7.1 centre, LFE and surrounds pass
+    /// through untouched. The only guard is mono output (no R channel to mix). This is the
+    /// surround-safe answer to "why doesn't it just work?": it always works, and never
+    /// corrupts the multichannel image.
     /// </summary>
     public static EffectCompilation CompileStereoWidth(StereoWidthSettings settings, DeviceCapabilities capabilities)
     {
@@ -90,9 +96,9 @@ public static class EffectCompilers
             return EffectCompilation.Empty;
         }
 
-        if (capabilities.Channels != 2)
+        if (capabilities.Channels < 2)
         {
-            return EffectCompilation.Empty with { Note = $"Stereo width skipped: device is {capabilities.Channels}-channel, effect is stereo-only." };
+            return EffectCompilation.Empty with { Note = "Stereo width needs at least two channels (mono output)." };
         }
 
         var w = settings.Width;
@@ -103,11 +109,12 @@ public static class EffectCompilers
 
         // L' = a·L + b·R, R' = b·L + a·R with a=(1+w)/2, b=(1−w)/2.
         // Mono (in-phase) content: a+b = 1 → untouched. Side content scales by w.
+        // Only L and R are assigned; every other channel of a surround stream is left alone.
         var a = (1 + w) / 2.0;
         var b = (1 - w) / 2.0;
         var commands = new List<ApoCommand>
         {
-            new CommentCommand($"Stereo width {settings.WidthPercent}%"),
+            new CommentCommand($"Stereo width {settings.WidthPercent}% (front L/R only)"),
             new CopyCommand([
                 new CopyAssignment("L", [new CopyTerm(a, "L"), new CopyTerm(b, "R")]),
                 new CopyAssignment("R", [new CopyTerm(b, "L"), new CopyTerm(a, "R")]),

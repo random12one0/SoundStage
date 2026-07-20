@@ -1,0 +1,15 @@
+{
+  "id": "electronic",
+  "name": "Electronic",
+  "description": "Deep sub-bass and crisp, airy highs for EDM, house and synth-heavy tracks.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": -5.0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 80, "gainDb": 4.5, "q": 0.707 },
+    { "type": "Peaking", "frequencyHz": 300, "gainDb": -1.5, "q": 1.0 },
+    { "type": "Peaking", "frequencyHz": 5000, "gainDb": 1.5, "q": 1.2 },
+    { "type": "HighShelf", "frequencyHz": 10000, "gainDb": 3.0, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

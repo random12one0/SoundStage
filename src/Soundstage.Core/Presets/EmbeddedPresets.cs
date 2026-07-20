@@ -11,7 +11,8 @@ public static class EmbeddedPresets
     /// <summary>Curated display order (files not listed sort after, alphabetically).</summary>
     private static readonly string[] Order =
     [
-        "flat", "music", "film-dialogue", "gaming", "podcast",
+        "flat", "music", "bass-boost", "bass-reducer", "vocal", "rock", "electronic",
+        "hip-hop", "jazz", "classical", "film-dialogue", "gaming", "podcast",
     ];
 
     public static IReadOnlyList<EqPreset> LoadAll()

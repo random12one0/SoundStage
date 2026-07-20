@@ -1,0 +1,15 @@
+{
+  "id": "rock",
+  "name": "Rock",
+  "description": "Punchy drums and bite on guitars — a classic smiley curve with a controlled midrange.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": -4.0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 100, "gainDb": 3.0, "q": 0.707 },
+    { "type": "Peaking", "frequencyHz": 500, "gainDb": -2.0, "q": 1.0 },
+    { "type": "Peaking", "frequencyHz": 3000, "gainDb": 2.0, "q": 1.1 },
+    { "type": "HighShelf", "frequencyHz": 8000, "gainDb": 3.0, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

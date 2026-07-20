@@ -20,6 +20,40 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="980" Margin="16,8,16,24" HorizontalAlignment="Stretch">
 
+            <!-- Live status: what's playing right now and how it's coming out -->
+            <Border Style="{StaticResource Card}" Margin="0,4,0,12" Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Style="{StaticResource GlyphChip}" VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="17" Foreground="{StaticResource AccentBrush}" Text="&#xE767;" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontWeight="SemiBold" FontSize="14" Text="{Binding StatusDevice}" />
+                            <Border Margin="10,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#264CC2FF">
+                                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Text="{Binding StatusLayout}" />
+                            </Border>
+                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding StatusFormat}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,3,0,0" Orientation="Horizontal">
+                            <TextBlock FontSize="12" Foreground="{StaticResource FaintTextBrush}" Text="{Binding StatusSpatial}"
+                                       Visibility="{Binding StatusSpatial, Converter={StaticResource StringToVisibility}}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#7ACC7A"
+                               Text="{Binding StatusNowPlaying}"
+                               Visibility="{Binding StatusNowPlaying, Converter={StaticResource StringToVisibility}}" />
+                </Grid>
+            </Border>
+
             <!-- Preset row -->
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
@@ -48,31 +82,9 @@
                     <ui:Button Margin="6,0,0,0" Command="{Binding ImportFileCommand}" Content="Import…" ToolTip="Import Peace or AutoEq preset files" />
                 </StackPanel>
 
-                <StackPanel Grid.Column="1" Orientation="Horizontal">
-                    <ui:Button
-                        Padding="12,8"
-                        VerticalAlignment="Center"
-                        Command="{Binding UndoCommand}"
-                        IsEnabled="{Binding CanUndo}"
-                        ToolTip="Undo your last change (Ctrl+Z)">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE7A7;" />
-                            <TextBlock Margin="7,0,0,0" Text="Undo" />
-                        </StackPanel>
-                    </ui:Button>
-                    <ToggleButton
-                        MinWidth="150"
-                        Margin="8,0,0,0"
-                        Padding="14,8"
-                        VerticalAlignment="Center"
-                        IsChecked="{Binding IsBypassed}"
-                        ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Text="&#xE8AB;" />
-                            <TextBlock Margin="8,0,0,0" Text="A/B Bypass" />
-                        </StackPanel>
-                    </ToggleButton>
-                </StackPanel>
+                <!-- Undo and A/B bypass live in the persistent top toolbar now (every page). -->
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" Opacity="0.55" FontSize="12"
+                           Text="{Binding HeadroomSummary}" />
             </Grid>
 
             <TextBlock

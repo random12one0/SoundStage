@@ -128,6 +128,22 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private string _importStatus = "";
 
+    // Live "now" status shown at the top of the dashboard.
+    [ObservableProperty]
+    private string _statusDevice = "—";
+
+    [ObservableProperty]
+    private string _statusLayout = "";
+
+    [ObservableProperty]
+    private string _statusFormat = "";
+
+    [ObservableProperty]
+    private string _statusSpatial = "";
+
+    [ObservableProperty]
+    private string _statusNowPlaying = "";
+
     public bool ApoAvailable => _services.ApoAvailable;
 
     public int AutoEqModelCount => _services.AutoEq.Count;
@@ -142,8 +158,28 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         services.Presets.Changed += () => UiDispatch.Post(RefreshPresets);
+        services.Environment.Changed += () => UiDispatch.Post(RefreshStatus);
         RefreshPresets();
         SyncFromState();
+        RefreshStatus();
+    }
+
+    /// <summary>Refreshes the live device/format/now-playing readout on the dashboard.</summary>
+    public void RefreshStatus()
+    {
+        var snapshot = _services.Environment.GetSnapshot();
+        StatusDevice = snapshot.DeviceName ?? "No output device";
+        StatusLayout = Core.Configio.ChainCompiler.FormatChannels(snapshot.Channels);
+        StatusFormat = snapshot.BitDepth > 0
+            ? $"{snapshot.SampleRateHz / 1000.0:0.#} kHz · {snapshot.BitDepth}-bit"
+            : $"{snapshot.SampleRateHz / 1000.0:0.#} kHz";
+        StatusSpatial = snapshot.Spatial switch
+        {
+            Core.Automation.SpatialAudioState.On => "Spatial audio on (Atmos / passthrough)",
+            Core.Automation.SpatialAudioState.Off => "Spatial audio off",
+            _ => "",
+        };
+        StatusNowPlaying = StatusBarViewModel.FormatNowPlaying(snapshot.ActiveAudioProcesses);
     }
 
     // ---- Preset picking ----

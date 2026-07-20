@@ -119,10 +119,32 @@
                 </ListBox>
             </StackPanel>
 
-            <ContentControl
-                Grid.Column="1"
-                Margin="4,8,12,8"
-                Content="{Binding CurrentPage}" />
+            <Grid Grid.Column="1" Margin="4,8,12,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Persistent toolbar: Undo + A/B bypass reachable from every page -->
+                <StackPanel Grid.Row="0" Margin="0,0,4,6" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <ui:Button Padding="10,6" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" ToolTip="Undo your last change (Ctrl+Z)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE7A7;" />
+                            <TextBlock Margin="7,0,0,0" Text="Undo" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ToggleButton Margin="8,0,0,0" Padding="12,6" IsChecked="{Binding IsBypassed}"
+                                  Command="{Binding ToggleBypassCommand}"
+                                  ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE8AB;" />
+                            <TextBlock Margin="7,0,0,0" Text="A/B Bypass" />
+                        </StackPanel>
+                    </ToggleButton>
+                </StackPanel>
+
+                <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
+            </Grid>
 
             <!-- Confirm-or-revert toast -->
             <Border

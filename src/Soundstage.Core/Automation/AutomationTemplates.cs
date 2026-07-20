@@ -54,7 +54,7 @@ public static class AutomationTemplates
                 Id = NewId(),
                 Name = "Gaming Mode",
                 Enabled = true,
-                Trigger = new AudioAppTrigger(["game", "steam", "valorant", "csgo", "cs2", "javaw"]),
+                Trigger = new AudioAppTrigger([.. AudioApps.Games]),
                 Actions = [new SwitchPresetAction("gaming")],
             }),
 
@@ -66,7 +66,7 @@ public static class AutomationTemplates
                 Id = NewId(),
                 Name = "Spotify Music",
                 Enabled = true,
-                Trigger = new AudioAppTrigger(["spotify", "tidal", "foobar2000", "musicbee", "itunes"]),
+                Trigger = new AudioAppTrigger([.. AudioApps.MusicPlayers]),
                 Actions = [new SwitchPresetAction("music")],
             }),
 
@@ -78,7 +78,7 @@ public static class AutomationTemplates
                 Id = NewId(),
                 Name = "Podcasts & Voice",
                 Enabled = true,
-                Trigger = new AudioAppTrigger(["chrome", "msedge", "firefox", "brave", "vlc"]),
+                Trigger = new AudioAppTrigger([.. AudioApps.Browsers]),
                 Actions = [new SwitchPresetAction("podcast")],
             }),
 

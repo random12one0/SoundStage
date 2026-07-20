@@ -22,13 +22,14 @@ public static class IrGenerator
 
         var left = new float[totalFrames];
         var right = new float[totalFrames];
-        left[0] = 0.85f;
-        right[0] = 0.85f;
 
-        // Per-channel tail L1 target: intensity 100% → 0.15, so dry (0.85) + tail ≤ 1.0
-        // exactly — the convolution can never amplify, and intensity maps linearly to
-        // reverb level.
-        var wetL1Target = 0.15 * intensity / 100.0;
+        // Per-channel tail L1 target: intensity 100% → 0.5. Dry is set so dry+wet == 1.0
+        // (unity gain, never clips) while the wet tail is strong enough to actually hear —
+        // much more audible than the previous timid 0.15 cap.
+        var wetL1Target = 0.5 * IntensityCurve.Fraction(intensity);
+        var dry = 1.0 - wetL1Target;
+        left[0] = (float)dry;
+        right[0] = (float)dry;
         var decayPerSample = Math.Log(1000.0) / tailSamples; // −60 dB by the end of the tail
 
         var rngL = new XorShift(0x5057_1234u);
