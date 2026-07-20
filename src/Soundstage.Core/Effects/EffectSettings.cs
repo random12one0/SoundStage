@@ -9,6 +9,24 @@ public enum EffectKind
 }
 
 /// <summary>
+/// Maps a 0–100 intensity slider to an effect amount with a deliberately front-loaded
+/// curve: the sweet spot lands near the middle of the slider and the top of the range is
+/// intentionally over the top. Concretely, 50% already delivers ~72% of the maximum, so
+/// a user who nudges the slider to the middle hears a clear, usable effect — and 100% is
+/// the "nobody actually runs this" extreme.
+/// </summary>
+public static class IntensityCurve
+{
+    private const double Exponent = 0.55; // &lt;1 rises fast early: 0.5^0.55 ≈ 0.68, 0.7^0.55 ≈ 0.82
+
+    /// <summary>Fraction 0..1 of the maximum amount for a given 0–100 intensity.</summary>
+    public static double Fraction(int intensity) => Math.Pow(Math.Clamp(intensity, 0, 100) / 100.0, Exponent);
+
+    /// <summary>Scales a maximum amount by the curve.</summary>
+    public static double Scale(double maxAmount, int intensity) => maxAmount * Fraction(intensity);
+}
+
+/// <summary>
 /// Night mode: a low-shelf bass cut (low frequencies are what travel through walls) plus
 /// dynamic range compression via a hosted VST when configured. One intensity drives both;
 /// the advanced overrides split them.
@@ -22,13 +40,16 @@ public sealed record NightModeSettings(
     string? VstLibraryPath = null,
     string? VstRawArguments = null)
 {
-    /// <summary>Bass shelf cut at 100% intensity.</summary>
-    public const double MaxBassCutDb = 9.0;
+    /// <summary>Bass shelf cut at 100% intensity — deliberately extreme (walls-shaking-quiet).</summary>
+    public const double MaxBassCutDb = 15.0;
 
     /// <summary>Extra preamp headroom at 100% intensity when no compressor VST is available.</summary>
-    public const double MaxDegradedHeadroomDb = 4.0;
+    public const double MaxDegradedHeadroomDb = 6.0;
 
-    public double EffectiveBassCutDb => BassCutDbOverride ?? -(MaxBassCutDb * Math.Clamp(Intensity, 0, 100) / 100.0);
+    // Curve so 50% ≈ −10 dB shelf (clearly noticeable) and 100% = −15 dB (too much on purpose).
+    public double EffectiveBassCutDb => BassCutDbOverride ?? -IntensityCurve.Scale(MaxBassCutDb, Intensity);
+
+    public double EffectiveDegradedHeadroomDb => IntensityCurve.Scale(MaxDegradedHeadroomDb, Intensity);
 }
 
 /// <summary>
@@ -42,7 +63,14 @@ public sealed record LoudnessSettings(
     double? ReferenceLevelOverride = null,
     double AttenuationDb = 0)
 {
-    public double EffectiveReferenceLevel => ReferenceLevelOverride ?? (-14.0 - 16.0 * Math.Clamp(Intensity, 0, 100) / 100.0);
+    // Higher intensity → higher reference level → correction engages across more of the
+    // volume range and boosts more. Front-loaded so 50% is already a strong, usable amount
+    // (≈ −64 dB reference) and 100% is the extreme end (−75 dB).
+    public const double MinReferenceLevel = -45.0; // at 0% intensity — barely any correction
+    public const double MaxReferenceLevel = -75.0; // at 100% — aggressive
+
+    public double EffectiveReferenceLevel =>
+        ReferenceLevelOverride ?? (MinReferenceLevel + (MaxReferenceLevel - MinReferenceLevel) * IntensityCurve.Fraction(Intensity));
 }
 
 /// <summary>

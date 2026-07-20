@@ -34,6 +34,14 @@
 
         <ScrollViewer Grid.Row="1" Margin="20,8" VerticalScrollBarVisibility="Auto">
             <StackPanel>
+                <!-- Live plain-English preview -->
+                <Border Margin="0,0,0,14" Padding="14,12" CornerRadius="10" Background="#1F4CC2FF" BorderBrush="#334CC2FF" BorderThickness="1">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="18" Foreground="#4CC2FF" Text="&#xE945;" />
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontSize="14.5" FontWeight="SemiBold" Text="{Binding LiveSentence}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <TextBlock Text="Name" Opacity="0.75" />
                 <ui:TextBox Margin="0,4,0,0" PlaceholderText="Leave empty to auto-name" Text="{Binding RuleName, UpdateSourceTrigger=PropertyChanged}" />
 

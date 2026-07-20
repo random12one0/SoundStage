@@ -66,27 +66,45 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ListBox
-                Grid.Column="0"
-                Margin="8,8,0,8"
-                Background="Transparent"
-                BorderThickness="0"
-                ItemsSource="{Binding NavItems}"
-                SelectedItem="{Binding SelectedItem}">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="6,8" Orientation="Horizontal">
-                            <TextBlock
-                                Width="22"
-                                VerticalAlignment="Center"
-                                FontFamily="Segoe MDL2 Assets"
-                                FontSize="16"
-                                Text="{Binding Glyph}" />
-                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="14" Text="{Binding Title}" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <StackPanel Grid.Column="0" Margin="8,4,0,8">
+                <StackPanel Margin="14,4,0,10" Orientation="Horizontal">
+                    <Border
+                        Width="26"
+                        Height="26"
+                        Background="{StaticResource AccentGradient}"
+                        CornerRadius="7">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="14"
+                            Foreground="#0B0B10"
+                            Text="&#xE9E9;" />
+                    </Border>
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Soundstage" />
+                </StackPanel>
+
+                <ListBox
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ItemContainerStyle="{StaticResource NavItemContainer}"
+                    ItemsSource="{Binding NavItems}"
+                    SelectedItem="{Binding SelectedItem}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock
+                                    Width="22"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="16"
+                                    Text="{Binding Glyph}" />
+                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="14" Text="{Binding Title}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
 
             <ContentControl
                 Grid.Column="1"

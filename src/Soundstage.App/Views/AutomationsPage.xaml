@@ -13,84 +13,167 @@
     <UserControl.Resources>
         <app:StringToVisibilityConverter x:Key="StringToVisibility" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <app:BoolToVisibilityInverseConverter x:Key="BoolToVisibilityInverse" />
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel MaxWidth="880" Margin="16,8,16,24">
+        <StackPanel MaxWidth="900" Margin="16,8,16,24">
 
             <!-- Master switch -->
-            <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+            <Border Style="{StaticResource Card}" Margin="0,8,0,12">
                 <Grid>
                     <StackPanel>
-                        <TextBlock FontSize="15" FontWeight="SemiBold" Text="Automations" />
-                        <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Automations" />
+                        <TextBlock Style="{StaticResource SectionSubtitle}"
                                    Text="Rules run top to bottom; when two set the same thing, the lower one wins. This switch pauses everything without deleting anything." />
                     </StackPanel>
                     <ui:ToggleSwitch HorizontalAlignment="Right" VerticalAlignment="Top" IsChecked="{Binding MasterEnabled}" />
                 </Grid>
             </Border>
 
-            <!-- Why is this active -->
-            <Border Margin="0,10,0,0" Padding="12,10" Background="#222E6BE6" CornerRadius="8">
-                <TextBlock FontSize="12.5" Text="{Binding DecisionSummary}" TextWrapping="Wrap" />
+            <!-- Live "why is this active" -->
+            <Border Margin="0,0,0,14" Padding="14,11" CornerRadius="10" Background="#1F4CC2FF" BorderBrush="#334CC2FF" BorderThickness="1">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{StaticResource AccentBrush}" Text="&#xE946;" />
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12.5" Text="{Binding DecisionSummary}" TextWrapping="Wrap" />
+                </StackPanel>
             </Border>
 
-            <!-- Rules -->
-            <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding Rules}">
+            <!-- Template gallery -->
+            <TextBlock Margin="2,0,0,8" Style="{StaticResource SectionTitle}" Text="Quick start" />
+            <ItemsControl ItemsSource="{Binding Templates}" Margin="0,0,0,6">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="0,4" Padding="12,10" Background="#22000000" CornerRadius="8">
+                        <Button
+                            Width="272"
+                            Margin="0,0,10,10"
+                            Padding="14,12"
+                            HorizontalContentAlignment="Left"
+                            Background="{StaticResource CardBrush}"
+                            BorderBrush="{StaticResource CardStrokeBrush}"
+                            Command="{Binding DataContext.AddTemplateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            Cursor="Hand"
+                            ToolTip="Add this automation (you can edit it after)">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
+                                        <ContentPresenter />
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource CardHoverBrush}" />
+                                            <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrushDim}" />
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource GlyphChip}">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               FontFamily="Segoe MDL2 Assets" FontSize="17"
+                                               Foreground="{StaticResource AccentBrush}" Text="{Binding Glyph}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Margin="12,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock FontWeight="SemiBold" Text="{Binding Title}" />
+                                    <TextBlock FontSize="11.5" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding Description}" TextWrapping="Wrap" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets"
+                                           FontSize="15" Foreground="{StaticResource FaintTextBrush}" Text="&#xE710;" />
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Your rules -->
+            <Grid Margin="2,14,0,8">
+                <TextBlock Style="{StaticResource SectionTitle}" Text="Your automations" />
+                <ui:Button HorizontalAlignment="Right" Appearance="Primary" Command="{Binding AddRuleCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE710;" />
+                        <TextBlock Margin="7,0,0,0" Text="New rule" />
+                    </StackPanel>
+                </ui:Button>
+            </Grid>
+
+            <TextBlock Margin="2,4,0,0" Style="{StaticResource SectionSubtitle}"
+                       Text="No automations yet — tap a Quick start card above, or build your own."
+                       Visibility="{Binding HasRules, Converter={StaticResource BoolToVisibilityInverse}}" />
+
+            <ItemsControl Margin="0,4,0,0" ItemsSource="{Binding Rules}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,0,8" Padding="14,12" Background="{StaticResource CardBrush}"
+                                BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="10">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
-                                    <ui:Button Padding="4,1" FontSize="10" Content="▲"
+                                <StackPanel Grid.Column="0" Margin="0,0,10,0" VerticalAlignment="Center">
+                                    <ui:Button Padding="4,1" FontSize="10" Content="&#xE70E;" FontFamily="Segoe MDL2 Assets"
                                                Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                               CommandParameter="{Binding}" />
-                                    <ui:Button Padding="4,1" Margin="0,3,0,0" FontSize="10" Content="▼"
+                                               CommandParameter="{Binding}" ToolTip="Move up (runs earlier)" />
+                                    <ui:Button Padding="4,1" Margin="0,3,0,0" FontSize="10" Content="&#xE70D;" FontFamily="Segoe MDL2 Assets"
                                                Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                               CommandParameter="{Binding}" />
+                                               CommandParameter="{Binding}" ToolTip="Move down (wins over rules above)" />
                                 </StackPanel>
 
-                                <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding Enabled}" />
+                                <Border Grid.Column="1" Style="{StaticResource GlyphChip}" VerticalAlignment="Center">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               FontFamily="Segoe MDL2 Assets" FontSize="16"
+                                               Foreground="{StaticResource AccentBrush}" Text="{Binding TriggerGlyph}" />
+                                </Border>
 
                                 <StackPanel Grid.Column="2" Margin="12,0" VerticalAlignment="Center">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
-                                        <Border Margin="8,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#3350B050" CornerRadius="4"
+                                        <Border Margin="8,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#3350C878"
                                                 Visibility="{Binding IsWinner, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock FontSize="10" Text="ACTIVE" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="6" Height="6" VerticalAlignment="Center" Fill="#50C878" />
+                                                <TextBlock Margin="5,0,0,0" FontSize="10" FontWeight="SemiBold" Foreground="#7DDDA0" Text="ACTIVE NOW" />
+                                            </StackPanel>
                                         </Border>
-                                        <Border Margin="6,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#33808080" CornerRadius="4"
+                                        <Border Margin="6,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#26FFFFFF"
                                                 Visibility="{Binding IsPrebuilt, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock FontSize="10" Text="BUILT-IN" />
+                                            <TextBlock FontSize="10" Foreground="{StaticResource SubtleTextBrush}" Text="BUILT-IN" />
                                         </Border>
                                     </StackPanel>
-                                    <TextBlock FontSize="12" Opacity="0.7" Text="{Binding TriggerText}" />
-                                    <TextBlock FontSize="12" Opacity="0.55" Text="{Binding ActionsText}" TextWrapping="Wrap" />
-                                    <TextBlock FontSize="11.5" Opacity="0.5" FontStyle="Italic" Text="{Binding LiveReason}"
+                                    <TextBlock Margin="0,3,0,0" FontSize="12.5" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding Sentence}" TextWrapping="Wrap" />
+                                    <TextBlock FontSize="11" Foreground="{StaticResource FaintTextBrush}" FontStyle="Italic" Text="{Binding LiveReason}"
                                                Visibility="{Binding LiveReason, Converter={StaticResource StringToVisibility}}" />
                                 </StackPanel>
 
-                                <ui:Button Grid.Column="3" VerticalAlignment="Center" Content="Edit"
-                                           Command="{Binding DataContext.EditRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                           CommandParameter="{Binding}" />
-                                <ui:Button Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" Content="Delete"
-                                           Command="{Binding DataContext.DeleteRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                           CommandParameter="{Binding}" />
+                                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <ui:Button Padding="8,5" FontFamily="Segoe MDL2 Assets" FontSize="13" Content="&#xE70F;" ToolTip="Edit"
+                                               Command="{Binding DataContext.EditRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}" />
+                                    <ui:Button Margin="6,0,0,0" Padding="8,5" FontFamily="Segoe MDL2 Assets" FontSize="13" Content="&#xE74D;" ToolTip="Delete"
+                                               Command="{Binding DataContext.DeleteRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}" />
+                                    <ui:ToggleSwitch Margin="10,0,0,0" IsChecked="{Binding Enabled}" />
+                                </StackPanel>
                             </Grid>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-
-            <ui:Button Margin="0,12,0,0" Appearance="Primary" Command="{Binding AddRuleCommand}" Content="Add rule" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

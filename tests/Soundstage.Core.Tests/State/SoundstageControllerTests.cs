@@ -118,7 +118,7 @@ public class SoundstageControllerTests : IDisposable
         _controller.Initialize();
         _controller.UpdateEffects(e => e with { Loudness = new LoudnessSettings(Enabled: true, Intensity: 100) });
 
-        Assert.Contains("LoudnessCorrection: State 1 ReferenceLevel -30", _fs.ReadAllText(_layout.ChainFilePath));
+        Assert.Contains($"LoudnessCorrection: State 1 ReferenceLevel {LoudnessSettings.MaxReferenceLevel:0.####}", _fs.ReadAllText(_layout.ChainFilePath));
     }
 
     [Fact]

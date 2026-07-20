@@ -56,7 +56,7 @@
                         IsEnabled="{Binding CanUndo}"
                         ToolTip="Undo your last change (Ctrl+Z)">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE7A7;" />
                             <TextBlock Margin="7,0,0,0" Text="Undo" />
                         </StackPanel>
                     </ui:Button>
@@ -68,7 +68,7 @@
                         IsChecked="{Binding IsBypassed}"
                         ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Text="" />
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Text="&#xE8AB;" />
                             <TextBlock Margin="8,0,0,0" Text="A/B Bypass" />
                         </StackPanel>
                     </ToggleButton>

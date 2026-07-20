@@ -19,7 +19,7 @@
         <StackPanel MaxWidth="820" Margin="16,8,16,24">
 
             <!-- Night mode -->
-            <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+            <Border Style="{StaticResource Card}" Margin="0,4,0,12">
                 <StackPanel>
                     <Grid>
                         <StackPanel>
@@ -73,7 +73,7 @@
             </Border>
 
             <!-- Loudness -->
-            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <Grid>
                         <StackPanel>
@@ -100,7 +100,7 @@
             </Border>
 
             <!-- Stereo width -->
-            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <Grid>
                         <StackPanel>
@@ -131,7 +131,7 @@
             </Border>
 
             <!-- Ambience (experimental, feature-flagged) -->
-            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8"
+            <Border Style="{StaticResource Card}"
                     Visibility="{Binding AmbienceVisible, Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
                     <Grid>

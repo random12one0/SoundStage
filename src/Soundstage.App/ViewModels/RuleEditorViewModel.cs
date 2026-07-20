@@ -113,12 +113,18 @@ public partial class RuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _ruleName = "";
 
+    private readonly Func<string, string>? _presetName;
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSchedule))]
     [NotifyPropertyChangedFor(nameof(IsAudioApp))]
     [NotifyPropertyChangedFor(nameof(IsChannelCount))]
     [NotifyPropertyChangedFor(nameof(IsDevice))]
     private TriggerKindChoice _triggerKind = TriggerKindChoice.Schedule;
+
+    /// <summary>Live plain-English preview of the rule as it's being built.</summary>
+    [ObservableProperty]
+    private string _liveSentence = "";
 
     public static IReadOnlyList<TriggerKindChoice> TriggerKinds { get; } = Enum.GetValues<TriggerKindChoice>();
 
@@ -166,28 +172,81 @@ public partial class RuleEditorViewModel : ObservableObject
     [ObservableProperty]
     private string _validationError = "";
 
-    public RuleEditorViewModel(IReadOnlyList<EqPreset> presets, AutomationRule? existing)
+    public RuleEditorViewModel(IReadOnlyList<EqPreset> presets, AutomationRule? existing, Func<string, string>? presetName = null)
     {
         _presets = presets;
+        _presetName = presetName;
+
         if (existing is null)
         {
             Actions.Add(new ActionEditorViewModel(presets));
-            return;
+        }
+        else
+        {
+            RuleName = existing.Name;
+            LoadTrigger(existing.Trigger);
+            foreach (var action in existing.Actions)
+            {
+                var vm = new ActionEditorViewModel(presets);
+                vm.LoadFrom(action);
+                Actions.Add(vm);
+            }
+
+            if (Actions.Count == 0)
+            {
+                Actions.Add(new ActionEditorViewModel(presets));
+            }
         }
 
-        RuleName = existing.Name;
-        LoadTrigger(existing.Trigger);
-        foreach (var action in existing.Actions)
+        // Keep the live sentence in sync with every editable field.
+        foreach (var day in Days)
         {
-            var vm = new ActionEditorViewModel(presets);
-            vm.LoadFrom(action);
-            Actions.Add(vm);
+            day.PropertyChanged += (_, _) => RecomputeSentence();
         }
 
-        if (Actions.Count == 0)
+        Actions.CollectionChanged += (_, e) =>
         {
-            Actions.Add(new ActionEditorViewModel(presets));
+            foreach (var item in e.NewItems?.OfType<ActionEditorViewModel>() ?? [])
+            {
+                item.PropertyChanged += (_, _) => RecomputeSentence();
+            }
+
+            RecomputeSentence();
+        };
+
+        foreach (var action in Actions)
+        {
+            action.PropertyChanged += (_, _) => RecomputeSentence();
         }
+
+        RecomputeSentence();
+    }
+
+    private void RecomputeSentence()
+    {
+        var (trigger, actions) = BuildPreview();
+        LiveSentence = RuleSentence.Compose(trigger, actions, _presetName);
+    }
+
+    /// <summary>Best-effort (never-throwing) trigger + actions for the live preview.</summary>
+    private (AutomationTrigger Trigger, IReadOnlyList<AutomationAction> Actions) BuildPreview()
+    {
+        AutomationTrigger trigger = TriggerKind switch
+        {
+            TriggerKindChoice.Schedule => new ScheduleTrigger(
+                Days.Where(d => d.Selected).Select(d => d.Day).DefaultIfEmpty(DayOfWeek.Monday).ToList(),
+                TimeOnly.TryParseExact(StartTimeText.Trim(), "HH:mm", out var s) ? s : new TimeOnly(22, 0),
+                TimeOnly.TryParseExact(EndTimeText.Trim(), "HH:mm", out var e) ? e : new TimeOnly(6, 0)),
+            TriggerKindChoice.AudioApp => new AudioAppTrigger(
+                ProcessesText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .DefaultIfEmpty("an app").ToList()),
+            TriggerKindChoice.ChannelCount => new ChannelCountTrigger(
+                ChannelCondition, ChannelCondition == ChannelCondition.Exactly ? (int)Math.Round(ExactChannels) : null),
+            _ => new DeviceTrigger(string.IsNullOrWhiteSpace(DevicePatternText) ? "device" : DevicePatternText.Trim()),
+        };
+
+        var actions = Actions.Select(a => a.Build()).OfType<AutomationAction>().ToList();
+        return (trigger, actions);
     }
 
     private void LoadTrigger(AutomationTrigger trigger)
@@ -219,6 +278,20 @@ public partial class RuleEditorViewModel : ObservableObject
                 break;
         }
     }
+
+    partial void OnTriggerKindChanged(TriggerKindChoice value) => RecomputeSentence();
+
+    partial void OnStartTimeTextChanged(string value) => RecomputeSentence();
+
+    partial void OnEndTimeTextChanged(string value) => RecomputeSentence();
+
+    partial void OnProcessesTextChanged(string value) => RecomputeSentence();
+
+    partial void OnChannelConditionChanged(ChannelCondition value) => RecomputeSentence();
+
+    partial void OnExactChannelsChanged(double value) => RecomputeSentence();
+
+    partial void OnDevicePatternTextChanged(string value) => RecomputeSentence();
 
     [RelayCommand]
     private void AddAction() => Actions.Add(new ActionEditorViewModel(_presets));

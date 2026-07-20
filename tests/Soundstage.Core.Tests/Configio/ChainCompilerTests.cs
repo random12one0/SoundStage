@@ -172,10 +172,12 @@ public class ChainCompilerTests
     public void GoldenEndToEnd_FullState_MatchesExactly()
     {
         var speakers = SpeakerProfile();
+        // Explicit overrides keep this a byte-exact STRUCTURE golden; the intensity→amount
+        // curve is covered numerically in IntensityCurveTests / EffectCompilerTests.
         speakers.Effects = EffectSettings.Default with
         {
-            NightMode = new NightModeSettings(Enabled: true, Intensity: 50),
-            Loudness = new LoudnessSettings(Enabled: true, Intensity: 50),
+            NightMode = new NightModeSettings(Enabled: true, Intensity: 50, BassCutDbOverride: -4.5),
+            Loudness = new LoudnessSettings(Enabled: true, ReferenceLevelOverride: -22),
         };
 
         var flat = EqPreset.CreateFlat();
@@ -187,8 +189,8 @@ public class ChainCompilerTests
             "# Managed by Soundstage. Generated processing chain — do not edit (use user.txt).\r\n" +
             "\r\n" +
             "# ── Onkyo TX-NR676 (5.1) — preset: Music\r\n" +
-            // -2.0 = min(night-mode degraded headroom −2.0, clip ceiling −0.5 − 1.5 peak) — they coincide here.
-            "Preamp: -2.0 dB\r\n" +
+            // Degraded night-mode headroom (6·curve(50) ≈ 4.1) dominates the clip ceiling here.
+            "Preamp: -4.1 dB\r\n" +
             "Filter 1: ON LSC Fc 80 Hz Gain 2.0 dB Q 0.707\r\n" +
             "Filter 2: ON PK Fc 250 Hz Gain -1.5 dB Q 1\r\n" +
             "Filter 3: ON HSC Fc 8000 Hz Gain 1.5 dB Q 0.707\r\n" +

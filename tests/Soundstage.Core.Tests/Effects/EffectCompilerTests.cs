@@ -20,16 +20,22 @@ public class EffectCompilerTests
     }
 
     [Fact]
-    public void NightMode_IntensityDrivesShelfDepth()
+    public void NightMode_IntensityCurve_IsFrontLoaded_50PercentIsStrong()
     {
         var half = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 50));
         var shelf = Assert.Single(half.Commands.OfType<FilterCommand>());
         Assert.Equal(FilterType.LowShelf, shelf.Type);
         Assert.Equal(90, shelf.FrequencyHz);
-        Assert.Equal(-4.5, shelf.GainDb, 2);
+        // 50% already delivers a clearly-noticeable cut (~−10 dB), not a timid half-amount.
+        Assert.InRange(-shelf.GainDb, 9.0, 11.5);
 
         var full = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 100));
-        Assert.Equal(-9.0, Assert.Single(full.Commands.OfType<FilterCommand>()).GainDb, 2);
+        Assert.Equal(-NightModeSettings.MaxBassCutDb, Assert.Single(full.Commands.OfType<FilterCommand>()).GainDb, 2);
+
+        // Front-loaded: the jump from 0→50 is bigger than 50→100.
+        var quarterCut = -EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 25))
+            .Commands.OfType<FilterCommand>().Single().GainDb;
+        Assert.True(quarterCut > NightModeSettings.MaxBassCutDb * 0.25 * 1.3, "curve must rise fast early");
     }
 
     [Fact]
@@ -37,7 +43,7 @@ public class EffectCompilerTests
     {
         var result = EffectCompilers.CompileNightMode(new NightModeSettings(Enabled: true, Intensity: 100));
         Assert.NotNull(result.Note);
-        Assert.Equal(4.0, result.ExtraHeadroomDb, 2);
+        Assert.Equal(NightModeSettings.MaxDegradedHeadroomDb, result.ExtraHeadroomDb, 2);
         Assert.Empty(result.PostCommands);
     }
 
@@ -68,15 +74,16 @@ public class EffectCompilerTests
     // ---- Loudness ----
 
     [Fact]
-    public void Loudness_MapsIntensityToReferenceLevel()
+    public void Loudness_MapsIntensityToReferenceLevel_FrontLoaded()
     {
         var result = EffectCompilers.CompileLoudness(new LoudnessSettings(Enabled: true, Intensity: 50));
         var cmd = Assert.Single(result.Commands.OfType<LoudnessCorrectionCommand>());
         Assert.True(cmd.State);
-        Assert.Equal(-22, cmd.ReferenceLevel, 2);
+        // 50% is already well past the midpoint of the range (strong, usable).
+        Assert.InRange(cmd.ReferenceLevel, -68, -60);
 
         var max = EffectCompilers.CompileLoudness(new LoudnessSettings(Enabled: true, Intensity: 100));
-        Assert.Equal(-30, Assert.Single(max.Commands.OfType<LoudnessCorrectionCommand>()).ReferenceLevel, 2);
+        Assert.Equal(LoudnessSettings.MaxReferenceLevel, Assert.Single(max.Commands.OfType<LoudnessCorrectionCommand>()).ReferenceLevel, 2);
     }
 
     [Fact]

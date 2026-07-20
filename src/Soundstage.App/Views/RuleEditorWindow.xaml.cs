@@ -16,7 +16,7 @@ public partial class RuleEditorWindow : FluentWindow
     public RuleEditorWindow(AppServices services, AutomationRule? existing)
     {
         _existing = existing;
-        _viewModel = new RuleEditorViewModel(services.Presets.All, existing);
+        _viewModel = new RuleEditorViewModel(services.Presets.All, existing, id => services.Presets.Get(id)?.Name ?? id);
         DataContext = _viewModel;
         InitializeComponent();
         Owner = Application.Current?.MainWindow;

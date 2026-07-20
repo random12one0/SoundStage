@@ -59,10 +59,9 @@ public static class EffectCompilers
             ]);
         }
 
-        var extraHeadroom = NightModeSettings.MaxDegradedHeadroomDb * Math.Clamp(settings.Intensity, 0, 100) / 100.0;
         return new EffectCompilation(
             commands,
-            ExtraHeadroomDb: extraHeadroom,
+            ExtraHeadroomDb: settings.EffectiveDegradedHeadroomDb,
             Note: "Compression off — no VST compressor configured; using bass shelf + extra headroom.");
     }
 

@@ -75,6 +75,37 @@ public class ViewModelSmokeTests : IDisposable
     }
 
     [Fact]
+    public void Automations_OffersTemplates_AndAddingOneCreatesARule()
+    {
+        var vm = new AutomationsViewModel(_services);
+        Assert.Equal(6, vm.Templates.Count);
+
+        // Only meaningful when APO is available (a live profile exists to hold rules).
+        if (_services.Controller?.ActiveProfile is null)
+        {
+            return;
+        }
+
+        var before = vm.Rules.Count;
+        vm.AddTemplateCommand.Execute(vm.Templates[0]);
+        Assert.Equal(before + 1, vm.Rules.Count);
+        Assert.False(string.IsNullOrWhiteSpace(vm.Rules[^1].Sentence));
+        Assert.False(string.IsNullOrWhiteSpace(vm.Rules[^1].TriggerGlyph));
+    }
+
+    [Fact]
+    public void RuleEditor_LiveSentence_UpdatesAsYouBuild()
+    {
+        var vm = new RuleEditorViewModel(_services.Presets.All, existing: null, id => _services.Presets.Get(id)?.Name ?? id);
+        Assert.False(string.IsNullOrWhiteSpace(vm.LiveSentence));
+
+        vm.TriggerKind = TriggerKindChoice.AudioApp;
+        vm.ProcessesText = "Spotify";
+        Assert.Contains("Spotify", vm.LiveSentence);
+        Assert.StartsWith("When", vm.LiveSentence);
+    }
+
+    [Fact]
     public void RuleEditor_BuildsARule_FromDefaults()
     {
         var vm = new RuleEditorViewModel(_services.Presets.All, existing: null);
