@@ -66,6 +66,31 @@ public partial class App : Application
         {
             _mainWindow.Show();
         }
+
+        MaybeCheckForUpdates();
+    }
+
+    private void MaybeCheckForUpdates()
+    {
+        var settings = _services?.Controller?.State.Settings ?? _services?.StateStore.Load().Settings;
+        if (_services is null || settings?.CheckForUpdatesOnStartup != true)
+        {
+            return;
+        }
+
+        // Fire-and-forget, a few seconds after launch so it never delays startup.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromSeconds(4));
+                await _services.Update.CheckAsync();
+            }
+            catch
+            {
+                // Update checks are best-effort.
+            }
+        });
     }
 
     private void SetupTray()

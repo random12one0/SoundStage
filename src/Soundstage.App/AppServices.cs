@@ -38,6 +38,8 @@ public sealed class AppServices : IDisposable
 
     public StartupManager Startup { get; } = new();
 
+    public Services.UpdateService Update { get; private set; } = null!;
+
     /// <summary>Null when Equalizer APO is not installed (UI runs in guidance mode).</summary>
     public ConfigLayout? Layout { get; private set; }
 
@@ -72,6 +74,10 @@ public sealed class AppServices : IDisposable
             Environment = environment,
             PeakMeter = new PeakMeterService(),
         };
+
+        var appVersion = typeof(AppServices).Assembly.GetName().Version ?? new Version(0, 0, 0);
+        var persisted = stateStore.Load();
+        services.Update = new Services.UpdateService(persisted.Settings.UpdateOwner, persisted.Settings.UpdateRepo, appVersion);
 
         services.TryInitializeApoPipeline();
         Current = services;

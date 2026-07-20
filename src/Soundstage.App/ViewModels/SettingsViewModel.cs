@@ -50,6 +50,28 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _statusMessage = "";
 
+    // ---- Updates ----
+
+    [ObservableProperty]
+    private bool _checkForUpdatesOnStartup = true;
+
+    [ObservableProperty]
+    private string _updateStatus = "";
+
+    [ObservableProperty]
+    private bool _updateAvailable;
+
+    [ObservableProperty]
+    private bool _isChecking;
+
+    [ObservableProperty]
+    private bool _isDownloading;
+
+    [ObservableProperty]
+    private double _downloadProgress;
+
+    public string CurrentVersionText => $"Current version: {Core.Update.UpdatePolicy.Format(_services.Update.CurrentVersion)}";
+
     public string AboutText =>
         $"Soundstage {typeof(SettingsViewModel).Assembly.GetName().Version?.ToString(3)} — a front-end and automation layer for Equalizer APO.\n" +
         "Bundled data: AutoEq headphone corrections (MIT, github.com/jaakkopasanen/AutoEq).\n" +
@@ -58,7 +80,9 @@ public partial class SettingsViewModel : ObservableObject
     public SettingsViewModel(AppServices services)
     {
         _services = services;
+        services.Update.Changed += () => UiDispatch.Post(SyncUpdateState);
         Sync();
+        SyncUpdateState();
         RefreshBackups();
     }
 
@@ -66,19 +90,26 @@ public partial class SettingsViewModel : ObservableObject
     {
         _syncing = true;
         LaunchOnBoot = _services.Startup.IsEnabled;
-        var settings = _services.Controller?.State.Settings;
-        if (settings is not null)
-        {
-            StartMinimized = settings.StartMinimized;
-            MinimizeToTray = settings.MinimizeToTray;
-            AmbienceFeature = settings.AmbienceFeatureEnabled;
-            ConfirmNewSounds = settings.ConfirmNewSounds;
-            GuardSeconds = settings.RevertGuardSeconds;
-            SafetyMargin = settings.SafetyMarginDb;
-            BypassHotkeyText = settings.BypassHotkey;
-        }
-
+        var settings = _services.Controller?.State.Settings ?? _services.StateStore.Load().Settings;
+        StartMinimized = settings.StartMinimized;
+        MinimizeToTray = settings.MinimizeToTray;
+        AmbienceFeature = settings.AmbienceFeatureEnabled;
+        ConfirmNewSounds = settings.ConfirmNewSounds;
+        GuardSeconds = settings.RevertGuardSeconds;
+        SafetyMargin = settings.SafetyMarginDb;
+        BypassHotkeyText = settings.BypassHotkey;
+        CheckForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
         _syncing = false;
+    }
+
+    private void SyncUpdateState()
+    {
+        var update = _services.Update;
+        UpdateStatus = update.StatusMessage;
+        UpdateAvailable = update.IsUpdateAvailable;
+        IsChecking = update.State == Services.UpdateState.Checking;
+        IsDownloading = update.State is Services.UpdateState.Downloading or Services.UpdateState.ReadyToInstall;
+        DownloadProgress = update.DownloadProgress * 100.0;
     }
 
     private void Persist(bool reapply = false)
@@ -133,6 +164,56 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnConfirmNewSoundsChanged(bool value) => Persist();
 
     partial void OnGuardSecondsChanged(double value) => Persist();
+
+    partial void OnCheckForUpdatesOnStartupChanged(bool value)
+    {
+        if (_syncing)
+        {
+            return;
+        }
+
+        // Persist even when APO isn't set up (Controller may be null).
+        if (_services.Controller is { } controller)
+        {
+            controller.State.Settings.CheckForUpdatesOnStartup = value;
+            controller.SaveState();
+        }
+        else
+        {
+            var state = _services.StateStore.Load();
+            state.Settings.CheckForUpdatesOnStartup = value;
+            _services.StateStore.Save(state);
+        }
+    }
+
+    [RelayCommand]
+    private async Task CheckForUpdatesAsync() => await _services.Update.CheckAsync();
+
+    [RelayCommand]
+    private async Task DownloadUpdateAsync()
+    {
+        await _services.Update.DownloadAndInstallAsync(() => UiDispatch.Post(() =>
+            System.Windows.Application.Current?.Shutdown()));
+    }
+
+    [RelayCommand]
+    private void OpenReleasePage()
+    {
+        var url = _services.Update.Latest?.HtmlUrl;
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch
+        {
+            // Non-critical.
+        }
+    }
 
     partial void OnSafetyMarginChanged(double value) => Persist(reapply: true);
 

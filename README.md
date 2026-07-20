@@ -75,6 +75,18 @@ single download:
 Until then, night mode still works in its lighter form — bass shelf + extra headroom — and
 says so right on the card.
 
+## Staying up to date
+
+Soundstage checks GitHub for a newer release a few seconds after launch (toggle it off in
+**Settings → Updates**) and shows a banner when one is available. **Settings → Updates**
+also has a **Check for updates** button and a one-click **Download & install** that fetches
+the new installer, verifies its SHA-256, runs it, and closes the app so it can update in
+place — no manual GitHub visit needed.
+
+> The in-app updater reads the repository's public Releases API. For it to work, this
+> repository must be **public** (Settings → General → Change visibility on GitHub). If it's
+> private, the updater will say so and you can still download releases manually.
+
 ## How it works
 
 Soundstage owns `config.txt` with a three-line stub and keeps everything it generates in

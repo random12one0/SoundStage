@@ -29,6 +29,12 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private bool _showTakeoverBanner;
 
+    [ObservableProperty]
+    private bool _showUpdateBanner;
+
+    [ObservableProperty]
+    private string _updateBannerText = "";
+
     public StatusBarViewModel StatusBar { get; }
 
     public RevertToastViewModel RevertToast { get; }
@@ -53,6 +59,8 @@ public partial class ShellViewModel : ObservableObject
         {
             controller.Changed += () => UiDispatch.Post(RefreshBanners);
         }
+
+        services.Update.Changed += () => UiDispatch.Post(RefreshBanners);
 
         SelectedItem = NavItems[0];
         RefreshBanners();
@@ -81,7 +89,12 @@ public partial class ShellViewModel : ObservableObject
         ShowApoMissingBanner = !_services.ApoAvailable;
         ShowTakeoverBanner = _services.ApoAvailable
                              && _services.Takeover?.GetOwnershipState() is not Core.Configio.OwnershipState.Owned;
+        ShowUpdateBanner = _services.Update.IsUpdateAvailable;
+        UpdateBannerText = _services.Update.Latest is { } latest ? $"{latest.Name} is available." : "An update is available.";
     }
+
+    [RelayCommand]
+    private void OpenUpdateSettings() => NavigateTo("settings");
 
     [RelayCommand]
     private void TakeOwnership()

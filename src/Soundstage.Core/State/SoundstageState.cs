@@ -44,6 +44,14 @@ public sealed class AppSettings
 
     /// <summary>Manual override when registry detection is unavailable/wrong.</summary>
     public string? ApoConfigDirectoryOverride { get; set; }
+
+    /// <summary>Check GitHub for a newer release shortly after launch.</summary>
+    public bool CheckForUpdatesOnStartup { get; set; } = true;
+
+    /// <summary>GitHub owner/repo the updater queries (kept configurable so a repo rename is trivial).</summary>
+    public string UpdateOwner { get; set; } = "random12one0";
+
+    public string UpdateRepo { get; set; } = "unblockere1231234";
 }
 
 /// <summary>Root persisted application state.</summary>

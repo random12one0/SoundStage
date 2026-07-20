@@ -57,6 +57,19 @@
                     <ui:Button Margin="12,0,0,0" Appearance="Primary" Command="{Binding TakeOwnershipCommand}" Content="Take control" />
                 </StackPanel>
             </Border>
+            <Border
+                Background="#264CC2FF"
+                Padding="16,10"
+                Visibility="{Binding ShowUpdateBanner, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{StaticResource AccentBrush}" Text="&#xE895;" />
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center">
+                        <Run Text="A new version of Soundstage is ready —" />
+                        <Run FontWeight="SemiBold" Text="{Binding UpdateBannerText, Mode=OneWay}" />
+                    </TextBlock>
+                    <ui:Button Margin="12,0,0,0" Appearance="Primary" Command="{Binding OpenUpdateSettingsCommand}" Content="View update" />
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Nav rail + page -->
