@@ -1,0 +1,183 @@
+<ui:FluentWindow
+    x:Class="Soundstage.App.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    Title="Soundstage"
+    Width="1180"
+    Height="780"
+    MinWidth="940"
+    MinHeight="620"
+    d:DataContext="{d:DesignInstance Type=vm:ShellViewModel}"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    ExtendsContentIntoTitleBar="True"
+    WindowBackdropType="Mica"
+    WindowStartupLocation="CenterScreen">
+
+    <ui:FluentWindow.Resources>
+        <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Soundstage" />
+
+        <!-- Attention banners -->
+        <StackPanel Grid.Row="1">
+            <Border
+                Background="#33D83B01"
+                Padding="16,10"
+                Visibility="{Binding ShowApoMissingBanner, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center" Text="Equalizer APO was not found on this PC — Soundstage needs it to shape your audio." />
+                    <ui:Button Margin="12,0,0,0" Command="{Binding OpenDiagnosticsCommand}" Content="See what to do" />
+                </StackPanel>
+            </Border>
+            <Border
+                Background="#332E6BE6"
+                Padding="16,10"
+                Visibility="{Binding ShowTakeoverBanner, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center" Text="Soundstage isn't controlling Equalizer APO yet. Your current config will be backed up first." />
+                    <ui:Button Margin="12,0,0,0" Appearance="Primary" Command="{Binding TakeOwnershipCommand}" Content="Take control" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Nav rail + page -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="208" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox
+                Grid.Column="0"
+                Margin="8,8,0,8"
+                Background="Transparent"
+                BorderThickness="0"
+                ItemsSource="{Binding NavItems}"
+                SelectedItem="{Binding SelectedItem}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="6,8" Orientation="Horizontal">
+                            <TextBlock
+                                Width="22"
+                                VerticalAlignment="Center"
+                                FontFamily="Segoe MDL2 Assets"
+                                FontSize="16"
+                                Text="{Binding Glyph}" />
+                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="14" Text="{Binding Title}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <ContentControl
+                Grid.Column="1"
+                Margin="4,8,12,8"
+                Content="{Binding CurrentPage}" />
+
+            <!-- Confirm-or-revert toast -->
+            <Border
+                Grid.Column="1"
+                MaxWidth="440"
+                Margin="0,18,0,0"
+                Padding="18,14"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"
+                Background="#F0202028"
+                BorderBrush="#554CC2FF"
+                BorderThickness="1"
+                CornerRadius="10"
+                DataContext="{Binding RevertToast}"
+                Visibility="{Binding IsVisible, Converter={StaticResource BoolToVisibility}}">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="24" Opacity="0.45" ShadowDepth="4" />
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="Keep this sound?" />
+                    <TextBlock Margin="0,4,0,10" Opacity="0.75" TextWrapping="Wrap">
+                        <Run Text="If you don't confirm, the previous sound comes back in" />
+                        <Run FontWeight="SemiBold" Text="{Binding SecondsRemaining, Mode=OneWay}" />
+                        <Run Text="s — so a bad setting can never leave you without audio." />
+                    </TextBlock>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Appearance="Primary" Command="{Binding KeepCommand}" Content="Keep it" />
+                        <ui:Button Margin="8,0,0,0" Command="{Binding RevertNowCommand}" Content="Revert now" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+        </Grid>
+
+        <!-- Status readout -->
+        <Border
+            Grid.Row="3"
+            Padding="16,7"
+            Background="#22000000"
+            DataContext="{Binding StatusBar}">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <Ellipse
+                        Width="9"
+                        Height="9"
+                        VerticalAlignment="Center"
+                        Fill="#E81123"
+                        Visibility="{Binding IsClipping, Converter={StaticResource BoolToVisibility}}" />
+                    <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding DeviceName}" />
+                    <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding ChannelText}" />
+                    <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding FormatText}" />
+                    <TextBlock
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
+                        Opacity="0.75"
+                        Text="{Binding SpatialText}"
+                        Visibility="{Binding SpatialText, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+                <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Border
+                        Margin="0,0,12,0"
+                        Padding="8,2"
+                        VerticalAlignment="Center"
+                        Background="#44D83B01"
+                        CornerRadius="4"
+                        Visibility="{Binding AutomationsPaused, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock FontSize="11" Text="AUTOMATIONS PAUSED" />
+                    </Border>
+                    <Border
+                        Margin="0,0,12,0"
+                        Padding="8,2"
+                        VerticalAlignment="Center"
+                        Background="#446C6C6C"
+                        CornerRadius="4"
+                        Visibility="{Binding IsBypassed, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock FontSize="11" Text="BYPASSED" />
+                    </Border>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Opacity="0.75"
+                        Text="{Binding HeadroomText}"
+                        Visibility="{Binding HeadroomText, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding PresetText}" />
+                    <TextBlock
+                        Margin="6,0,0,0"
+                        VerticalAlignment="Center"
+                        Opacity="0.6"
+                        Text="{Binding AttributionText}"
+                        Visibility="{Binding AttributionText, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</ui:FluentWindow>

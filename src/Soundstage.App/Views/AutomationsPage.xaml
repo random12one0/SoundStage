@@ -1,0 +1,96 @@
+<UserControl
+    x:Class="Soundstage.App.Views.AutomationsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=vm:AutomationsViewModel}">
+
+    <UserControl.Resources>
+        <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="880" Margin="16,8,16,24">
+
+            <!-- Master switch -->
+            <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <Grid>
+                    <StackPanel>
+                        <TextBlock FontSize="15" FontWeight="SemiBold" Text="Automations" />
+                        <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                   Text="Rules run top to bottom; when two set the same thing, the lower one wins. This switch pauses everything without deleting anything." />
+                    </StackPanel>
+                    <ui:ToggleSwitch HorizontalAlignment="Right" VerticalAlignment="Top" IsChecked="{Binding MasterEnabled}" />
+                </Grid>
+            </Border>
+
+            <!-- Why is this active -->
+            <Border Margin="0,10,0,0" Padding="12,10" Background="#222E6BE6" CornerRadius="8">
+                <TextBlock FontSize="12.5" Text="{Binding DecisionSummary}" TextWrapping="Wrap" />
+            </Border>
+
+            <!-- Rules -->
+            <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding Rules}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,4" Padding="12,10" Background="#22000000" CornerRadius="8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <ui:Button Padding="4,1" FontSize="10" Content="▲"
+                                               Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}" />
+                                    <ui:Button Padding="4,1" Margin="0,3,0,0" FontSize="10" Content="▼"
+                                               Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}" />
+                                </StackPanel>
+
+                                <ui:ToggleSwitch Grid.Column="1" VerticalAlignment="Center" IsChecked="{Binding Enabled}" />
+
+                                <StackPanel Grid.Column="2" Margin="12,0" VerticalAlignment="Center">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontWeight="SemiBold" Text="{Binding Name}" />
+                                        <Border Margin="8,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#3350B050" CornerRadius="4"
+                                                Visibility="{Binding IsWinner, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock FontSize="10" Text="ACTIVE" />
+                                        </Border>
+                                        <Border Margin="6,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#33808080" CornerRadius="4"
+                                                Visibility="{Binding IsPrebuilt, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock FontSize="10" Text="BUILT-IN" />
+                                        </Border>
+                                    </StackPanel>
+                                    <TextBlock FontSize="12" Opacity="0.7" Text="{Binding TriggerText}" />
+                                    <TextBlock FontSize="12" Opacity="0.55" Text="{Binding ActionsText}" TextWrapping="Wrap" />
+                                    <TextBlock FontSize="11.5" Opacity="0.5" FontStyle="Italic" Text="{Binding LiveReason}"
+                                               Visibility="{Binding LiveReason, Converter={StaticResource StringToVisibility}}" />
+                                </StackPanel>
+
+                                <ui:Button Grid.Column="3" VerticalAlignment="Center" Content="Edit"
+                                           Command="{Binding DataContext.EditRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding}" />
+                                <ui:Button Grid.Column="4" Margin="6,0,0,0" VerticalAlignment="Center" Content="Delete"
+                                           Command="{Binding DataContext.DeleteRuleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <ui:Button Margin="0,12,0,0" Appearance="Primary" Command="{Binding AddRuleCommand}" Content="Add rule" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

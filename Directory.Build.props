@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Allows net8.0-windows (WPF) projects to compile on non-Windows build hosts. -->
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Deterministic>true</Deterministic>
+    <Product>Soundstage</Product>
+    <Company>Soundstage</Company>
+    <Authors>Soundstage contributors</Authors>
+    <Version>0.1.0</Version>
+    <Copyright>© 2026 Soundstage contributors</Copyright>
+  </PropertyGroup>
+</Project>

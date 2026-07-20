@@ -1,0 +1,66 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{DE94BA46-919B-4E30-8B3B-6CF3F72B6692}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Soundstage.Core", "src\Soundstage.Core\Soundstage.Core.csproj", "{3BCE3699-C7CE-4169-B66D-0C6B00500CF1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Soundstage.Windows", "src\Soundstage.Windows\Soundstage.Windows.csproj", "{AEC5D89F-AAF7-47D7-BE28-ED4B36D19E36}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{EC2EEB6E-B6BA-4958-AE2F-05ADCAFF8DCA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Soundstage.Core.Tests", "tests\Soundstage.Core.Tests\Soundstage.Core.Tests.csproj", "{E1A5D2E8-09E4-4C2B-BF23-286D2EF86250}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2A606B5E-8484-4AF3-8C6D-D2C7599DC569}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AutoEqPacker", "tools\AutoEqPacker\AutoEqPacker.csproj", "{3572898B-21EB-4B82-8294-141FF18574AA}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Soundstage.App", "src\Soundstage.App\Soundstage.App.csproj", "{0229A23B-440F-44CC-BF06-5561307D1E97}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Soundstage.App.Tests", "tests\Soundstage.App.Tests\Soundstage.App.Tests.csproj", "{0BD18078-32BC-43DF-959A-DF5B4CCA413B}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3BCE3699-C7CE-4169-B66D-0C6B00500CF1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BCE3699-C7CE-4169-B66D-0C6B00500CF1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BCE3699-C7CE-4169-B66D-0C6B00500CF1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BCE3699-C7CE-4169-B66D-0C6B00500CF1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AEC5D89F-AAF7-47D7-BE28-ED4B36D19E36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AEC5D89F-AAF7-47D7-BE28-ED4B36D19E36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AEC5D89F-AAF7-47D7-BE28-ED4B36D19E36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AEC5D89F-AAF7-47D7-BE28-ED4B36D19E36}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E1A5D2E8-09E4-4C2B-BF23-286D2EF86250}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E1A5D2E8-09E4-4C2B-BF23-286D2EF86250}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E1A5D2E8-09E4-4C2B-BF23-286D2EF86250}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E1A5D2E8-09E4-4C2B-BF23-286D2EF86250}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3572898B-21EB-4B82-8294-141FF18574AA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3572898B-21EB-4B82-8294-141FF18574AA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3572898B-21EB-4B82-8294-141FF18574AA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3572898B-21EB-4B82-8294-141FF18574AA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0229A23B-440F-44CC-BF06-5561307D1E97}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0229A23B-440F-44CC-BF06-5561307D1E97}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0229A23B-440F-44CC-BF06-5561307D1E97}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0229A23B-440F-44CC-BF06-5561307D1E97}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0BD18078-32BC-43DF-959A-DF5B4CCA413B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0BD18078-32BC-43DF-959A-DF5B4CCA413B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0BD18078-32BC-43DF-959A-DF5B4CCA413B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0BD18078-32BC-43DF-959A-DF5B4CCA413B}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3BCE3699-C7CE-4169-B66D-0C6B00500CF1} = {DE94BA46-919B-4E30-8B3B-6CF3F72B6692}
+		{AEC5D89F-AAF7-47D7-BE28-ED4B36D19E36} = {DE94BA46-919B-4E30-8B3B-6CF3F72B6692}
+		{E1A5D2E8-09E4-4C2B-BF23-286D2EF86250} = {EC2EEB6E-B6BA-4958-AE2F-05ADCAFF8DCA}
+		{3572898B-21EB-4B82-8294-141FF18574AA} = {2A606B5E-8484-4AF3-8C6D-D2C7599DC569}
+		{0229A23B-440F-44CC-BF06-5561307D1E97} = {DE94BA46-919B-4E30-8B3B-6CF3F72B6692}
+		{0BD18078-32BC-43DF-959A-DF5B4CCA413B} = {EC2EEB6E-B6BA-4958-AE2F-05ADCAFF8DCA}
+	EndGlobalSection
+EndGlobal

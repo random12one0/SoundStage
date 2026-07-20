@@ -1,0 +1,150 @@
+<UserControl
+    x:Class="Soundstage.App.Views.EffectsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=vm:EffectsViewModel}">
+
+    <UserControl.Resources>
+        <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="820" Margin="16,8,16,24">
+
+            <!-- Night mode -->
+            <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="Night mode" />
+                            <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="Quieter late-night listening: pulls down the bass that travels through walls and tames loud peaks." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" VerticalAlignment="Top" IsChecked="{Binding NightEnabled}" />
+                    </Grid>
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding NightEnabled}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="46" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Intensity" />
+                        <Slider Grid.Column="1" Margin="12,0" VerticalAlignment="Center" Maximum="100" Minimum="0" Value="{Binding NightIntensity}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding NightIntensity, StringFormat={}{0:0}%}" />
+                    </Grid>
+                    <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="#E6C19C00" TextWrapping="Wrap"
+                               Text="{Binding NightStatus}"
+                               Visibility="{Binding NightStatus, Converter={StaticResource StringToVisibility}}" />
+                    <Expander Margin="0,8,0,0" Header="Advanced">
+                        <StackPanel Margin="0,8,0,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="60" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Bass shelf corner" />
+                                <Slider Grid.Column="1" Margin="12,0" Maximum="200" Minimum="40" Value="{Binding NightBassCorner}" />
+                                <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding NightBassCorner, StringFormat={}{0:0} Hz}" />
+                            </Grid>
+                            <TextBlock Margin="0,12,0,4" FontWeight="SemiBold" FontSize="13" Text="Compressor (VST)" />
+                            <TextBlock FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="Equalizer APO can host a free VST 2 compressor for real dynamic range control. A good free choice is LoudMax (Thomas Mundt) — point Soundstage at the 64-bit DLL." />
+                            <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                <ui:Button Command="{Binding PickVstCommand}" Content="Choose VST DLL…" />
+                                <ui:Button Margin="8,0,0,0" Command="{Binding ClearVstCommand}" Content="Remove" />
+                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" Opacity="0.7" Text="{Binding NightVstPath}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                </StackPanel>
+            </Border>
+
+            <!-- Loudness -->
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="Loudness compensation" />
+                            <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="At low volume your ears lose bass and treble first. This adds them back, tracking your volume — great together with night mode." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" VerticalAlignment="Top" IsChecked="{Binding LoudnessEnabled}" />
+                    </Grid>
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding LoudnessEnabled}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="46" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Intensity" />
+                        <Slider Grid.Column="1" Margin="12,0" Maximum="100" Minimum="0" Value="{Binding LoudnessIntensity}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding LoudnessIntensity, StringFormat={}{0:0}%}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Stereo width -->
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="Stereo width" />
+                            <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="Spreads panned instruments further apart. 100% is untouched. Stereo output only — it switches itself off on 5.1/7.1." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" VerticalAlignment="Top" IsChecked="{Binding WidthEnabled}" />
+                    </Grid>
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding WidthEnabled}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="52" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Width" />
+                        <Slider Grid.Column="1" Margin="12,0" Maximum="200" Minimum="0" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding WidthPercent}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding WidthPercent, StringFormat={}{0:0}%}" />
+                    </Grid>
+                    <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.55" Text="Safe zone up to 120% — beyond that, centered vocals start to thin out." />
+                    <TextBlock Margin="0,6,0,0" FontSize="12" Foreground="#E6D83B01" TextWrapping="Wrap"
+                               Text="{Binding WidthStatus}"
+                               Visibility="{Binding WidthStatus, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Ambience (experimental, feature-flagged) -->
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8"
+                    Visibility="{Binding AmbienceVisible, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <Grid>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="Ambience" />
+                            <Border Margin="8,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#446C2EB0" CornerRadius="4">
+                                <TextBlock FontSize="10" Text="EXPERIMENTAL" />
+                            </Border>
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" VerticalAlignment="Top" IsChecked="{Binding AmbienceEnabled}" />
+                    </Grid>
+                    <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" Text="A touch of room reverb for stereo music." />
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding AmbienceEnabled}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="46" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Intensity" />
+                        <Slider Grid.Column="1" Margin="12,0" Maximum="100" Minimum="0" Value="{Binding AmbienceIntensity}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding AmbienceIntensity, StringFormat={}{0:0}%}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <RootNamespace>Soundstage.Core</RootNamespace>
+    <Description>OS-neutral core of Soundstage: preset model, Equalizer APO config compilation, safety analysis, and the automation engine.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="EmbeddedAssets/**/*.json" />
+  </ItemGroup>
+
+</Project>

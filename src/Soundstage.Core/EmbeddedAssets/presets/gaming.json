@@ -1,0 +1,15 @@
+{
+  "id": "gaming",
+  "name": "Gaming",
+  "description": "A little extra impact down low and detail up top — positional cues like footsteps and reloads come forward while explosions keep their weight.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": 0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 70, "gainDb": 1.5, "q": 0.707 },
+    { "type": "Peaking", "frequencyHz": 300, "gainDb": -1.0, "q": 1.0 },
+    { "type": "Peaking", "frequencyHz": 4000, "gainDb": 2.0, "q": 1.2 },
+    { "type": "HighShelf", "frequencyHz": 8000, "gainDb": 1.5, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

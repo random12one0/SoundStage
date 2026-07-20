@@ -1,0 +1,129 @@
+<ui:FluentWindow
+    x:Class="Soundstage.App.Views.RuleEditorWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=vm:RuleEditorViewModel}"
+    Title="Automation rule"
+    Width="560"
+    Height="640"
+    MinWidth="480"
+    MinHeight="520"
+    WindowStartupLocation="CenterOwner"
+    ExtendsContentIntoTitleBar="True"
+    WindowBackdropType="Mica">
+
+    <ui:FluentWindow.Resources>
+        <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+    </ui:FluentWindow.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Grid.Row="0" Title="Automation rule" ShowMaximize="False" ShowMinimize="False" />
+
+        <ScrollViewer Grid.Row="1" Margin="20,8" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock Text="Name" Opacity="0.75" />
+                <ui:TextBox Margin="0,4,0,0" PlaceholderText="Leave empty to auto-name" Text="{Binding RuleName, UpdateSourceTrigger=PropertyChanged}" />
+
+                <TextBlock Margin="0,16,0,0" FontWeight="SemiBold" Text="When…" />
+                <ComboBox Margin="0,6,0,0" ItemsSource="{Binding TriggerKinds}" SelectedItem="{Binding TriggerKind}" />
+
+                <!-- Schedule -->
+                <StackPanel Margin="0,10,0,0" Visibility="{Binding IsSchedule, Converter={StaticResource BoolToVisibility}}">
+                    <ItemsControl ItemsSource="{Binding Days}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <CheckBox Margin="0,0,10,0" Content="{Binding Label}" IsChecked="{Binding Selected}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="From" />
+                        <ui:TextBox Width="76" Margin="8,0" Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="until" />
+                        <ui:TextBox Width="76" Margin="8,0" Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock VerticalAlignment="Center" FontSize="12" Opacity="0.55" Text="(22:00 → 06:00 spans midnight)" />
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Audio app -->
+                <StackPanel Margin="0,10,0,0" Visibility="{Binding IsAudioApp, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock FontSize="12" Opacity="0.65" Text="App names, comma separated — matches the process playing audio (e.g. Spotify, chrome, vlc)." TextWrapping="Wrap" />
+                    <ui:TextBox Margin="0,6,0,0" Text="{Binding ProcessesText, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+
+                <!-- Channel count -->
+                <StackPanel Margin="0,10,0,0" Orientation="Horizontal" Visibility="{Binding IsChannelCount, Converter={StaticResource BoolToVisibility}}">
+                    <ComboBox MinWidth="170" ItemsSource="{Binding ChannelConditions}" SelectedItem="{Binding ChannelCondition}" />
+                    <ui:TextBox Width="70" Margin="10,0,0,0" Text="{Binding ExactChannels, StringFormat=0}"
+                                Visibility="{Binding IsExactChannels, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+
+                <!-- Device -->
+                <StackPanel Margin="0,10,0,0" Visibility="{Binding IsDevice, Converter={StaticResource BoolToVisibility}}">
+                    <TextBlock FontSize="12" Opacity="0.65" Text="Part of the output device's name (e.g. headphone, Onkyo)." />
+                    <ui:TextBox Margin="0,6,0,0" Text="{Binding DevicePatternText, UpdateSourceTrigger=PropertyChanged}" />
+                </StackPanel>
+
+                <TextBlock Margin="0,18,0,0" FontWeight="SemiBold" Text="Then…" />
+                <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding Actions}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border Margin="0,4" Padding="10" Background="#22000000" CornerRadius="6">
+                                <StackPanel>
+                                    <Grid>
+                                        <ComboBox MinWidth="200" HorizontalAlignment="Left" ItemsSource="{Binding ActionKinds}" SelectedItem="{Binding Kind}" />
+                                        <ui:Button HorizontalAlignment="Right" Padding="6,3" FontSize="11" Content="✕"
+                                                   Command="{Binding DataContext.RemoveActionCommand, RelativeSource={RelativeSource AncestorType=ui:FluentWindow}}"
+                                                   CommandParameter="{Binding}" />
+                                    </Grid>
+                                    <ComboBox Margin="0,8,0,0" MinWidth="220" HorizontalAlignment="Left"
+                                              DisplayMemberPath="Name"
+                                              ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+                                              Visibility="{Binding IsPresetKind, Converter={StaticResource BoolToVisibility}}" />
+                                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
+                                                Visibility="{Binding IsEnabledKind, Converter={StaticResource BoolToVisibility}}">
+                                        <ComboBox MinWidth="150" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
+                                        <CheckBox Margin="10,0,0,0" VerticalAlignment="Center" Content="Turn on" IsChecked="{Binding EffectOn}" />
+                                    </StackPanel>
+                                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
+                                                Visibility="{Binding IsIntensityKind, Converter={StaticResource BoolToVisibility}}">
+                                        <ComboBox MinWidth="150" VerticalAlignment="Center" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
+                                        <Slider Width="180" Margin="10,0" VerticalAlignment="Center" Maximum="100" Minimum="0" Value="{Binding Intensity}" />
+                                        <TextBlock VerticalAlignment="Center" Text="{Binding Intensity, StringFormat={}{0:0}%}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ui:Button Margin="0,6,0,0" Command="{Binding AddActionCommand}" Content="Add another action" FontSize="12" />
+
+                <TextBlock Margin="0,10,0,0" Foreground="#E6D83B01" Text="{Binding ValidationError}" TextWrapping="Wrap"
+                           Visibility="{Binding ValidationError, Converter={StaticResource StringToVisibility}}" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Margin="20,0,20,16" HorizontalAlignment="Right" Orientation="Horizontal">
+            <ui:Button MinWidth="90" Appearance="Primary" Click="OnSave" Content="Save rule" IsDefault="True" />
+            <ui:Button MinWidth="90" Margin="8,0,0,0" Content="Cancel" IsCancel="True" />
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

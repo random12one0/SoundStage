@@ -1,0 +1,15 @@
+{
+  "id": "music",
+  "name": "Music",
+  "description": "A gentle lift at both ends and a touch less low-mid congestion. Adds warmth and sparkle to stereo music without changing its character.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": 0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 80, "gainDb": 2.0, "q": 0.707 },
+    { "type": "Peaking", "frequencyHz": 250, "gainDb": -1.5, "q": 1.0 },
+    { "type": "Peaking", "frequencyHz": 3000, "gainDb": 1.0, "q": 1.2 },
+    { "type": "HighShelf", "frequencyHz": 8000, "gainDb": 1.5, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

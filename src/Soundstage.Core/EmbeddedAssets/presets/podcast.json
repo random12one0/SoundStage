@@ -1,0 +1,15 @@
+{
+  "id": "podcast",
+  "name": "Spoken Word",
+  "description": "Tuned for podcasts, audiobooks and voice chat: trims room rumble and boxiness, lifts intelligibility. Not intended for music.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": 0,
+  "bands": [
+    { "type": "LowShelf", "frequencyHz": 90, "gainDb": -3.0, "q": 0.707 },
+    { "type": "Peaking", "frequencyHz": 320, "gainDb": -1.5, "q": 1.0 },
+    { "type": "Peaking", "frequencyHz": 2500, "gainDb": 2.5, "q": 1.1 },
+    { "type": "HighShelf", "frequencyHz": 9000, "gainDb": 1.0, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

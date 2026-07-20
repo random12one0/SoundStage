@@ -1,0 +1,138 @@
+<UserControl
+    x:Class="Soundstage.App.Views.SettingsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:app="clr-namespace:Soundstage.App"
+    xmlns:vm="clr-namespace:Soundstage.App.ViewModels"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    d:DataContext="{d:DesignInstance Type=vm:SettingsViewModel}">
+
+    <UserControl.Resources>
+        <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel MaxWidth="760" Margin="16,8,16,24">
+
+            <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="Behavior" />
+
+                    <Grid Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Launch when Windows starts" />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="Starts minimized to the tray so automations run from boot." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding LaunchOnBoot}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <TextBlock VerticalAlignment="Center" Text="Start minimized to tray" />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding StartMinimized}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <TextBlock VerticalAlignment="Center" Text="Closing the window keeps Soundstage in the tray" />
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding MinimizeToTray}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Bypass hotkey" />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="Takes effect the next time Soundstage starts." />
+                        </StackPanel>
+                        <ui:TextBox Width="160" HorizontalAlignment="Right" Text="{Binding BypassHotkeyText, UpdateSourceTrigger=LostFocus}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="Safety" />
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Confirm-or-revert countdown" />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="How long a new, never-confirmed sound waits before reverting." />
+                        </StackPanel>
+                        <Slider Grid.Column="1" VerticalAlignment="Center" Maximum="30" Minimum="3" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GuardSeconds}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding GuardSeconds, StringFormat={}{0:0}s}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="44" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Clipping safety margin" />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="Extra distance kept below full scale when EQ boosts." />
+                        </StackPanel>
+                        <Slider Grid.Column="1" VerticalAlignment="Center" Maximum="3" Minimum="0" TickFrequency="0.25" IsSnapToTickEnabled="True" Value="{Binding SafetyMargin}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding SafetyMargin, StringFormat={}{0:0.00}}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Ambience effect (experimental)" />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="Shows the ambience card on the Effects page." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AmbienceFeature}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock FontSize="15" FontWeight="SemiBold" Text="Backups" />
+                        <ui:Button HorizontalAlignment="Right" Command="{Binding RefreshBackupsCommand}" Content="Refresh" FontSize="12" />
+                    </Grid>
+                    <TextBlock Margin="0,4,0,8" FontSize="12" Opacity="0.6"
+                               Text="Every config Soundstage replaces is kept here — including whatever existed before it took control." />
+                    <ItemsControl MaxHeight="240" ItemsSource="{Binding Backups}">
+                        <ItemsControl.Template>
+                            <ControlTemplate TargetType="ItemsControl">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsPresenter />
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <TextBlock VerticalAlignment="Center" FontSize="12.5" Text="{Binding Description}" />
+                                    <ui:Button HorizontalAlignment="Right" Padding="10,3" FontSize="12" Content="Restore"
+                                               Command="{Binding DataContext.RestoreBackupCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                               CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <ui:Button Command="{Binding OpenConfigFolderCommand}" Content="Open APO config folder" />
+                        <ui:Button Margin="8,0,0,0" Command="{Binding OpenDataFolderCommand}" Content="Open Soundstage data folder" />
+                    </StackPanel>
+                    <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="#E6C19C00" Text="{Binding StatusMessage}" TextWrapping="Wrap"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <Border Margin="0,10,0,0" Padding="16" Background="#22000000" CornerRadius="8">
+                <StackPanel>
+                    <TextBlock FontSize="15" FontWeight="SemiBold" Text="About" />
+                    <TextBlock Margin="0,8,0,0" FontSize="12.5" Opacity="0.75" Text="{Binding AboutText}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

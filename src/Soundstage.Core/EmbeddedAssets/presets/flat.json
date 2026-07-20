@@ -1,0 +1,10 @@
+{
+  "id": "flat",
+  "name": "Flat Reference",
+  "description": "No processing at all — exactly what your source and receiver produce. Use this as your A/B baseline, and for multichannel movie content that is already mastered the way it should sound.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": 0,
+  "bands": [],
+  "isBuiltIn": true
+}
