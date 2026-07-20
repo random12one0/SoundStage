@@ -1,12 +1,19 @@
 name: Release
 
-# Pushing a tag like v0.1.0 builds Soundstage on Windows, runs the full test
-# suite as a gate, and publishes a GitHub Release with directly downloadable
-# EXEs (portable + installer).
+# Two ways to cut a release, both build on Windows with the full test suite as
+# a gate and publish a GitHub Release with directly downloadable EXEs:
+#   1. Push a tag like v0.1.0
+#   2. Run this workflow manually (workflow_dispatch) with the version input —
+#      the release step then creates the tag itself.
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. v0.1.0)"
+        required: true
 
 permissions:
   contents: write
@@ -42,9 +49,10 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           $notes = @"
-          ## Soundstage ${{ github.ref_name }}
+          ## Soundstage $env:VERSION
 
           A modern front-end and automation layer for Equalizer APO — system-wide EQ, night mode, loudness, automations, and 8,600+ bundled headphone corrections.
 
@@ -54,10 +62,11 @@ jobs:
           3. In Soundstage, click **Take control** (your existing config is backed up first).
           4. Pick a preset. Done.
 
-          **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/ATMOS-VALIDATION.md).
+          **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/$env:VERSION/docs/ATMOS-VALIDATION.md).
           "@
-          gh release create "${{ github.ref_name }}" `
+          gh release create "$env:VERSION" `
             "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `
             "installer/Output/Soundstage-Setup.exe#Soundstage-Setup.exe (installer)" `
-            --title "Soundstage ${{ github.ref_name }}" `
+            --target "${{ github.sha }}" `
+            --title "Soundstage $env:VERSION" `
             --notes $notes
