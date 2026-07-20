@@ -43,8 +43,23 @@ public partial class App : Application
         _mainWindow = new MainWindow(_services);
         MainWindow = _mainWindow;
 
-        SetupTray();
-        SetupHotkey();
+        try
+        {
+            SetupTray();
+        }
+        catch
+        {
+            // No tray (e.g. restricted shells) must not stop the app from opening.
+        }
+
+        try
+        {
+            SetupHotkey();
+        }
+        catch
+        {
+            // A conflicting hotkey registration is non-fatal.
+        }
 
         var startHidden = e.Args.Contains("--tray") || (_services.Controller?.State.Settings.StartMinimized ?? false);
         if (!startHidden)

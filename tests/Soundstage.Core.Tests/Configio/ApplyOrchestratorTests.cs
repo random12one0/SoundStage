@@ -99,6 +99,21 @@ public class ApplyOrchestratorTests
     }
 
     [Fact]
+    public void SupersededApply_DoesNotGetItsHashConfirmed_WhenLaterApplyIsKept()
+    {
+        // Apply A (guarded), then B while A's countdown runs, then the user keeps B.
+        var first = _orchestrator.Apply(_state, Resolve, ApplyAttribution.Manual());
+        _state.Profiles[0].ActivePresetId = "mild";
+        var second = _orchestrator.Apply(_state, Resolve, ApplyAttribution.Manual());
+
+        _orchestrator.Guard.Confirm();
+
+        // Only B — the sound the user actually heard and kept — is whitelisted.
+        Assert.Contains(second.ChainHash, _state.ConfirmedChainHashes);
+        Assert.DoesNotContain(first.ChainHash, _state.ConfirmedChainHashes);
+    }
+
+    [Fact]
     public void RuleApply_IsNeverGuarded()
     {
         var result = _orchestrator.Apply(_state, Resolve, ApplyAttribution.Rule("r1", "Night mode after 10pm"));

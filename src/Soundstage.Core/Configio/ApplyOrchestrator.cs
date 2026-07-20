@@ -85,9 +85,14 @@ public sealed class ApplyOrchestrator
                 _fs.WriteAllTextAtomic(_layout.ChainFilePath, revertTo);
             });
 
-            // Wire confirm → remember the hash (idempotent; RevertGuard resolves once).
+            // Wire confirm → remember the hash. The handler detaches on the FIRST outcome
+            // it sees: a Superseded outcome means a newer apply took over the pending
+            // guard, and confirming THAT one must not whitelist this apply's hash — the
+            // user never chose to keep this sound. (Arm fires Superseded before the newer
+            // apply subscribes its own handler, so the newer handler never sees it.)
             void OnResolved(RevertOutcome outcome)
             {
+                _guard.Resolved -= OnResolved;
                 if (outcome == RevertOutcome.Confirmed)
                 {
                     if (!state.ConfirmedChainHashes.Contains(hash))
@@ -97,11 +102,6 @@ public sealed class ApplyOrchestrator
                     }
 
                     ChainHashConfirmed?.Invoke(hash);
-                }
-
-                if (outcome != RevertOutcome.Superseded)
-                {
-                    _guard.Resolved -= OnResolved;
                 }
             }
 
