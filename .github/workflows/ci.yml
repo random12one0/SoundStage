@@ -69,6 +69,17 @@ jobs:
           name: Soundstage-portable-win-x64
           path: publish/
 
+      # Inno Setup 6 is preinstalled on windows-latest runners.
+      - name: Build installer
+        shell: pwsh
+        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\Soundstage.iss'
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Soundstage-Setup
+          path: installer/Output/
+
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
