@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
 using Soundstage.App.Services;
 using Soundstage.Core.Effects;
 
@@ -28,12 +27,6 @@ public partial class EffectsViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _nightCornerOverridden;
-
-    [ObservableProperty]
-    private bool _nightUseVst;
-
-    [ObservableProperty]
-    private string? _nightVstPath;
 
     [ObservableProperty]
     private string _nightStatus = "";
@@ -95,8 +88,6 @@ public partial class EffectsViewModel : ObservableObject
         NightIntensity = e.NightMode.Intensity;
         NightBassCorner = e.NightMode.EffectiveCornerHz;
         NightCornerOverridden = e.NightMode.BassCornerOverrideHz is not null;
-        NightUseVst = e.NightMode.UseVstCompressor;
-        NightVstPath = e.NightMode.VstLibraryPath;
         LoudnessEnabled = e.Loudness.Enabled;
         LoudnessIntensity = e.Loudness.Intensity;
         WidthEnabled = e.StereoWidth.Enabled;
@@ -128,7 +119,7 @@ public partial class EffectsViewModel : ObservableObject
     private void Commit()
     {
         // `with`-mutation preserves advanced overrides the page doesn't surface
-        // (BassCutDbOverride, VstRawArguments, ReferenceLevelOverride, …).
+        // (BassCutDbOverride, ReferenceLevelOverride, …).
         _services.Controller?.UpdateEffects(e => e with
         {
             NightMode = e.NightMode with
@@ -136,8 +127,6 @@ public partial class EffectsViewModel : ObservableObject
                 Enabled = NightEnabled,
                 Intensity = (int)Math.Round(NightIntensity),
                 BassCornerOverrideHz = NightCornerOverridden ? Math.Clamp(NightBassCorner, 40, 400) : null,
-                UseVstCompressor = NightUseVst,
-                VstLibraryPath = NightVstPath,
             },
             Loudness = e.Loudness with { Enabled = LoudnessEnabled, Intensity = (int)Math.Round(LoudnessIntensity) },
             StereoWidth = e.StereoWidth with { Enabled = WidthEnabled, WidthPercent = (int)Math.Round(WidthPercent) },
@@ -181,8 +170,6 @@ public partial class EffectsViewModel : ObservableObject
         _syncing = false;
         Push(immediate: true);
     }
-
-    partial void OnNightUseVstChanged(bool value) => Push(immediate: true);
 
     partial void OnLoudnessEnabledChanged(bool value) => Push(immediate: true);
 
@@ -233,72 +220,8 @@ public partial class EffectsViewModel : ObservableObject
         Push(immediate: true);
     }
 
-    [RelayCommand]
-    private void ScanForVst()
-    {
-        var best = Services.VstScanner.FindBestCompressor();
-        if (best is not null)
-        {
-            NightVstPath = best;
-            NightUseVst = true;
-            Push(immediate: true);
-            NightStatus = $"Found and wired up {System.IO.Path.GetFileName(best)}.";
-        }
-        else
-        {
-            NightStatus = "No compressor plugin found. Click “Get LoudMax (free)”, unzip it, and note where the 64-bit DLL (LoudMaxWin64.dll) is — then Scan again (Downloads, Desktop and Documents are all checked), or use “Choose DLL…”.";
-        }
-    }
-
-    [RelayCommand]
-    private void OpenLoudMaxSite()
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://loudmax.blogspot.com") { UseShellExecute = true });
-        }
-        catch
-        {
-            NightStatus = "Couldn't open the browser — visit loudmax.blogspot.com manually.";
-        }
-    }
-
-    [RelayCommand]
-    private void PickVst()
-    {
-        var dialog = new OpenFileDialog
-        {
-            Title = "Choose a VST 2 compressor DLL",
-            Filter = "VST 2 plugin (*.dll)|*.dll",
-        };
-        if (dialog.ShowDialog() == true)
-        {
-            NightVstPath = dialog.FileName;
-            NightUseVst = true;
-            Push(immediate: true);
-        }
-    }
-
-    [RelayCommand]
-    private void ClearVst()
-    {
-        NightVstPath = null;
-        NightUseVst = false;
-        Push(immediate: true);
-    }
-
     private void OnApplied(Core.Configio.ApplyResult result)
     {
-        var endpointId = _services.Controller?.State.ActiveEndpointId;
-        var report = result.Compilation.Devices.FirstOrDefault(d => d.EndpointId == endpointId);
-        var notes = report?.Notes ?? [];
-
-        NightStatus = NightEnabled && notes.Any(n => n.Contains("Compression off", StringComparison.Ordinal))
-            ? "Compression off — pick a compressor VST below for full night mode. The bass shelf still works."
-            : NightEnabled && NightUseVst
-                ? "Bass shelf + VST compressor active."
-                : "";
-
         WidthStatus = WidthEnabled && WidthInDangerZone
             ? "Past 140% centered vocals start sounding thin and distant."
             : WidthEnabled

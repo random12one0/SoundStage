@@ -44,6 +44,7 @@ public sealed class SoundstageController : IDisposable
 
         _environment.Changed += OnEnvironmentChanged;
         _orchestrator.ChainHashConfirmed += _ => SaveState();
+        _orchestrator.WriteBlocked += blocked => WriteBlocked?.Invoke(blocked);
     }
 
     public SoundstageState State { get; }
@@ -65,6 +66,9 @@ public sealed class SoundstageController : IDisposable
 
     /// <summary>Raised when an apply happened (carries headroom reports for the meter).</summary>
     public event Action<ApplyResult>? Applied;
+
+    /// <summary>Raised when a config write was blocked (permission/lock) — the UI shows a hint instead of crashing.</summary>
+    public event Action<ConfigWriteBlocked>? WriteBlocked;
 
     public DeviceProfile? ActiveProfile => State.ActiveProfile;
 

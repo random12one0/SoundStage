@@ -36,6 +36,12 @@ public partial class ShellViewModel : ObservableObject
     private string _updateBannerText = "";
 
     [ObservableProperty]
+    private bool _showWriteBlockedBanner;
+
+    [ObservableProperty]
+    private string _writeBlockedText = "";
+
+    [ObservableProperty]
     private bool _canUndo;
 
     [ObservableProperty]
@@ -64,6 +70,11 @@ public partial class ShellViewModel : ObservableObject
         if (services.Controller is { } controller)
         {
             controller.Changed += () => UiDispatch.Post(RefreshBanners);
+            controller.WriteBlocked += blocked => UiDispatch.Post(() =>
+            {
+                WriteBlockedText = blocked.FriendlyMessage;
+                ShowWriteBlockedBanner = true;
+            });
         }
 
         services.Update.Changed += () => UiDispatch.Post(RefreshBanners);
@@ -125,6 +136,9 @@ public partial class ShellViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenDiagnostics() => NavigateTo("diagnostics");
+
+    [RelayCommand]
+    private void DismissWriteBlocked() => ShowWriteBlockedBanner = false;
 
     /// <summary>Global Ctrl+Z — steps the sound back one change.</summary>
     [RelayCommand]

@@ -25,7 +25,7 @@
                         <StackPanel>
                             <TextBlock FontSize="15" FontWeight="SemiBold" Text="Night mode" />
                             <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
-                                       Text="Quieter late-night listening: pulls down the bass that travels through walls and tames loud peaks." />
+                                       Text="Quieter late-night listening: pulls down the bass that travels through walls and eases the overall level. 100% native — no plugins, so it can never interrupt your audio." />
                         </StackPanel>
                         <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal">
                             <ui:Button Margin="0,0,10,0" Command="{Binding ResetNightCommand}" Content="Reset" FontSize="11" Opacity="0.6" ToolTip="Back to defaults" />
@@ -62,16 +62,6 @@
                             </Grid>
                             <TextBlock Margin="0,4,0,0" FontSize="11" Opacity="0.55"
                                        Text="By default the intensity slider opens this up automatically — higher intensity removes more of the bass. Drag to pin it, or Reset to hand it back to intensity." TextWrapping="Wrap" />
-                            <TextBlock Margin="0,12,0,4" FontWeight="SemiBold" FontSize="13" Text="Compressor (VST)" />
-                            <TextBlock FontSize="12" Opacity="0.65" TextWrapping="Wrap"
-                                       Text="Real dynamic range control uses a free VST 2 compressor hosted by Equalizer APO. Licenses don't allow bundling one, but it's a single download: get LoudMax, unzip it, and Soundstage will find it. LoudMax includes several DLLs — you want the 64-bit one (LoudMaxWin64.dll); Scan picks it automatically." />
-                            <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
-                                <ui:Button Appearance="Primary" Command="{Binding ScanForVstCommand}" Content="Scan this PC" />
-                                <ui:Button Margin="8,0,0,0" Command="{Binding OpenLoudMaxSiteCommand}" Content="Get LoudMax (free)" />
-                                <ui:Button Margin="8,0,0,0" Command="{Binding PickVstCommand}" Content="Choose DLL…" />
-                                <ui:Button Margin="8,0,0,0" Command="{Binding ClearVstCommand}" Content="Remove" />
-                            </StackPanel>
-                            <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.7" Text="{Binding NightVstPath}" TextWrapping="Wrap" />
                         </StackPanel>
                     </Expander>
                 </StackPanel>
