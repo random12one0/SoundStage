@@ -123,17 +123,22 @@ public partial class EffectsViewModel : ObservableObject
 
     private void Commit()
     {
-        _services.Controller?.UpdateEffects(_ => new EffectSettings(
-            new NightModeSettings(
-                NightEnabled,
-                (int)Math.Round(NightIntensity),
-                Math.Clamp(NightBassCorner, 40, 200),
-                BassCutDbOverride: null,
-                NightUseVst,
-                NightVstPath),
-            new LoudnessSettings(LoudnessEnabled, (int)Math.Round(LoudnessIntensity)),
-            new StereoWidthSettings(WidthEnabled, (int)Math.Round(WidthPercent)),
-            new AmbienceSettings(AmbienceEnabled, (int)Math.Round(AmbienceIntensity))));
+        // `with`-mutation preserves advanced overrides the page doesn't surface
+        // (BassCutDbOverride, VstRawArguments, ReferenceLevelOverride, …).
+        _services.Controller?.UpdateEffects(e => e with
+        {
+            NightMode = e.NightMode with
+            {
+                Enabled = NightEnabled,
+                Intensity = (int)Math.Round(NightIntensity),
+                BassCornerHz = Math.Clamp(NightBassCorner, 40, 200),
+                UseVstCompressor = NightUseVst,
+                VstLibraryPath = NightVstPath,
+            },
+            Loudness = e.Loudness with { Enabled = LoudnessEnabled, Intensity = (int)Math.Round(LoudnessIntensity) },
+            StereoWidth = e.StereoWidth with { Enabled = WidthEnabled, WidthPercent = (int)Math.Round(WidthPercent) },
+            Ambience = e.Ambience with { Enabled = AmbienceEnabled, Intensity = (int)Math.Round(AmbienceIntensity) },
+        });
     }
 
     partial void OnNightEnabledChanged(bool value) => Push(immediate: true);
