@@ -1,3 +1,5 @@
+using System;
+using System.Windows;
 using Soundstage.App.Services;
 using Soundstage.App.Tests.Support;
 using Soundstage.App.Views;
@@ -17,6 +19,14 @@ public class XamlSmokeTests
         UiDispatch.Post = action => action();
         StaTestHelper.Run(() =>
         {
+            // Pages use app-level styles (Card, SectionTitle, …) that App.xaml loads at
+            // runtime. Mirror that here so the smoke test exercises the same resource graph.
+            var app = Application.Current ?? new Application();
+            app.Resources.MergedDictionaries.Add(new ResourceDictionary
+            {
+                Source = new Uri("pack://application:,,,/Soundstage;component/Resources/Theme.xaml", UriKind.Absolute),
+            });
+
             using var services = AppServices.Build();
             _ = new DashboardPage(services);
             _ = new EffectsPage(services);
