@@ -101,4 +101,8 @@ public partial class ShellViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenDiagnostics() => NavigateTo("diagnostics");
+
+    /// <summary>Global Ctrl+Z — steps the sound back one change.</summary>
+    [RelayCommand]
+    private void Undo() => _services.Controller?.Undo();
 }

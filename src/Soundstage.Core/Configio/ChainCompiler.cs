@@ -42,10 +42,16 @@ public static class ChainCompiler
             document.Commands.Add(new CommentCommand("No devices configured."));
         }
 
+        // With a single profile there is nothing to disambiguate — apply globally, with no
+        // Device: scoping. This sidesteps the one silent-failure mode of APO's device
+        // matching (a non-matching pattern applies to nothing, with no error anywhere).
+        // Scoped sections only appear once a second device profile exists.
+        var scopePerDevice = profiles.Count > 1;
+
         foreach (var profile in profiles)
         {
             document.Commands.Add(BlankLineCommand.Instance);
-            CompileDevice(document, profile, state, presetResolver, ambienceIrResolver, reports);
+            CompileDevice(document, profile, state, presetResolver, ambienceIrResolver, reports, scopePerDevice);
         }
 
         return new ChainCompilation(document, document.Render(), reports);
@@ -57,7 +63,8 @@ public static class ChainCompiler
         SoundstageState state,
         Func<string, EqPreset?> presetResolver,
         Func<int, string?>? ambienceIrResolver,
-        List<DeviceChainReport> reports)
+        List<DeviceChainReport> reports,
+        bool scopePerDevice)
     {
         var notes = new List<string>();
         var capabilities = profile.Capabilities;
@@ -116,7 +123,10 @@ public static class ChainCompiler
 
         // ---- Emit the section ----
         document.Commands.Add(new CommentCommand($"── {profile.FriendlyName} ({FormatChannels(capabilities.Channels)}) — preset: {preset?.Name ?? "none"}"));
-        document.Commands.Add(new DeviceCommand(profile.EffectiveMatchSpec));
+        if (scopePerDevice)
+        {
+            document.Commands.Add(new DeviceCommand(profile.EffectiveMatchSpec));
+        }
 
         if (Math.Abs(headroom.RecommendedPreampDb) > 0.01)
         {

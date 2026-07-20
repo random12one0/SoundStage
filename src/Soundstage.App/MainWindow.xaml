@@ -23,6 +23,10 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </ui:FluentWindow.Resources>
 
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Command="{Binding UndoCommand}" Gesture="Ctrl+Z" />
+    </ui:FluentWindow.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -136,7 +140,12 @@
                         Fill="#E81123"
                         Visibility="{Binding IsClipping, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding DeviceName}" />
-                    <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding ChannelText}" />
+                    <TextBlock
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
+                        Opacity="0.75"
+                        Text="{Binding ChannelText}"
+                        ToolTip="Your output device's speaker configuration — what Windows mixes everything to. Stereo content (like Spotify) still shows the full layout here; the receiver/Atmos handles the upmix." />
                     <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding FormatText}" />
                     <TextBlock
                         Margin="14,0,0,0"
@@ -144,6 +153,14 @@
                         Opacity="0.75"
                         Text="{Binding SpatialText}"
                         Visibility="{Binding SpatialText, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock
+                        Margin="16,0,0,0"
+                        VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        Foreground="#7ACC7A"
+                        Text="{Binding NowPlayingText}"
+                        ToolTip="Apps currently playing audio (detected live — the same signal automations use)"
+                        Visibility="{Binding NowPlayingText, Converter={StaticResource StringToVisibility}}" />
                 </StackPanel>
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                     <Border

@@ -173,6 +173,7 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         _syncing = true;
+        OnPropertyChanged(nameof(CanUndo));
         IsBypassed = controller.State.BypassActive;
         var activeId = controller.ActiveProfile?.ActivePresetId;
         if (SelectedPreset?.Id != activeId)
@@ -209,6 +210,50 @@ public partial class DashboardViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleBypass() => _services.Controller?.ToggleBypass();
+
+    public bool CanUndo => _services.Controller?.CanUndo ?? false;
+
+    [RelayCommand]
+    private void Undo()
+    {
+        _services.Controller?.Undo();
+        RefreshPresets();
+        RebuildEditor();
+        OnPropertyChanged(nameof(CanUndo));
+    }
+
+    /// <summary>Marks the start of an editing gesture: one undo step per gesture, not per tick.</summary>
+    private void PushUndoIfGestureStart()
+    {
+        if (_editDebounce is null)
+        {
+            _services.Controller?.PushUndoSnapshot();
+            OnPropertyChanged(nameof(CanUndo));
+        }
+    }
+
+    [RelayCommand]
+    private void ResetEq()
+    {
+        var preset = EnsureEditablePreset();
+        if (preset is null)
+        {
+            return;
+        }
+
+        _services.Controller?.PushUndoSnapshot();
+        foreach (var band in Bands)
+        {
+            band.GainDb = 0;
+        }
+
+        foreach (var graphicBand in GraphicBands)
+        {
+            graphicBand.Value = 0;
+        }
+
+        OnPropertyChanged(nameof(CanUndo));
+    }
 
     // ---- Preset management ----
 
@@ -401,6 +446,7 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void AddBand()
     {
+        PushUndoIfGestureStart();
         if (EnsureEditablePreset() is null)
         {
             return;
@@ -413,6 +459,7 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void RemoveBand(BandViewModel? band)
     {
+        PushUndoIfGestureStart();
         if (band is null || EnsureEditablePreset() is null)
         {
             return;
@@ -453,6 +500,7 @@ public partial class DashboardViewModel : ObservableObject
 
     private void OnGraphicChanged(int index, double value)
     {
+        PushUndoIfGestureStart();
         var preset = EnsureEditablePreset();
         if (preset is null)
         {
@@ -471,6 +519,7 @@ public partial class DashboardViewModel : ObservableObject
     private void OnEditorChanged()
     {
         RecomputeCurve();
+        PushUndoIfGestureStart();
         var preset = EnsureEditablePreset();
         if (preset is null)
         {
@@ -480,6 +529,7 @@ public partial class DashboardViewModel : ObservableObject
         _editDebounce?.Dispose();
         _editDebounce = _services.Scheduler.Schedule(TimeSpan.FromMilliseconds(350), () => UiDispatch.Post(() =>
         {
+            _editDebounce = null; // gesture over — the next tweak starts a new undo step
             if (preset.Mode == EqMode.Parametric)
             {
                 preset.Bands = Bands.Select(b => b.ToBand()).ToList();

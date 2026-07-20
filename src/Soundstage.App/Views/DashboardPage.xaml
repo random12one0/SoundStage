@@ -48,18 +48,31 @@
                     <ui:Button Margin="6,0,0,0" Command="{Binding ImportFileCommand}" Content="Import…" ToolTip="Import Peace or AutoEq preset files" />
                 </StackPanel>
 
-                <ToggleButton
-                    Grid.Column="1"
-                    MinWidth="150"
-                    Padding="14,8"
-                    VerticalAlignment="Center"
-                    IsChecked="{Binding IsBypassed}"
-                    ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Text="" />
-                        <TextBlock Margin="8,0,0,0" Text="A/B Bypass" />
-                    </StackPanel>
-                </ToggleButton>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ui:Button
+                        Padding="12,8"
+                        VerticalAlignment="Center"
+                        Command="{Binding UndoCommand}"
+                        IsEnabled="{Binding CanUndo}"
+                        ToolTip="Undo your last change (Ctrl+Z)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="" />
+                            <TextBlock Margin="7,0,0,0" Text="Undo" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ToggleButton
+                        MinWidth="150"
+                        Margin="8,0,0,0"
+                        Padding="14,8"
+                        VerticalAlignment="Center"
+                        IsChecked="{Binding IsBypassed}"
+                        ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Text="" />
+                            <TextBlock Margin="8,0,0,0" Text="A/B Bypass" />
+                        </StackPanel>
+                    </ToggleButton>
+                </StackPanel>
             </Grid>
 
             <TextBlock
@@ -107,7 +120,8 @@
                     <Grid>
                         <TextBlock FontWeight="SemiBold" Text="Equalizer" />
                         <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
-                            <ui:Button Command="{Binding SetModeCommand}" CommandParameter="Parametric" Content="Parametric" FontSize="12" />
+                            <ui:Button Command="{Binding ResetEqCommand}" Content="Zero all bands" FontSize="11" Opacity="0.7" ToolTip="Flatten every band back to 0 dB (undoable)" />
+                            <ui:Button Margin="10,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Parametric" Content="Parametric" FontSize="12" />
                             <ui:Button Margin="6,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Graphic10" Content="10-band" FontSize="12" />
                             <ui:Button Margin="6,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Graphic31" Content="31-band" FontSize="12" />
                         </StackPanel>

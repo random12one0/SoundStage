@@ -87,8 +87,20 @@ public sealed class SoundstageController : IDisposable
             {
                 return;
             }
+        }
 
-            profile.ActivePresetId = presetId;
+        // Only the user's own actions earn undo steps — automation churn would bury them.
+        if ((attribution?.Source ?? AttributionSource.Manual) == AttributionSource.Manual)
+        {
+            PushUndoSnapshot();
+        }
+
+        lock (_gate)
+        {
+            if (ActiveProfile is { } profile)
+            {
+                profile.ActivePresetId = presetId;
+            }
         }
 
         Apply(attribution ?? ApplyAttribution.Manual());
@@ -101,6 +113,7 @@ public sealed class SoundstageController : IDisposable
 
     public void UpdateEffects(Func<EffectSettings, EffectSettings> mutate, ApplyAttribution? attribution = null)
     {
+        EffectSettings updated;
         lock (_gate)
         {
             var profile = ActiveProfile;
@@ -109,13 +122,24 @@ public sealed class SoundstageController : IDisposable
                 return;
             }
 
-            var updated = mutate(profile.Effects);
+            updated = mutate(profile.Effects);
             if (updated == profile.Effects)
             {
                 return;
             }
+        }
 
-            profile.Effects = updated;
+        if ((attribution?.Source ?? AttributionSource.Manual) == AttributionSource.Manual)
+        {
+            PushUndoSnapshot();
+        }
+
+        lock (_gate)
+        {
+            if (ActiveProfile is { } profile)
+            {
+                profile.Effects = updated;
+            }
         }
 
         Apply(attribution ?? ApplyAttribution.Manual());
@@ -142,6 +166,99 @@ public sealed class SoundstageController : IDisposable
 
     /// <summary>User confirmed a guarded apply (the countdown toast's Keep button).</summary>
     public void ConfirmPendingApply() => _orchestrator.Guard.Confirm();
+
+    // ---- Undo ----
+
+    private sealed record UndoSnapshot(string StateJson, string? PresetId, string? PresetJson);
+
+    private const int MaxUndoDepth = 50;
+    private readonly List<UndoSnapshot> _undoStack = [];
+
+    public bool CanUndo
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _undoStack.Count > 0;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Captures the current sound (state + the active user preset's content) as an undo
+    /// step. Callers push at the START of a user gesture, so a whole slider drag
+    /// collapses into one step.
+    /// </summary>
+    public void PushUndoSnapshot()
+    {
+        lock (_gate)
+        {
+            var presetId = ActiveProfile?.ActivePresetId;
+            var preset = presetId is null ? null : _presets.Get(presetId);
+            var presetJson = preset is { IsBuiltIn: false }
+                ? System.Text.Json.JsonSerializer.Serialize(preset, JsonDefaults.Readable)
+                : null;
+
+            _undoStack.Add(new UndoSnapshot(
+                System.Text.Json.JsonSerializer.Serialize(State, JsonDefaults.Readable),
+                presetId,
+                presetJson));
+
+            if (_undoStack.Count > MaxUndoDepth)
+            {
+                _undoStack.RemoveAt(0);
+            }
+        }
+
+        // No Changed event here: pushing a snapshot is invisible to the sound; the apply
+        // that follows the mutation raises Changed (and refreshes CanUndo bindings).
+    }
+
+    /// <summary>Steps back to the previous sound: profile state, effects, preset choice and content.</summary>
+    public bool Undo()
+    {
+        UndoSnapshot snapshot;
+        lock (_gate)
+        {
+            if (_undoStack.Count == 0)
+            {
+                return false;
+            }
+
+            snapshot = _undoStack[^1];
+            _undoStack.RemoveAt(_undoStack.Count - 1);
+
+            var restored = System.Text.Json.JsonSerializer.Deserialize<SoundstageState>(snapshot.StateJson, JsonDefaults.Readable);
+            if (restored is null)
+            {
+                return false;
+            }
+
+            // Audio-affecting fields only. The physical device, settings, and the
+            // confirmed-hash memory are not part of "what did I just change".
+            State.BypassActive = restored.BypassActive;
+            State.AutomationsEnabled = restored.AutomationsEnabled;
+            State.Profiles.Clear();
+            State.Profiles.AddRange(restored.Profiles);
+        }
+
+        if (snapshot.PresetJson is not null)
+        {
+            var preset = System.Text.Json.JsonSerializer.Deserialize<Presets.EqPreset>(snapshot.PresetJson, JsonDefaults.Readable);
+            if (preset is not null)
+            {
+                preset.IsBuiltIn = false;
+                _presets.Save(preset);
+            }
+        }
+
+        // The current default device is physical reality — make sure it still has a profile.
+        AdoptCurrentDevice(applyAfter: false);
+        _orchestrator.SetBypass(State, State.BypassActive);
+        Apply(ApplyAttribution.System("undo"));
+        return true;
+    }
 
     // ---- Devices ----
 

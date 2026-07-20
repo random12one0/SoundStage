@@ -27,6 +27,9 @@ public partial class StatusBarViewModel : ObservableObject
     private string _spatialText = "";
 
     [ObservableProperty]
+    private string _nowPlayingText = "";
+
+    [ObservableProperty]
     private string _presetText = "—";
 
     [ObservableProperty]
@@ -64,10 +67,13 @@ public partial class StatusBarViewModel : ObservableObject
     {
         var snapshot = _services.Environment.GetSnapshot();
         DeviceName = snapshot.DeviceName ?? "No output device";
-        ChannelText = ChainCompiler.FormatChannels(snapshot.Channels);
+        // "out": this is the device's configured speaker layout (what Windows mixes to),
+        // not the content's channel count — stereo Spotify still shows 7.1 on a 7.1 rig.
+        ChannelText = $"{ChainCompiler.FormatChannels(snapshot.Channels)} out";
         FormatText = snapshot.BitDepth > 0
             ? $"{snapshot.SampleRateHz / 1000.0:0.#} kHz · {snapshot.BitDepth}-bit"
             : $"{snapshot.SampleRateHz / 1000.0:0.#} kHz";
+        NowPlayingText = FormatNowPlaying(snapshot.ActiveAudioProcesses);
         SpatialText = snapshot.Spatial switch
         {
             SpatialAudioState.On => "Spatial audio on",
@@ -102,6 +108,36 @@ public partial class StatusBarViewModel : ObservableObject
         HeadroomText = report is null ? "" : $"{report.Headroom.HeadroomDb:0.0} dB headroom";
         Refresh();
     }
+
+    /// <summary>"♪ Spotify" / "♪ Spotify · Chrome" from the processes with active audio sessions.</summary>
+    internal static string FormatNowPlaying(IReadOnlyList<string> processes)
+    {
+        if (processes.Count == 0)
+        {
+            return "";
+        }
+
+        var pretty = processes.Select(PrettyProcessName).Distinct().Take(2).ToList();
+        var extra = processes.Count - pretty.Count;
+        return "♪ " + string.Join(" · ", pretty) + (extra > 0 ? $" +{extra}" : "");
+    }
+
+    private static string PrettyProcessName(string processName) => processName.ToLowerInvariant() switch
+    {
+        "spotify" => "Spotify",
+        "chrome" => "Chrome",
+        "msedge" => "Edge",
+        "firefox" => "Firefox",
+        "brave" => "Brave",
+        "opera" => "Opera",
+        "vlc" => "VLC",
+        "steam" => "Steam",
+        "discord" => "Discord",
+        "foobar2000" => "foobar2000",
+        "itunes" => "iTunes",
+        "musicbee" => "MusicBee",
+        _ => processName,
+    };
 
     private void OnClipping()
     {

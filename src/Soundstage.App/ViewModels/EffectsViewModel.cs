@@ -166,6 +166,39 @@ public partial class EffectsViewModel : ObservableObject
     partial void OnAmbienceIntensityChanged(double value) => Push();
 
     [RelayCommand]
+    private void ResetNight()
+    {
+        NightEnabled = false;
+        NightIntensity = 50;
+        NightBassCorner = 90;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetLoudness()
+    {
+        LoudnessEnabled = false;
+        LoudnessIntensity = 50;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetWidth()
+    {
+        WidthEnabled = false;
+        WidthPercent = 100;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetAmbience()
+    {
+        AmbienceEnabled = false;
+        AmbienceIntensity = 30;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
     private void ScanForVst()
     {
         var found = Services.VstScanner.FindCompressors();

@@ -54,6 +54,15 @@
                     <TextBlock FontSize="15" FontWeight="SemiBold" Text="Safety" />
 
                     <Grid Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Ask before keeping a brand-new sound" />
+                            <TextBlock FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                                       Text="Off (default): changes apply instantly and Undo (Ctrl+Z) is your safety net. On: never-heard-before configs show a keep-or-revert countdown." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding ConfirmNewSounds}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding ConfirmNewSounds}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="220" />
@@ -61,7 +70,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="Confirm-or-revert countdown" />
-                            <TextBlock FontSize="12" Opacity="0.6" Text="How long a new, never-confirmed sound waits before reverting." />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="How long a new sound waits for confirmation before reverting." />
                         </StackPanel>
                         <Slider Grid.Column="1" VerticalAlignment="Center" Maximum="30" Minimum="3" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GuardSeconds}" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding GuardSeconds, StringFormat={}{0:0}s}" />

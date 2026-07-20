@@ -56,10 +56,21 @@ public class ChainCompilerTests
     }
 
     [Fact]
-    public void DeviceSection_UsesEndpointGuid_AsMatchSpec()
+    public void SingleProfile_AppliesGlobally_WithoutDeviceScoping()
     {
+        // One device = nothing to disambiguate. Skipping Device: sidesteps APO's silent
+        // no-match failure mode entirely for the common single-output setup.
         var compilation = ChainCompiler.Compile(StateWith(SpeakerProfile()), _ => MusicPreset);
+        Assert.DoesNotContain("Device:", compilation.RenderedText);
+        Assert.Contains("Filter 1:", compilation.RenderedText);
+    }
+
+    [Fact]
+    public void TwoProfiles_UseEndpointGuids_AsMatchSpecs()
+    {
+        var compilation = ChainCompiler.Compile(StateWith(SpeakerProfile(), HeadphoneProfile()), _ => MusicPreset);
         Assert.Contains("Device: {aaaa1111-2222-3333-4444-555566667777}", compilation.RenderedText);
+        Assert.Contains("Device: {bbbb1111-2222-3333-4444-555566667777}", compilation.RenderedText);
     }
 
     [Fact]
@@ -176,7 +187,6 @@ public class ChainCompilerTests
             "# Managed by Soundstage. Generated processing chain — do not edit (use user.txt).\r\n" +
             "\r\n" +
             "# ── Onkyo TX-NR676 (5.1) — preset: Music\r\n" +
-            "Device: {aaaa1111-2222-3333-4444-555566667777}\r\n" +
             // -2.0 = min(night-mode degraded headroom −2.0, clip ceiling −0.5 − 1.5 peak) — they coincide here.
             "Preamp: -2.0 dB\r\n" +
             "Filter 1: ON LSC Fc 80 Hz Gain 2.0 dB Q 0.707\r\n" +

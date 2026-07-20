@@ -141,6 +141,8 @@ jobs:
           4. Pick a preset. Done.
 
           **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/main/docs/ATMOS-VALIDATION.md).
+
+          **Full night mode (compression):** one free download — [LoudMax](https://loudmax.blogspot.com) (64-bit VST DLL), then **Effects → Night mode → Advanced → Scan this PC** wires it up automatically. See the README for the 2-step guide.
           "@
           gh release create "$env:VERSION" `
             "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `

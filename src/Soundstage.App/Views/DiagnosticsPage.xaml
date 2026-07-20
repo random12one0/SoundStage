@@ -60,7 +60,14 @@
                             <Run Text="Muffling active — reverting in " /><Run Text="{Binding SweepSecondsLeft, Mode=OneWay}" /><Run Text="s" />
                         </TextBlock>
                     </StackPanel>
-                    <Expander Margin="0,12,0,0" Header="I heard no change — what now?">
+                    <Expander Margin="0,12,0,0" Header="Advanced: test device targeting">
+                        <StackPanel Margin="0,8,0,0">
+                            <TextBlock FontSize="12.5" Opacity="0.8" TextWrapping="Wrap"
+                                       Text="Runs the same muffle test, but restricted to the current output device the way multi-device profiles target it. Only relevant once you use two or more devices — if the normal test muffles and this one doesn't, device targeting isn't matching on your driver." />
+                            <ui:Button Margin="0,8,0,0" Command="{Binding RunScopedSweepCommand}" Content="Start targeted 8-second test" />
+                        </StackPanel>
+                    </Expander>
+                    <Expander Margin="0,8,0,0" Header="I heard no change — what now?">
                         <TextBlock Margin="0,8,0,0" FontSize="12.5" Opacity="0.8" TextWrapping="Wrap">
                             1. Open Equalizer APO's Configurator (Start menu → Configurator), select your output device, and
                             click "Troubleshooting options".&#10;

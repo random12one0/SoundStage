@@ -33,6 +33,9 @@ public partial class SettingsViewModel : ObservableObject
     private bool _ambienceFeature;
 
     [ObservableProperty]
+    private bool _confirmNewSounds;
+
+    [ObservableProperty]
     private double _guardSeconds = 10;
 
     [ObservableProperty]
@@ -69,6 +72,7 @@ public partial class SettingsViewModel : ObservableObject
             StartMinimized = settings.StartMinimized;
             MinimizeToTray = settings.MinimizeToTray;
             AmbienceFeature = settings.AmbienceFeatureEnabled;
+            ConfirmNewSounds = settings.ConfirmNewSounds;
             GuardSeconds = settings.RevertGuardSeconds;
             SafetyMargin = settings.SafetyMarginDb;
             BypassHotkeyText = settings.BypassHotkey;
@@ -94,6 +98,7 @@ public partial class SettingsViewModel : ObservableObject
         settings.StartMinimized = StartMinimized;
         settings.MinimizeToTray = MinimizeToTray;
         settings.AmbienceFeatureEnabled = AmbienceFeature;
+        settings.ConfirmNewSounds = ConfirmNewSounds;
         settings.RevertGuardSeconds = (int)Math.Clamp(GuardSeconds, 3, 60);
         settings.SafetyMarginDb = Math.Clamp(SafetyMargin, 0, 3);
         settings.BypassHotkey = BypassHotkeyText;
@@ -124,6 +129,8 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnMinimizeToTrayChanged(bool value) => Persist();
 
     partial void OnAmbienceFeatureChanged(bool value) => Persist(reapply: true);
+
+    partial void OnConfirmNewSoundsChanged(bool value) => Persist();
 
     partial void OnGuardSecondsChanged(double value) => Persist();
 
