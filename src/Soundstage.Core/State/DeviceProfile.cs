@@ -1,3 +1,4 @@
+using Soundstage.Core.Automation;
 using Soundstage.Core.Effects;
 
 namespace Soundstage.Core.State;
@@ -25,6 +26,9 @@ public sealed class DeviceProfile
     public string? ActivePresetId { get; set; }
 
     public EffectSettings Effects { get; set; } = EffectSettings.Default;
+
+    /// <summary>This device's automation rules, evaluated top-to-bottom (last match wins).</summary>
+    public List<AutomationRule> Rules { get; set; } = [];
 
     /// <summary>Last observed format — lets the compiler apply channel guards while the device is inactive.</summary>
     public int LastKnownChannels { get; set; } = 2;

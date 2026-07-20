@@ -78,7 +78,12 @@ public sealed class SoundstageState
             return existing;
         }
 
-        var profile = new DeviceProfile { EndpointId = endpointId, FriendlyName = friendlyName };
+        var profile = new DeviceProfile
+        {
+            EndpointId = endpointId,
+            FriendlyName = friendlyName,
+            Rules = Automation.PrebuiltRules.CreateDefaultSet(),
+        };
         Profiles.Add(profile);
         return profile;
     }
