@@ -56,10 +56,21 @@ public class ChainCompilerTests
     }
 
     [Fact]
-    public void DeviceSection_UsesEndpointGuid_AsMatchSpec()
+    public void SingleProfile_AppliesGlobally_WithoutDeviceScoping()
     {
+        // One device = nothing to disambiguate. Skipping Device: sidesteps APO's silent
+        // no-match failure mode entirely for the common single-output setup.
         var compilation = ChainCompiler.Compile(StateWith(SpeakerProfile()), _ => MusicPreset);
+        Assert.DoesNotContain("Device:", compilation.RenderedText);
+        Assert.Contains("Filter 1:", compilation.RenderedText);
+    }
+
+    [Fact]
+    public void TwoProfiles_UseEndpointGuids_AsMatchSpecs()
+    {
+        var compilation = ChainCompiler.Compile(StateWith(SpeakerProfile(), HeadphoneProfile()), _ => MusicPreset);
         Assert.Contains("Device: {aaaa1111-2222-3333-4444-555566667777}", compilation.RenderedText);
+        Assert.Contains("Device: {bbbb1111-2222-3333-4444-555566667777}", compilation.RenderedText);
     }
 
     [Fact]
@@ -76,9 +87,9 @@ public class ChainCompilerTests
     }
 
     [Fact]
-    public void WidthOnSurroundProfile_EmitsNoCopy_AndExplains()
+    public void WidthOnSurroundProfile_EmitsFrontLRCopy_SurroundSafe()
     {
-        var profile = SpeakerProfile();
+        var profile = SpeakerProfile(); // 5.1
         profile.Effects = EffectSettings.Default with
         {
             StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 150),
@@ -86,9 +97,9 @@ public class ChainCompilerTests
 
         var compilation = ChainCompiler.Compile(StateWith(profile), _ => MusicPreset);
 
-        Assert.DoesNotContain("Copy:", compilation.RenderedText);
-        var report = Assert.Single(compilation.Devices);
-        Assert.Contains(report.Notes, n => n.Contains("stereo-only"));
+        // Now applies on surround too — but only touches L and R.
+        Assert.Contains("Copy: L=", compilation.RenderedText);
+        Assert.DoesNotContain("C=", compilation.RenderedText);
     }
 
     [Fact]
@@ -161,10 +172,12 @@ public class ChainCompilerTests
     public void GoldenEndToEnd_FullState_MatchesExactly()
     {
         var speakers = SpeakerProfile();
+        // Explicit overrides keep this a byte-exact STRUCTURE golden; the intensity→amount
+        // curve is covered numerically in IntensityCurveTests / EffectCompilerTests.
         speakers.Effects = EffectSettings.Default with
         {
-            NightMode = new NightModeSettings(Enabled: true, Intensity: 50),
-            Loudness = new LoudnessSettings(Enabled: true, Intensity: 50),
+            NightMode = new NightModeSettings(Enabled: true, Intensity: 50, BassCornerOverrideHz: 90, BassCutDbOverride: -4.5),
+            Loudness = new LoudnessSettings(Enabled: true, ReferenceLevelOverride: -22),
         };
 
         var flat = EqPreset.CreateFlat();
@@ -176,9 +189,8 @@ public class ChainCompilerTests
             "# Managed by Soundstage. Generated processing chain — do not edit (use user.txt).\r\n" +
             "\r\n" +
             "# ── Onkyo TX-NR676 (5.1) — preset: Music\r\n" +
-            "Device: {aaaa1111-2222-3333-4444-555566667777}\r\n" +
-            // -2.0 = min(night-mode degraded headroom −2.0, clip ceiling −0.5 − 1.5 peak) — they coincide here.
-            "Preamp: -2.0 dB\r\n" +
+            // Degraded night-mode headroom (6·curve(50) ≈ 4.1) dominates the clip ceiling here.
+            "Preamp: -4.1 dB\r\n" +
             "Filter 1: ON LSC Fc 80 Hz Gain 2.0 dB Q 0.707\r\n" +
             "Filter 2: ON PK Fc 250 Hz Gain -1.5 dB Q 1\r\n" +
             "Filter 3: ON HSC Fc 8000 Hz Gain 1.5 dB Q 0.707\r\n" +

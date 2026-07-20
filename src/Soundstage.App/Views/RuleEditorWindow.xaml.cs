@@ -16,10 +16,16 @@ public partial class RuleEditorWindow : FluentWindow
     public RuleEditorWindow(AppServices services, AutomationRule? existing)
     {
         _existing = existing;
-        _viewModel = new RuleEditorViewModel(services.Presets.All, existing);
+        _viewModel = new RuleEditorViewModel(services.Presets.All, existing, id => services.Presets.Get(id)?.Name ?? id);
         DataContext = _viewModel;
         InitializeComponent();
-        Owner = Application.Current?.MainWindow;
+
+        // Guard against being our own owner: if no other window exists yet, WPF has already
+        // made THIS window the app's MainWindow, and Owner = MainWindow would throw.
+        if (Application.Current?.MainWindow is { } main && !ReferenceEquals(main, this))
+        {
+            Owner = main;
+        }
     }
 
     private void OnSave(object sender, RoutedEventArgs e)

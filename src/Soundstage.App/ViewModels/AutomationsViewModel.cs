@@ -22,11 +22,11 @@ public partial class RuleViewModel : ObservableObject
 
     public string Name => Rule.Name;
 
-    public string TriggerText => Rule.Trigger.Describe();
+    /// <summary>Glyph for the trigger kind — shown in the accent chip on the card.</summary>
+    public string TriggerGlyph => AutomationGlyphs.ForTrigger(Rule.Trigger);
 
-    public string ActionsText => Rule.Actions.Count == 0
-        ? "No actions"
-        : string.Join(" · ", Rule.Actions.Select(a => a.Describe()));
+    /// <summary>The whole rule as one plain-English sentence.</summary>
+    public string Sentence => RuleSentence.Compose(Rule.Trigger, Rule.Actions, _owner.PresetName);
 
     public bool IsPrebuilt => Rule.IsPrebuilt;
 
@@ -51,9 +51,21 @@ public partial class RuleViewModel : ObservableObject
     public void RefreshTexts()
     {
         OnPropertyChanged(nameof(Name));
-        OnPropertyChanged(nameof(TriggerText));
-        OnPropertyChanged(nameof(ActionsText));
+        OnPropertyChanged(nameof(TriggerGlyph));
+        OnPropertyChanged(nameof(Sentence));
     }
+}
+
+/// <summary>A tap-to-add template card.</summary>
+public partial class TemplateViewModel(AutomationTemplate template) : ObservableObject
+{
+    public AutomationTemplate Template { get; } = template;
+
+    public string Title => Template.Title;
+
+    public string Description => Template.Description;
+
+    public string Glyph => Template.Glyph;
 }
 
 /// <summary>
@@ -74,7 +86,16 @@ public partial class AutomationsViewModel : ObservableObject
     [ObservableProperty]
     private string _decisionSummary = "No evaluation yet.";
 
+    [ObservableProperty]
+    private bool _hasRules;
+
+    public ObservableCollection<TemplateViewModel> Templates { get; } =
+        new(AutomationTemplates.All.Select(t => new TemplateViewModel(t)));
+
     public bool ApoAvailable => _services.ApoAvailable;
+
+    /// <summary>Humanizes a preset id to its display name for rule sentences.</summary>
+    public Func<string, string> PresetName => id => _services.Presets.Get(id)?.Name ?? id;
 
     public AutomationsViewModel(AppServices services)
     {
@@ -97,6 +118,20 @@ public partial class AutomationsViewModel : ObservableObject
     {
         var rules = _services.Controller?.ActiveProfile?.Rules ?? [];
         Rules = new ObservableCollection<RuleViewModel>(rules.Select(r => new RuleViewModel(r, this)));
+        HasRules = Rules.Count > 0;
+    }
+
+    [RelayCommand]
+    private void AddTemplate(TemplateViewModel? template)
+    {
+        if (template is null || _services.Controller?.ActiveProfile is not { } profile)
+        {
+            return;
+        }
+
+        profile.Rules.Add(template.Template.Build());
+        Reload();
+        RuleMutated();
     }
 
     private void SyncMaster()

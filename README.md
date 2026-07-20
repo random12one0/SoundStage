@@ -60,6 +60,33 @@ Plus: instant A/B bypass (button + global hotkey `Ctrl+Alt+B`), system tray with
 > Atmos active. If not, the same page walks you through APO's SFX/EFX install-mode fix.
 > Details in [docs/ATMOS-VALIDATION.md](docs/ATMOS-VALIDATION.md).
 
+### Night mode's compressor — one free download
+
+Full night mode uses a compressor plugin hosted by Equalizer APO. Compressor plugins are
+free to *use* but their licenses don't allow bundling one inside Soundstage, so it's a
+single download:
+
+1. Get **[LoudMax](https://loudmax.blogspot.com)** (free, by Thomas Mundt) — the
+   **64-bit Windows VST** version. No installer; it's just a DLL.
+2. In Soundstage: **Effects → Night mode → Advanced → Scan this PC.** Soundstage checks
+   the standard VST folders *and* your Downloads folder and wires the DLL up automatically
+   (or use **Choose DLL…** to point at it yourself).
+
+Until then, night mode still works in its lighter form — bass shelf + extra headroom — and
+says so right on the card.
+
+## Staying up to date
+
+Soundstage checks GitHub for a newer release a few seconds after launch (toggle it off in
+**Settings → Updates**) and shows a banner when one is available. **Settings → Updates**
+also has a **Check for updates** button and a one-click **Download & install** that fetches
+the new installer, verifies its SHA-256, runs it, and closes the app so it can update in
+place — no manual GitHub visit needed.
+
+> The in-app updater reads the repository's public Releases API. For it to work, this
+> repository must be **public** (Settings → General → Change visibility on GitHub). If it's
+> private, the updater will say so and you can still download releases manually.
+
 ## How it works
 
 Soundstage owns `config.txt` with a three-line stub and keeps everything it generates in

@@ -27,6 +27,9 @@ public partial class StatusBarViewModel : ObservableObject
     private string _spatialText = "";
 
     [ObservableProperty]
+    private string _nowPlayingText = "";
+
+    [ObservableProperty]
     private string _presetText = "—";
 
     [ObservableProperty]
@@ -64,10 +67,13 @@ public partial class StatusBarViewModel : ObservableObject
     {
         var snapshot = _services.Environment.GetSnapshot();
         DeviceName = snapshot.DeviceName ?? "No output device";
-        ChannelText = ChainCompiler.FormatChannels(snapshot.Channels);
+        // "out": this is the device's configured speaker layout (what Windows mixes to),
+        // not the content's channel count — stereo Spotify still shows 7.1 on a 7.1 rig.
+        ChannelText = $"{ChainCompiler.FormatChannels(snapshot.Channels)} out";
         FormatText = snapshot.BitDepth > 0
             ? $"{snapshot.SampleRateHz / 1000.0:0.#} kHz · {snapshot.BitDepth}-bit"
             : $"{snapshot.SampleRateHz / 1000.0:0.#} kHz";
+        NowPlayingText = FormatNowPlaying(snapshot.ActiveAudioProcesses);
         SpatialText = snapshot.Spatial switch
         {
             SpatialAudioState.On => "Spatial audio on",
@@ -101,6 +107,24 @@ public partial class StatusBarViewModel : ObservableObject
                      ?? result.Compilation.Devices.FirstOrDefault();
         HeadroomText = report is null ? "" : $"{report.Headroom.HeadroomDb:0.0} dB headroom";
         Refresh();
+    }
+
+    /// <summary>"♪ Spotify" / "♪ Spotify · Chrome" from the processes with active audio sessions.</summary>
+    internal static string FormatNowPlaying(IReadOnlyList<string> processes)
+    {
+        var pretty = processes
+            .Where(p => !Core.Automation.AudioApps.IsNoise(p))
+            .Select(Core.Automation.AudioApps.Pretty)
+            .Distinct()
+            .ToList();
+        if (pretty.Count == 0)
+        {
+            return "";
+        }
+
+        var shown = pretty.Take(2).ToList();
+        var extra = pretty.Count - shown.Count;
+        return "♪ " + string.Join(" · ", shown) + (extra > 0 ? $" +{extra}" : "");
     }
 
     private void OnClipping()

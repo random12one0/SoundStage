@@ -132,7 +132,27 @@ public partial class DiagnosticsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void RunSweep()
+    private void RunSweep() => StartSweep(DiagnosticSweep.BuildChainText());
+
+    /// <summary>
+    /// Same muffle test but inside a Device: section for the current output — verifies
+    /// APO's device targeting works with the match text Soundstage generates (only used
+    /// when two or more device profiles make scoping necessary).
+    /// </summary>
+    [RelayCommand]
+    private void RunScopedSweep()
+    {
+        var matchSpec = _services.Controller?.ActiveProfile?.EffectiveMatchSpec;
+        if (matchSpec is null)
+        {
+            StatusMessage = "No active device profile to target.";
+            return;
+        }
+
+        StartSweep(DiagnosticSweep.BuildScopedChainText(matchSpec));
+    }
+
+    private void StartSweep(string chainText)
     {
         var orchestrator = _services.Orchestrator;
         if (orchestrator is null || SweepRunning)
@@ -140,7 +160,7 @@ public partial class DiagnosticsViewModel : ObservableObject
             return;
         }
 
-        _sweepHandle = orchestrator.ApplyTemporary(DiagnosticSweep.BuildChainText(), DiagnosticSweep.DefaultDuration, _services.Scheduler);
+        _sweepHandle = orchestrator.ApplyTemporary(chainText, DiagnosticSweep.DefaultDuration, _services.Scheduler);
         SweepRunning = true;
         SweepSecondsLeft = (int)DiagnosticSweep.DefaultDuration.TotalSeconds;
         StatusMessage = "";

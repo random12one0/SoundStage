@@ -19,8 +19,12 @@ public class PresetStoreTests
         var store = CreateStore();
         var builtIns = store.All.Where(p => p.IsBuiltIn).ToList();
 
-        Assert.Equal(5, builtIns.Count);
-        Assert.Equal(new[] { "flat", "music", "film-dialogue", "gaming", "podcast" }, builtIns.Select(p => p.Id));
+        Assert.Equal(13, builtIns.Count);
+        // Curated order leads; flat is always first.
+        Assert.Equal("flat", builtIns[0].Id);
+        Assert.Equal("music", builtIns[1].Id);
+        Assert.Contains(builtIns, p => p.Id == "bass-boost");
+        Assert.Contains(builtIns, p => p.Id == "rock");
         Assert.All(builtIns, p => Assert.False(string.IsNullOrWhiteSpace(p.Description)));
     }
 
@@ -115,7 +119,7 @@ public class PresetStoreTests
         _fs.WriteAllTextAtomic($@"{Dir}\broken.json", "{not json");
         var store = CreateStore();
 
-        Assert.Equal(5, store.All.Count); // just the built-ins
+        Assert.Equal(13, store.All.Count); // just the built-ins
         Assert.True(_fs.FileExists($@"{Dir}\broken.json"));
     }
 

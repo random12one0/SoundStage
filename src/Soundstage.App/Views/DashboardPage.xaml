@@ -20,6 +20,40 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="980" Margin="16,8,16,24" HorizontalAlignment="Stretch">
 
+            <!-- Live status: what's playing right now and how it's coming out -->
+            <Border Style="{StaticResource Card}" Margin="0,4,0,12" Padding="16,12">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Style="{StaticResource GlyphChip}" VerticalAlignment="Center">
+                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets"
+                                   FontSize="17" Foreground="{StaticResource AccentBrush}" Text="&#xE767;" />
+                    </Border>
+
+                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontWeight="SemiBold" FontSize="14" Text="{Binding StatusDevice}" />
+                            <Border Margin="10,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#264CC2FF">
+                                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Text="{Binding StatusLayout}" />
+                            </Border>
+                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding StatusFormat}" />
+                        </StackPanel>
+                        <StackPanel Margin="0,3,0,0" Orientation="Horizontal">
+                            <TextBlock FontSize="12" Foreground="{StaticResource FaintTextBrush}" Text="{Binding StatusSpatial}"
+                                       Visibility="{Binding StatusSpatial, Converter={StaticResource StringToVisibility}}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#7ACC7A"
+                               Text="{Binding StatusNowPlaying}"
+                               Visibility="{Binding StatusNowPlaying, Converter={StaticResource StringToVisibility}}" />
+                </Grid>
+            </Border>
+
             <!-- Preset row -->
             <Grid Margin="0,8,0,0">
                 <Grid.ColumnDefinitions>
@@ -48,18 +82,9 @@
                     <ui:Button Margin="6,0,0,0" Command="{Binding ImportFileCommand}" Content="Import…" ToolTip="Import Peace or AutoEq preset files" />
                 </StackPanel>
 
-                <ToggleButton
-                    Grid.Column="1"
-                    MinWidth="150"
-                    Padding="14,8"
-                    VerticalAlignment="Center"
-                    IsChecked="{Binding IsBypassed}"
-                    ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Text="" />
-                        <TextBlock Margin="8,0,0,0" Text="A/B Bypass" />
-                    </StackPanel>
-                </ToggleButton>
+                <!-- Undo and A/B bypass live in the persistent top toolbar now (every page). -->
+                <TextBlock Grid.Column="1" VerticalAlignment="Center" Opacity="0.55" FontSize="12"
+                           Text="{Binding HeadroomSummary}" />
             </Grid>
 
             <TextBlock
@@ -106,9 +131,9 @@
                 <StackPanel>
                     <Grid>
                         <TextBlock FontWeight="SemiBold" Text="Equalizer" />
-                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal"
-                                    Visibility="{Binding IsEditable, Converter={StaticResource BoolToVisibility}}">
-                            <ui:Button Command="{Binding SetModeCommand}" CommandParameter="Parametric" Content="Parametric" FontSize="12" />
+                        <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                            <ui:Button Command="{Binding ResetEqCommand}" Content="Zero all bands" FontSize="11" Opacity="0.7" ToolTip="Flatten every band back to 0 dB (undoable)" />
+                            <ui:Button Margin="10,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Parametric" Content="Parametric" FontSize="12" />
                             <ui:Button Margin="6,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Graphic10" Content="10-band" FontSize="12" />
                             <ui:Button Margin="6,0,0,0" Command="{Binding SetModeCommand}" CommandParameter="Graphic31" Content="31-band" FontSize="12" />
                         </StackPanel>
@@ -117,13 +142,13 @@
                     <TextBlock
                         Margin="0,10,0,0"
                         Opacity="0.7"
-                        Text="This is a built-in preset. Duplicate it to make changes — your copy applies live as you edit."
+                        Text="This is a built-in preset — tweak anything and your own editable copy is created automatically."
                         TextWrapping="Wrap"
                         Visibility="{Binding IsEditable, Converter={StaticResource BoolToVisibilityInverse}}" />
 
                     <!-- Parametric editor -->
                     <StackPanel Visibility="{Binding IsParametric, Converter={StaticResource BoolToVisibility}}">
-                        <ItemsControl Margin="0,8,0,0" IsEnabled="{Binding IsEditable}" ItemsSource="{Binding Bands}">
+                        <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding Bands}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <Grid Margin="0,3">
@@ -162,15 +187,13 @@
                         <ui:Button
                             Margin="0,10,0,0"
                             Command="{Binding AddBandCommand}"
-                            Content="Add band"
-                            Visibility="{Binding IsEditable, Converter={StaticResource BoolToVisibility}}" />
+                            Content="Add band" />
                     </StackPanel>
 
                     <!-- Graphic editor -->
                     <ItemsControl
                         Margin="0,12,0,0"
                         HorizontalAlignment="Center"
-                        IsEnabled="{Binding IsEditable}"
                         ItemsSource="{Binding GraphicBands}"
                         Visibility="{Binding IsParametric, Converter={StaticResource BoolToVisibilityInverse}}">
                         <ItemsControl.ItemsPanel>

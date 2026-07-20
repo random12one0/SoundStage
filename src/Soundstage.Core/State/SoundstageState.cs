@@ -19,6 +19,13 @@ public sealed record ApplyAttribution(AttributionSource Source, string Descripti
 
 public sealed class AppSettings
 {
+    /// <summary>
+    /// When on, brand-new (never-confirmed) sounds show a keep-or-revert countdown.
+    /// Off by default: routine tweaking with a confirm prompt on every change is
+    /// infuriating — Undo is the primary safety net instead.
+    /// </summary>
+    public bool ConfirmNewSounds { get; set; }
+
     public int RevertGuardSeconds { get; set; } = 10;
 
     public double SafetyMarginDb { get; set; } = 0.5;
@@ -37,6 +44,14 @@ public sealed class AppSettings
 
     /// <summary>Manual override when registry detection is unavailable/wrong.</summary>
     public string? ApoConfigDirectoryOverride { get; set; }
+
+    /// <summary>Check GitHub for a newer release shortly after launch.</summary>
+    public bool CheckForUpdatesOnStartup { get; set; } = true;
+
+    /// <summary>GitHub owner/repo the updater queries (kept configurable so a repo rename is trivial).</summary>
+    public string UpdateOwner { get; set; } = "random12one0";
+
+    public string UpdateRepo { get; set; } = "unblockere1231234";
 }
 
 /// <summary>Root persisted application state.</summary>

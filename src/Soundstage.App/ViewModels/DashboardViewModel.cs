@@ -128,6 +128,22 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private string _importStatus = "";
 
+    // Live "now" status shown at the top of the dashboard.
+    [ObservableProperty]
+    private string _statusDevice = "—";
+
+    [ObservableProperty]
+    private string _statusLayout = "";
+
+    [ObservableProperty]
+    private string _statusFormat = "";
+
+    [ObservableProperty]
+    private string _statusSpatial = "";
+
+    [ObservableProperty]
+    private string _statusNowPlaying = "";
+
     public bool ApoAvailable => _services.ApoAvailable;
 
     public int AutoEqModelCount => _services.AutoEq.Count;
@@ -142,8 +158,28 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         services.Presets.Changed += () => UiDispatch.Post(RefreshPresets);
+        services.Environment.Changed += () => UiDispatch.Post(RefreshStatus);
         RefreshPresets();
         SyncFromState();
+        RefreshStatus();
+    }
+
+    /// <summary>Refreshes the live device/format/now-playing readout on the dashboard.</summary>
+    public void RefreshStatus()
+    {
+        var snapshot = _services.Environment.GetSnapshot();
+        StatusDevice = snapshot.DeviceName ?? "No output device";
+        StatusLayout = Core.Configio.ChainCompiler.FormatChannels(snapshot.Channels);
+        StatusFormat = snapshot.BitDepth > 0
+            ? $"{snapshot.SampleRateHz / 1000.0:0.#} kHz · {snapshot.BitDepth}-bit"
+            : $"{snapshot.SampleRateHz / 1000.0:0.#} kHz";
+        StatusSpatial = snapshot.Spatial switch
+        {
+            Core.Automation.SpatialAudioState.On => "Spatial audio on (Atmos / passthrough)",
+            Core.Automation.SpatialAudioState.Off => "Spatial audio off",
+            _ => "",
+        };
+        StatusNowPlaying = StatusBarViewModel.FormatNowPlaying(snapshot.ActiveAudioProcesses);
     }
 
     // ---- Preset picking ----
@@ -155,7 +191,13 @@ public partial class DashboardViewModel : ObservableObject
         Presets = new ObservableCollection<EqPreset>(_services.Presets.All);
         SelectedPreset = Presets.FirstOrDefault(p => p.Id == (selectedId ?? _services.Controller?.ActiveProfile?.ActivePresetId));
         _syncing = false;
-        RebuildEditor();
+
+        // Rebuild the editor only when the selection actually changed — a refresh caused
+        // by saving our own live edits must not yank band rows out from under a drag.
+        if (SelectedPreset?.Id != selectedId)
+        {
+            RebuildEditor();
+        }
     }
 
     private void SyncFromState()
@@ -167,6 +209,7 @@ public partial class DashboardViewModel : ObservableObject
         }
 
         _syncing = true;
+        OnPropertyChanged(nameof(CanUndo));
         IsBypassed = controller.State.BypassActive;
         var activeId = controller.ActiveProfile?.ActivePresetId;
         if (SelectedPreset?.Id != activeId)
@@ -203,6 +246,50 @@ public partial class DashboardViewModel : ObservableObject
 
     [RelayCommand]
     private void ToggleBypass() => _services.Controller?.ToggleBypass();
+
+    public bool CanUndo => _services.Controller?.CanUndo ?? false;
+
+    [RelayCommand]
+    private void Undo()
+    {
+        _services.Controller?.Undo();
+        RefreshPresets();
+        RebuildEditor();
+        OnPropertyChanged(nameof(CanUndo));
+    }
+
+    /// <summary>Marks the start of an editing gesture: one undo step per gesture, not per tick.</summary>
+    private void PushUndoIfGestureStart()
+    {
+        if (_editDebounce is null)
+        {
+            _services.Controller?.PushUndoSnapshot();
+            OnPropertyChanged(nameof(CanUndo));
+        }
+    }
+
+    [RelayCommand]
+    private void ResetEq()
+    {
+        var preset = EnsureEditablePreset();
+        if (preset is null)
+        {
+            return;
+        }
+
+        _services.Controller?.PushUndoSnapshot();
+        foreach (var band in Bands)
+        {
+            band.GainDb = 0;
+        }
+
+        foreach (var graphicBand in GraphicBands)
+        {
+            graphicBand.Value = 0;
+        }
+
+        OnPropertyChanged(nameof(CanUndo));
+    }
 
     // ---- Preset management ----
 
@@ -335,6 +422,35 @@ public partial class DashboardViewModel : ObservableObject
 
     // ---- EQ editing ----
 
+    /// <summary>
+    /// Editing a built-in preset transparently forks it into the user's own copy first —
+    /// nobody should meet a locked dial. The editor keeps its live state; only the target
+    /// of the debounced save changes.
+    /// </summary>
+    private EqPreset? EnsureEditablePreset()
+    {
+        var preset = SelectedPreset;
+        if (preset is null)
+        {
+            return null;
+        }
+
+        if (!preset.IsBuiltIn)
+        {
+            return preset;
+        }
+
+        var copy = _services.Presets.Duplicate(preset.Id, $"{preset.Name} (custom)");
+        _syncing = true;
+        Presets = new ObservableCollection<EqPreset>(_services.Presets.All);
+        SelectedPreset = Presets.FirstOrDefault(p => p.Id == copy.Id);
+        _syncing = false;
+        _services.Controller?.ApplyPreset(copy.Id);
+        IsEditable = true;
+        ImportStatus = $"Created “{copy.Name}” — built-in presets stay untouched.";
+        return copy;
+    }
+
     private void RebuildEditor()
     {
         _editDebounce?.Dispose();
@@ -366,7 +482,8 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void AddBand()
     {
-        if (!IsEditable)
+        PushUndoIfGestureStart();
+        if (EnsureEditablePreset() is null)
         {
             return;
         }
@@ -378,7 +495,8 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void RemoveBand(BandViewModel? band)
     {
-        if (band is null || !IsEditable)
+        PushUndoIfGestureStart();
+        if (band is null || EnsureEditablePreset() is null)
         {
             return;
         }
@@ -390,36 +508,44 @@ public partial class DashboardViewModel : ObservableObject
     [RelayCommand]
     private void SetMode(string? modeName)
     {
-        if (SelectedPreset is null || !IsEditable || !Enum.TryParse<EqMode>(modeName, out var mode) || SelectedPreset.Mode == mode)
+        if (!Enum.TryParse<EqMode>(modeName, out var mode) || SelectedPreset?.Mode == mode)
         {
             return;
         }
 
-        SelectedPreset.Mode = mode;
+        var preset = EnsureEditablePreset();
+        if (preset is null)
+        {
+            return;
+        }
+
+        preset.Mode = mode;
         if (mode != EqMode.Parametric)
         {
             var length = Core.Presets.GraphicBands.FrequenciesFor(mode).Length;
-            if (SelectedPreset.GraphicGains.Length != length)
+            if (preset.GraphicGains.Length != length)
             {
-                SelectedPreset.GraphicGains = new double[length];
+                preset.GraphicGains = new double[length];
             }
         }
 
-        _services.Presets.Save(SelectedPreset);
+        _services.Presets.Save(preset);
         RebuildEditor();
         _services.Controller?.NotifyPresetContentChanged();
     }
 
     private void OnGraphicChanged(int index, double value)
     {
-        if (SelectedPreset is null)
+        PushUndoIfGestureStart();
+        var preset = EnsureEditablePreset();
+        if (preset is null)
         {
             return;
         }
 
-        if (index < SelectedPreset.GraphicGains.Length)
+        if (index < preset.GraphicGains.Length)
         {
-            SelectedPreset.GraphicGains[index] = Math.Clamp(value, -15, 15);
+            preset.GraphicGains[index] = Math.Clamp(value, -15, 15);
         }
 
         OnEditorChanged();
@@ -429,8 +555,9 @@ public partial class DashboardViewModel : ObservableObject
     private void OnEditorChanged()
     {
         RecomputeCurve();
-        var preset = SelectedPreset;
-        if (preset is null || preset.IsBuiltIn)
+        PushUndoIfGestureStart();
+        var preset = EnsureEditablePreset();
+        if (preset is null)
         {
             return;
         }
@@ -438,6 +565,7 @@ public partial class DashboardViewModel : ObservableObject
         _editDebounce?.Dispose();
         _editDebounce = _services.Scheduler.Schedule(TimeSpan.FromMilliseconds(350), () => UiDispatch.Post(() =>
         {
+            _editDebounce = null; // gesture over — the next tweak starts a new undo step
             if (preset.Mode == EqMode.Parametric)
             {
                 preset.Bands = Bands.Select(b => b.ToBand()).ToList();

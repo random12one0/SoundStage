@@ -23,6 +23,10 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </ui:FluentWindow.Resources>
 
+    <ui:FluentWindow.InputBindings>
+        <KeyBinding Command="{Binding UndoCommand}" Gesture="Ctrl+Z" />
+    </ui:FluentWindow.InputBindings>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -53,6 +57,19 @@
                     <ui:Button Margin="12,0,0,0" Appearance="Primary" Command="{Binding TakeOwnershipCommand}" Content="Take control" />
                 </StackPanel>
             </Border>
+            <Border
+                Background="#264CC2FF"
+                Padding="16,10"
+                Visibility="{Binding ShowUpdateBanner, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="15" Foreground="{StaticResource AccentBrush}" Text="&#xE895;" />
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center">
+                        <Run Text="A new version of Soundstage is ready —" />
+                        <Run FontWeight="SemiBold" Text="{Binding UpdateBannerText, Mode=OneWay}" />
+                    </TextBlock>
+                    <ui:Button Margin="12,0,0,0" Appearance="Primary" Command="{Binding OpenUpdateSettingsCommand}" Content="View update" />
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Nav rail + page -->
@@ -62,32 +79,72 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <ListBox
-                Grid.Column="0"
-                Margin="8,8,0,8"
-                Background="Transparent"
-                BorderThickness="0"
-                ItemsSource="{Binding NavItems}"
-                SelectedItem="{Binding SelectedItem}">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Margin="6,8" Orientation="Horizontal">
-                            <TextBlock
-                                Width="22"
-                                VerticalAlignment="Center"
-                                FontFamily="Segoe MDL2 Assets"
-                                FontSize="16"
-                                Text="{Binding Glyph}" />
-                            <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="14" Text="{Binding Title}" />
-                        </StackPanel>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <StackPanel Grid.Column="0" Margin="8,4,0,8">
+                <StackPanel Margin="14,4,0,10" Orientation="Horizontal">
+                    <Border
+                        Width="26"
+                        Height="26"
+                        Background="{StaticResource AccentGradient}"
+                        CornerRadius="7">
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontFamily="Segoe MDL2 Assets"
+                            FontSize="14"
+                            Foreground="#0B0B10"
+                            Text="&#xE9E9;" />
+                    </Border>
+                    <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold" Text="Soundstage" />
+                </StackPanel>
 
-            <ContentControl
-                Grid.Column="1"
-                Margin="4,8,12,8"
-                Content="{Binding CurrentPage}" />
+                <ListBox
+                    Background="Transparent"
+                    BorderThickness="0"
+                    ItemContainerStyle="{StaticResource NavItemContainer}"
+                    ItemsSource="{Binding NavItems}"
+                    SelectedItem="{Binding SelectedItem}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock
+                                    Width="22"
+                                    VerticalAlignment="Center"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="16"
+                                    Text="{Binding Glyph}" />
+                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="14" Text="{Binding Title}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </StackPanel>
+
+            <Grid Grid.Column="1" Margin="4,8,12,8">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Persistent toolbar: Undo + A/B bypass reachable from every page -->
+                <StackPanel Grid.Row="0" Margin="0,0,4,6" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <ui:Button Padding="10,6" Command="{Binding UndoCommand}" IsEnabled="{Binding CanUndo}" ToolTip="Undo your last change (Ctrl+Z)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE7A7;" />
+                            <TextBlock Margin="7,0,0,0" Text="Undo" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ToggleButton Margin="8,0,0,0" Padding="12,6" IsChecked="{Binding IsBypassed}"
+                                  Command="{Binding ToggleBypassCommand}"
+                                  ToolTip="Hear your audio with all Soundstage processing off (Ctrl+Alt+B)">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE8AB;" />
+                            <TextBlock Margin="7,0,0,0" Text="A/B Bypass" />
+                        </StackPanel>
+                    </ToggleButton>
+                </StackPanel>
+
+                <ContentControl Grid.Row="1" Content="{Binding CurrentPage}" />
+            </Grid>
 
             <!-- Confirm-or-revert toast -->
             <Border
@@ -136,7 +193,12 @@
                         Fill="#E81123"
                         Visibility="{Binding IsClipping, Converter={StaticResource BoolToVisibility}}" />
                     <TextBlock Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding DeviceName}" />
-                    <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding ChannelText}" />
+                    <TextBlock
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
+                        Opacity="0.75"
+                        Text="{Binding ChannelText}"
+                        ToolTip="Your output device's speaker configuration — what Windows mixes everything to. Stereo content (like Spotify) still shows the full layout here; the receiver/Atmos handles the upmix." />
                     <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding FormatText}" />
                     <TextBlock
                         Margin="14,0,0,0"
@@ -144,6 +206,14 @@
                         Opacity="0.75"
                         Text="{Binding SpatialText}"
                         Visibility="{Binding SpatialText, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock
+                        Margin="16,0,0,0"
+                        VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        Foreground="#7ACC7A"
+                        Text="{Binding NowPlayingText}"
+                        ToolTip="Apps currently playing audio (detected live — the same signal automations use)"
+                        Visibility="{Binding NowPlayingText, Converter={StaticResource StringToVisibility}}" />
                 </StackPanel>
                 <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
                     <Border

@@ -37,6 +37,8 @@ public class ApplyOrchestratorTests
         _orchestrator = new ApplyOrchestrator(_fs, _layout, _backups, new RevertGuard(_scheduler));
 
         _state = new SoundstageState();
+        // These tests exercise the opt-in confirm-or-revert path.
+        _state.Settings.ConfirmNewSounds = true;
         _state.Profiles.Add(new DeviceProfile
         {
             EndpointId = "{0.0.0.00000000}.{aaaa1111-2222-3333-4444-555566667777}",
@@ -55,6 +57,16 @@ public class ApplyOrchestratorTests
         "mild" => Mild,
         _ => null,
     };
+
+    [Fact]
+    public void ManualApply_IsNotGuarded_ByDefault()
+    {
+        // Default settings: no confirm prompts — Undo is the safety net instead.
+        _state.Settings.ConfirmNewSounds = false;
+        var result = _orchestrator.Apply(_state, Resolve, ApplyAttribution.Manual());
+        Assert.True(result.Changed);
+        Assert.False(result.Guarded);
+    }
 
     [Fact]
     public void ManualApply_OfNewChain_IsGuarded_AndWritesChain()

@@ -1,0 +1,14 @@
+{
+  "id": "classical",
+  "name": "Classical",
+  "description": "Wide, natural balance with a touch of air — faithful to the recording.",
+  "category": "Speakers",
+  "mode": "Parametric",
+  "preampDb": -1.5,
+  "bands": [
+    { "type": "Peaking", "frequencyHz": 250, "gainDb": -1.0, "q": 1.0 },
+    { "type": "Peaking", "frequencyHz": 4000, "gainDb": 1.0, "q": 1.2 },
+    { "type": "HighShelf", "frequencyHz": 12000, "gainDb": 1.5, "q": 0.707 }
+  ],
+  "isBuiltIn": true
+}

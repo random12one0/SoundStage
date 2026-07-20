@@ -12,10 +12,50 @@
 
     <UserControl.Resources>
         <app:StringToVisibilityConverter x:Key="StringToVisibility" />
+        <app:InverseBoolConverter x:Key="InverseBool" />
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel MaxWidth="760" Margin="16,8,16,24">
+
+            <!-- Updates -->
+            <Border Style="{StaticResource Card}" Margin="0,8,0,12">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionTitle}" Text="Updates" />
+                    <TextBlock Margin="0,6,0,0" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding CurrentVersionText}" />
+
+                    <StackPanel Margin="0,10,0,0" Orientation="Horizontal">
+                        <ui:Button Command="{Binding CheckForUpdatesCommand}" IsEnabled="{Binding IsChecking, Converter={StaticResource InverseBool}}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Text="&#xE895;" />
+                                <TextBlock Margin="7,0,0,0" Text="Check for updates" />
+                            </StackPanel>
+                        </ui:Button>
+                        <ui:Button Margin="8,0,0,0" Appearance="Primary" Command="{Binding DownloadUpdateCommand}"
+                                   Content="Download &amp; install"
+                                   Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVisibility}}" />
+                        <ui:Button Margin="8,0,0,0" Command="{Binding OpenReleasePageCommand}" Content="Release notes"
+                                   Visibility="{Binding UpdateAvailable, Converter={StaticResource BoolToVisibility}}" />
+                    </StackPanel>
+
+                    <TextBlock Margin="0,10,0,0" FontSize="12.5" Foreground="{StaticResource SubtleTextBrush}"
+                               Text="{Binding UpdateStatus}" TextWrapping="Wrap"
+                               Visibility="{Binding UpdateStatus, Converter={StaticResource StringToVisibility}}" />
+
+                    <ProgressBar Margin="0,10,0,0" Height="4" Maximum="100" Value="{Binding DownloadProgress}"
+                                 Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVisibility}}" />
+
+                    <Grid Margin="0,14,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Check for updates on startup" />
+                            <TextBlock FontSize="12" Foreground="{StaticResource SubtleTextBrush}"
+                                       Text="Looks for a newer release a few seconds after launch. No personal data leaves your PC." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding CheckForUpdatesOnStartup}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
 
             <Border Margin="0,8,0,0" Padding="16" Background="#22000000" CornerRadius="8">
                 <StackPanel>
@@ -54,6 +94,15 @@
                     <TextBlock FontSize="15" FontWeight="SemiBold" Text="Safety" />
 
                     <Grid Margin="0,12,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Ask before keeping a brand-new sound" />
+                            <TextBlock FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                                       Text="Off (default): changes apply instantly and Undo (Ctrl+Z) is your safety net. On: never-heard-before configs show a keep-or-revert countdown." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding ConfirmNewSounds}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding ConfirmNewSounds}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="220" />
@@ -61,7 +110,7 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel>
                             <TextBlock Text="Confirm-or-revert countdown" />
-                            <TextBlock FontSize="12" Opacity="0.6" Text="How long a new, never-confirmed sound waits before reverting." />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="How long a new sound waits for confirmation before reverting." />
                         </StackPanel>
                         <Slider Grid.Column="1" VerticalAlignment="Center" Maximum="30" Minimum="3" TickFrequency="1" IsSnapToTickEnabled="True" Value="{Binding GuardSeconds}" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding GuardSeconds, StringFormat={}{0:0}s}" />

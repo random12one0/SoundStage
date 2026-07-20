@@ -73,7 +73,8 @@ public sealed class ApplyOrchestrator
 
         _fs.WriteAllTextAtomic(_layout.ChainFilePath, newText);
 
-        var shouldGuard = attribution.Source == AttributionSource.Manual
+        var shouldGuard = state.Settings.ConfirmNewSounds
+                          && attribution.Source == AttributionSource.Manual
                           && !state.ConfirmedChainHashes.Contains(hash)
                           && currentText is not null;
 

@@ -9,11 +9,11 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
     d:DataContext="{d:DesignInstance Type=vm:RuleEditorViewModel}"
-    Title="Automation rule"
-    Width="560"
-    Height="640"
-    MinWidth="480"
-    MinHeight="520"
+    Title="Automation"
+    Width="600"
+    Height="720"
+    MinWidth="520"
+    MinHeight="560"
     WindowStartupLocation="CenterOwner"
     ExtendsContentIntoTitleBar="True"
     WindowBackdropType="Mica">
@@ -21,109 +21,229 @@
     <ui:FluentWindow.Resources>
         <app:StringToVisibilityConverter x:Key="StringToVisibility" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <app:EnumEqualsConverter x:Key="EnumEquals" />
+
+        <!-- A selectable pill (RadioButton) for the trigger kind -->
+        <Style x:Key="Pill" TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,0,8,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Padding="12,8" Background="{StaticResource CardBrush}"
+                                BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="Ico" FontFamily="Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center"
+                                           Foreground="{StaticResource SubtleTextBrush}" Text="{TemplateBinding Tag}" />
+                                <ContentPresenter Margin="8,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource CardHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentGradient}" />
+                                <Setter TargetName="Ico" Property="Foreground" Value="#0B0B10" />
+                                <Setter Property="Foreground" Value="#0B0B10" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A round day toggle (M T W …) -->
+        <Style x:Key="DayChip" TargetType="ToggleButton">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Bd" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardStrokeBrush}"
+                                BorderThickness="1" CornerRadius="17">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentGradient}" />
+                                <Setter Property="Foreground" Value="#0B0B10" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SuggestChip" TargetType="ui:Button">
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="Margin" Value="0,0,6,0" />
+            <Setter Property="FontSize" Value="11.5" />
+        </Style>
     </ui:FluentWindow.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <ui:TitleBar Grid.Row="0" Title="Automation rule" ShowMaximize="False" ShowMinimize="False" />
+        <ui:TitleBar Grid.Row="0" Title="Automation" ShowMaximize="False" ShowMinimize="False" />
 
-        <ScrollViewer Grid.Row="1" Margin="20,8" VerticalScrollBarVisibility="Auto">
+        <!-- Live plain-English preview -->
+        <Border Grid.Row="1" Margin="20,4,20,10" Padding="16,14" CornerRadius="10" Background="#1F4CC2FF" BorderBrush="#334CC2FF" BorderThickness="1">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets" FontSize="20" Foreground="#4CC2FF" Text="&#xE945;" />
+                <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" FontSize="15" FontWeight="SemiBold" Text="{Binding LiveSentence}" TextWrapping="Wrap" />
+            </StackPanel>
+        </Border>
+
+        <ScrollViewer Grid.Row="2" Margin="20,0" VerticalScrollBarVisibility="Auto">
             <StackPanel>
-                <TextBlock Text="Name" Opacity="0.75" />
-                <ui:TextBox Margin="0,4,0,0" PlaceholderText="Leave empty to auto-name" Text="{Binding RuleName, UpdateSourceTrigger=PropertyChanged}" />
+                <ui:TextBox PlaceholderText="Name (optional — we'll name it for you)" Text="{Binding RuleName, UpdateSourceTrigger=PropertyChanged}" />
 
-                <TextBlock Margin="0,16,0,0" FontWeight="SemiBold" Text="When…" />
-                <ComboBox Margin="0,6,0,0" ItemsSource="{Binding TriggerKinds}" SelectedItem="{Binding TriggerKind}" />
+                <TextBlock Margin="2,18,0,8" Style="{StaticResource SectionTitle}" Text="When…" />
+                <WrapPanel>
+                    <RadioButton Style="{StaticResource Pill}" Tag="&#xE823;" Content="Schedule"
+                                 IsChecked="{Binding TriggerKind, Converter={StaticResource EnumEquals}, ConverterParameter=Schedule}" />
+                    <RadioButton Style="{StaticResource Pill}" Tag="&#xE71D;" Content="App plays audio"
+                                 IsChecked="{Binding TriggerKind, Converter={StaticResource EnumEquals}, ConverterParameter=AudioApp}" />
+                    <RadioButton Style="{StaticResource Pill}" Tag="&#xE7F3;" Content="Channel count"
+                                 IsChecked="{Binding TriggerKind, Converter={StaticResource EnumEquals}, ConverterParameter=ChannelCount}" />
+                    <RadioButton Style="{StaticResource Pill}" Tag="&#xE772;" Content="Output device"
+                                 IsChecked="{Binding TriggerKind, Converter={StaticResource EnumEquals}, ConverterParameter=Device}" />
+                </WrapPanel>
 
-                <!-- Schedule -->
-                <StackPanel Margin="0,10,0,0" Visibility="{Binding IsSchedule, Converter={StaticResource BoolToVisibility}}">
-                    <ItemsControl ItemsSource="{Binding Days}">
-                        <ItemsControl.ItemsPanel>
-                            <ItemsPanelTemplate>
-                                <StackPanel Orientation="Horizontal" />
-                            </ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <CheckBox Margin="0,0,10,0" Content="{Binding Label}" IsChecked="{Binding Selected}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
-                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="From" />
-                        <ui:TextBox Width="76" Margin="8,0" Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="until" />
-                        <ui:TextBox Width="76" Margin="8,0" Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBlock VerticalAlignment="Center" FontSize="12" Opacity="0.55" Text="(22:00 → 06:00 spans midnight)" />
+                <Border Margin="0,10,0,0" Style="{StaticResource Card}">
+                    <StackPanel>
+                        <!-- Schedule -->
+                        <StackPanel Visibility="{Binding IsSchedule, Converter={StaticResource BoolToVisibility}}">
+                            <ItemsControl ItemsSource="{Binding Days}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ToggleButton Style="{StaticResource DayChip}" Content="{Binding Label}" IsChecked="{Binding Selected}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Margin="0,12,0,0" Orientation="Horizontal">
+                                <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="From" />
+                                <ui:TextBox Width="78" Margin="8,0" Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="until" />
+                                <ui:TextBox Width="78" Margin="8,0" Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock VerticalAlignment="Center" FontSize="11.5" Opacity="0.5" Text="24-hour · 22:00→06:00 spans midnight" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- App -->
+                        <StackPanel Visibility="{Binding IsAudioApp, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="Which apps? Match the app that's playing audio. Comma-separated, partial names are fine." />
+                            <ui:TextBox Margin="0,6,0,0" Text="{Binding ProcessesText, UpdateSourceTrigger=PropertyChanged}" />
+                            <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding AppSuggestions}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ui:Button Style="{StaticResource SuggestChip}" Content="{Binding}"
+                                                   Command="{Binding DataContext.AppendAppCommand, RelativeSource={RelativeSource AncestorType=ui:FluentWindow}}"
+                                                   CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
+                        <!-- Channels -->
+                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsChannelCount, Converter={StaticResource BoolToVisibility}}">
+                            <ComboBox MinWidth="180" ItemsSource="{Binding ChannelConditions}" SelectedItem="{Binding ChannelCondition}" />
+                            <ui:TextBox Width="70" Margin="10,0,0,0" Text="{Binding ExactChannels, StringFormat=0}"
+                                        Visibility="{Binding IsExactChannels, Converter={StaticResource BoolToVisibility}}" />
+                        </StackPanel>
+
+                        <!-- Device -->
+                        <StackPanel Visibility="{Binding IsDevice, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock FontSize="12" Opacity="0.65" Text="Part of the output device's name (e.g. headphone, Onkyo)." />
+                            <ui:TextBox Margin="0,6,0,0" Text="{Binding DevicePatternText, UpdateSourceTrigger=PropertyChanged}" />
+                            <ItemsControl Margin="0,8,0,0" ItemsSource="{Binding DeviceSuggestions}">
+                                <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ui:Button Style="{StaticResource SuggestChip}" Content="{Binding}"
+                                                   Command="{Binding DataContext.UseDeviceSuggestionCommand, RelativeSource={RelativeSource AncestorType=ui:FluentWindow}}"
+                                                   CommandParameter="{Binding}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </StackPanel>
-                </StackPanel>
+                </Border>
 
-                <!-- Audio app -->
-                <StackPanel Margin="0,10,0,0" Visibility="{Binding IsAudioApp, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock FontSize="12" Opacity="0.65" Text="App names, comma separated — matches the process playing audio (e.g. Spotify, chrome, vlc)." TextWrapping="Wrap" />
-                    <ui:TextBox Margin="0,6,0,0" Text="{Binding ProcessesText, UpdateSourceTrigger=PropertyChanged}" />
-                </StackPanel>
-
-                <!-- Channel count -->
-                <StackPanel Margin="0,10,0,0" Orientation="Horizontal" Visibility="{Binding IsChannelCount, Converter={StaticResource BoolToVisibility}}">
-                    <ComboBox MinWidth="170" ItemsSource="{Binding ChannelConditions}" SelectedItem="{Binding ChannelCondition}" />
-                    <ui:TextBox Width="70" Margin="10,0,0,0" Text="{Binding ExactChannels, StringFormat=0}"
-                                Visibility="{Binding IsExactChannels, Converter={StaticResource BoolToVisibility}}" />
-                </StackPanel>
-
-                <!-- Device -->
-                <StackPanel Margin="0,10,0,0" Visibility="{Binding IsDevice, Converter={StaticResource BoolToVisibility}}">
-                    <TextBlock FontSize="12" Opacity="0.65" Text="Part of the output device's name (e.g. headphone, Onkyo)." />
-                    <ui:TextBox Margin="0,6,0,0" Text="{Binding DevicePatternText, UpdateSourceTrigger=PropertyChanged}" />
-                </StackPanel>
-
-                <TextBlock Margin="0,18,0,0" FontWeight="SemiBold" Text="Then…" />
-                <ItemsControl Margin="0,6,0,0" ItemsSource="{Binding Actions}">
+                <TextBlock Margin="2,18,0,8" Style="{StaticResource SectionTitle}" Text="Then…" />
+                <ItemsControl ItemsSource="{Binding Actions}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,4" Padding="10" Background="#22000000" CornerRadius="6">
-                                <StackPanel>
-                                    <Grid>
-                                        <ComboBox MinWidth="200" HorizontalAlignment="Left" ItemsSource="{Binding ActionKinds}" SelectedItem="{Binding Kind}" />
-                                        <ui:Button HorizontalAlignment="Right" Padding="6,3" FontSize="11" Content="✕"
-                                                   Command="{Binding DataContext.RemoveActionCommand, RelativeSource={RelativeSource AncestorType=ui:FluentWindow}}"
-                                                   CommandParameter="{Binding}" />
-                                    </Grid>
-                                    <ComboBox Margin="0,8,0,0" MinWidth="220" HorizontalAlignment="Left"
-                                              DisplayMemberPath="Name"
-                                              ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
-                                              Visibility="{Binding IsPresetKind, Converter={StaticResource BoolToVisibility}}" />
-                                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
-                                                Visibility="{Binding IsEnabledKind, Converter={StaticResource BoolToVisibility}}">
-                                        <ComboBox MinWidth="150" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
-                                        <CheckBox Margin="10,0,0,0" VerticalAlignment="Center" Content="Turn on" IsChecked="{Binding EffectOn}" />
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Style="{StaticResource GlyphChip}" VerticalAlignment="Top">
+                                        <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" FontFamily="Segoe MDL2 Assets"
+                                                   FontSize="16" Foreground="{StaticResource AccentBrush}" Text="{Binding Glyph}" />
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0">
+                                        <ComboBox HorizontalAlignment="Left" MinWidth="200" ItemsSource="{Binding ActionKinds}" SelectedItem="{Binding Kind}" />
+                                        <ComboBox Margin="0,8,0,0" MinWidth="220" HorizontalAlignment="Left" DisplayMemberPath="Name"
+                                                  ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
+                                                  Visibility="{Binding IsPresetKind, Converter={StaticResource BoolToVisibility}}" />
+                                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
+                                                    Visibility="{Binding IsEnabledKind, Converter={StaticResource BoolToVisibility}}">
+                                            <ComboBox MinWidth="150" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
+                                            <ui:ToggleSwitch Margin="12,0,0,0" VerticalAlignment="Center" IsChecked="{Binding EffectOn}"
+                                                             OnContent="On" OffContent="Off" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
+                                                    Visibility="{Binding IsIntensityKind, Converter={StaticResource BoolToVisibility}}">
+                                            <ComboBox MinWidth="150" VerticalAlignment="Center" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
+                                            <Slider Width="160" Margin="12,0" VerticalAlignment="Center" Maximum="100" Minimum="0" Value="{Binding Intensity}" />
+                                            <TextBlock VerticalAlignment="Center" Text="{Binding Intensity, StringFormat={}{0:0}%}" />
+                                        </StackPanel>
                                     </StackPanel>
-                                    <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
-                                                Visibility="{Binding IsIntensityKind, Converter={StaticResource BoolToVisibility}}">
-                                        <ComboBox MinWidth="150" VerticalAlignment="Center" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
-                                        <Slider Width="180" Margin="10,0" VerticalAlignment="Center" Maximum="100" Minimum="0" Value="{Binding Intensity}" />
-                                        <TextBlock VerticalAlignment="Center" Text="{Binding Intensity, StringFormat={}{0:0}%}" />
-                                    </StackPanel>
-                                </StackPanel>
+
+                                    <ui:Button Grid.Column="2" VerticalAlignment="Top" Padding="7,4" FontFamily="Segoe MDL2 Assets" FontSize="12" Content="&#xE711;"
+                                               ToolTip="Remove this action"
+                                               Command="{Binding DataContext.RemoveActionCommand, RelativeSource={RelativeSource AncestorType=ui:FluentWindow}}"
+                                               CommandParameter="{Binding}" />
+                                </Grid>
                             </Border>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <ui:Button Margin="0,6,0,0" Command="{Binding AddActionCommand}" Content="Add another action" FontSize="12" />
+                <ui:Button HorizontalAlignment="Left" Command="{Binding AddActionCommand}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="Segoe MDL2 Assets" FontSize="12" VerticalAlignment="Center" Text="&#xE710;" />
+                        <TextBlock Margin="7,0,0,0" Text="Add another action" />
+                    </StackPanel>
+                </ui:Button>
 
-                <TextBlock Margin="0,10,0,0" Foreground="#E6D83B01" Text="{Binding ValidationError}" TextWrapping="Wrap"
-                           Visibility="{Binding ValidationError, Converter={StaticResource StringToVisibility}}" />
+                <ui:InfoBar Margin="0,12,0,8" Severity="Error" IsOpen="True"
+                            Message="{Binding ValidationError}"
+                            Visibility="{Binding ValidationError, Converter={StaticResource StringToVisibility}}" />
             </StackPanel>
         </ScrollViewer>
 
-        <StackPanel Grid.Row="2" Margin="20,0,20,16" HorizontalAlignment="Right" Orientation="Horizontal">
-            <ui:Button MinWidth="90" Appearance="Primary" Click="OnSave" Content="Save rule" IsDefault="True" />
-            <ui:Button MinWidth="90" Margin="8,0,0,0" Content="Cancel" IsCancel="True" />
+        <StackPanel Grid.Row="3" Margin="20,10,20,16" HorizontalAlignment="Right" Orientation="Horizontal">
+            <ui:Button MinWidth="100" Appearance="Primary" Click="OnSave" Content="Save" IsDefault="True" />
+            <ui:Button MinWidth="100" Margin="8,0,0,0" Content="Cancel" IsCancel="True" />
         </StackPanel>
     </Grid>
 </ui:FluentWindow>

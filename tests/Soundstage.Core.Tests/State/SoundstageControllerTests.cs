@@ -63,13 +63,14 @@ public class SoundstageControllerTests : IDisposable
     }
 
     [Fact]
-    public void ApplyPreset_WritesPresetIntoChain_ForActiveDeviceSection()
+    public void ApplyPreset_WritesPresetIntoChain_GloballyForSingleDevice()
     {
         _controller.Initialize();
         _controller.ApplyPreset("music");
 
         var chain = _fs.ReadAllText(_layout.ChainFilePath);
-        Assert.Contains("Device: {aaaa1111-0000-0000-0000-000000000001}", chain);
+        // One profile → no Device: scoping (APO device matching can silently no-match).
+        Assert.DoesNotContain("Device:", chain);
         Assert.Contains("preset: Music", chain);
         Assert.Contains("Filter 1:", chain);
         Assert.Equal("music", _controller.ActiveProfile!.ActivePresetId);
@@ -117,26 +118,20 @@ public class SoundstageControllerTests : IDisposable
         _controller.Initialize();
         _controller.UpdateEffects(e => e with { Loudness = new LoudnessSettings(Enabled: true, Intensity: 100) });
 
-        Assert.Contains("LoudnessCorrection: State 1 ReferenceLevel -30", _fs.ReadAllText(_layout.ChainFilePath));
+        Assert.Contains($"LoudnessCorrection: State 1 ReferenceLevel {LoudnessSettings.MaxReferenceLevel:0.####}", _fs.ReadAllText(_layout.ChainFilePath));
     }
 
     [Fact]
-    public void WidthEffect_IsGuardedOff_On51Device_ButCompilesOnStereoDevice()
+    public void WidthEffect_AppliesOnSurroundToFrontLR_SurroundSafe()
     {
-        _controller.Initialize();
-        _controller.UpdateEffects(e => e with { StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 140) });
-        Assert.DoesNotContain("Copy:", _fs.ReadAllText(_layout.ChainFilePath)); // 5.1 → guard
-
-        _environment.Snapshot = _environment.Snapshot with
-        {
-            DeviceId = "{0.0.0.00000000}.{cccc3333-0000-0000-0000-000000000003}",
-            DeviceName = "Headphones",
-            Channels = 2,
-        };
-        _environment.Raise();
+        _controller.Initialize(); // active device is 5.1
         _controller.UpdateEffects(e => e with { StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 140) });
 
-        Assert.Contains("Copy: L=1.2*L-0.2*R", _fs.ReadAllText(_layout.ChainFilePath));
+        var chain = _fs.ReadAllText(_layout.ChainFilePath);
+        // Now applies on 5.1 — but only remixes the front L/R pair.
+        Assert.Contains("Copy: L=1.2*L-0.2*R R=-0.2*L+1.2*R", chain);
+        Assert.DoesNotContain("C=", chain);
+        Assert.DoesNotContain("SL=", chain);
     }
 
     [Fact]
@@ -192,9 +187,57 @@ public class SoundstageControllerTests : IDisposable
     }
 
     [Fact]
+    public void Undo_RestoresEffectsChange()
+    {
+        _controller.Initialize();
+        Assert.False(_controller.CanUndo);
+
+        _controller.UpdateEffects(e => e with { NightMode = e.NightMode with { Enabled = true, Intensity = 80 } });
+        Assert.True(_controller.ActiveProfile!.Effects.NightMode.Enabled);
+        Assert.True(_controller.CanUndo);
+        Assert.Contains("Night mode", _fs.ReadAllText(_layout.ChainFilePath));
+
+        Assert.True(_controller.Undo());
+
+        Assert.False(_controller.ActiveProfile!.Effects.NightMode.Enabled);
+        Assert.DoesNotContain("Night mode", _fs.ReadAllText(_layout.ChainFilePath));
+    }
+
+    [Fact]
+    public void Undo_RestoresPresetSwitch_StepByStep()
+    {
+        _controller.Initialize();
+        _controller.ApplyPreset("music");
+        _controller.ApplyPreset("gaming");
+        Assert.Equal("gaming", _controller.ActiveProfile!.ActivePresetId);
+
+        Assert.True(_controller.Undo());
+        Assert.Equal("music", _controller.ActiveProfile!.ActivePresetId);
+        Assert.Contains("preset: Music", _fs.ReadAllText(_layout.ChainFilePath));
+        Assert.Contains("Fc 80 Hz", _fs.ReadAllText(_layout.ChainFilePath));
+
+        Assert.True(_controller.Undo());
+        Assert.Null(_controller.ActiveProfile!.ActivePresetId);
+        Assert.False(_controller.Undo()); // stack empty
+    }
+
+    [Fact]
+    public void AutomationApplies_DoNotPolluteTheUndoStack()
+    {
+        _controller.Initialize();
+        _controller.ApplyPreset("mild", ApplyAttribution.Rule("r1", "some rule"));
+        _controller.UpdateEffects(
+            e => e with { Loudness = e.Loudness with { Enabled = true } },
+            ApplyAttribution.Rule("r1", "some rule"));
+
+        Assert.False(_controller.CanUndo);
+    }
+
+    [Fact]
     public void ManualApply_GetsGuarded_ConfirmPersistsHash()
     {
         _controller.Initialize();
+        _controller.State.Settings.ConfirmNewSounds = true;
         _controller.ApplyPreset("music");
         Assert.Equal(RevertGuardStatus.Pending, _controller.Orchestrator.Guard.Status);
 

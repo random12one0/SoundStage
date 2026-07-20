@@ -27,6 +27,9 @@ public partial class EffectsViewModel : ObservableObject
     private double _nightBassCorner = 90;
 
     [ObservableProperty]
+    private bool _nightCornerOverridden;
+
+    [ObservableProperty]
     private bool _nightUseVst;
 
     [ObservableProperty]
@@ -90,7 +93,8 @@ public partial class EffectsViewModel : ObservableObject
         var e = profile.Effects;
         NightEnabled = e.NightMode.Enabled;
         NightIntensity = e.NightMode.Intensity;
-        NightBassCorner = e.NightMode.BassCornerHz;
+        NightBassCorner = e.NightMode.EffectiveCornerHz;
+        NightCornerOverridden = e.NightMode.BassCornerOverrideHz is not null;
         NightUseVst = e.NightMode.UseVstCompressor;
         NightVstPath = e.NightMode.VstLibraryPath;
         LoudnessEnabled = e.Loudness.Enabled;
@@ -131,7 +135,7 @@ public partial class EffectsViewModel : ObservableObject
             {
                 Enabled = NightEnabled,
                 Intensity = (int)Math.Round(NightIntensity),
-                BassCornerHz = Math.Clamp(NightBassCorner, 40, 200),
+                BassCornerOverrideHz = NightCornerOverridden ? Math.Clamp(NightBassCorner, 40, 400) : null,
                 UseVstCompressor = NightUseVst,
                 VstLibraryPath = NightVstPath,
             },
@@ -143,9 +147,40 @@ public partial class EffectsViewModel : ObservableObject
 
     partial void OnNightEnabledChanged(bool value) => Push(immediate: true);
 
-    partial void OnNightIntensityChanged(double value) => Push();
+    partial void OnNightIntensityChanged(double value)
+    {
+        // While the corner rides the slider, keep the advanced display in step so the user
+        // can see intensity opening up the bass band.
+        if (!_syncing && !NightCornerOverridden)
+        {
+            _syncing = true;
+            NightBassCorner = NightModeSettings.MinCornerHz
+                + (NightModeSettings.MaxCornerHz - NightModeSettings.MinCornerHz) * IntensityCurve.Fraction((int)Math.Round(value));
+            _syncing = false;
+        }
 
-    partial void OnNightBassCornerChanged(double value) => Push();
+        Push();
+    }
+
+    partial void OnNightBassCornerChanged(double value)
+    {
+        if (!_syncing)
+        {
+            NightCornerOverridden = true; // dragging the corner pins it manually
+            Push();
+        }
+    }
+
+    [RelayCommand]
+    private void ResetBassCorner()
+    {
+        NightCornerOverridden = false;
+        _syncing = true;
+        NightBassCorner = NightModeSettings.MinCornerHz
+            + (NightModeSettings.MaxCornerHz - NightModeSettings.MinCornerHz) * IntensityCurve.Fraction((int)Math.Round(NightIntensity));
+        _syncing = false;
+        Push(immediate: true);
+    }
 
     partial void OnNightUseVstChanged(bool value) => Push(immediate: true);
 
@@ -164,6 +199,69 @@ public partial class EffectsViewModel : ObservableObject
     partial void OnAmbienceEnabledChanged(bool value) => Push(immediate: true);
 
     partial void OnAmbienceIntensityChanged(double value) => Push();
+
+    [RelayCommand]
+    private void ResetNight()
+    {
+        NightCornerOverridden = false;
+        NightEnabled = false;
+        NightIntensity = 50;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetLoudness()
+    {
+        LoudnessEnabled = false;
+        LoudnessIntensity = 50;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetWidth()
+    {
+        WidthEnabled = false;
+        WidthPercent = 100;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetAmbience()
+    {
+        AmbienceEnabled = false;
+        AmbienceIntensity = 30;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ScanForVst()
+    {
+        var best = Services.VstScanner.FindBestCompressor();
+        if (best is not null)
+        {
+            NightVstPath = best;
+            NightUseVst = true;
+            Push(immediate: true);
+            NightStatus = $"Found and wired up {System.IO.Path.GetFileName(best)}.";
+        }
+        else
+        {
+            NightStatus = "No compressor plugin found. Click “Get LoudMax (free)”, unzip it, and note where the 64-bit DLL (LoudMaxWin64.dll) is — then Scan again (Downloads, Desktop and Documents are all checked), or use “Choose DLL…”.";
+        }
+    }
+
+    [RelayCommand]
+    private void OpenLoudMaxSite()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("https://loudmax.blogspot.com") { UseShellExecute = true });
+        }
+        catch
+        {
+            NightStatus = "Couldn't open the browser — visit loudmax.blogspot.com manually.";
+        }
+    }
 
     [RelayCommand]
     private void PickVst()
@@ -201,9 +299,10 @@ public partial class EffectsViewModel : ObservableObject
                 ? "Bass shelf + VST compressor active."
                 : "";
 
-        WidthStatus = notes.FirstOrDefault(n => n.Contains("stereo-only", StringComparison.Ordinal))
-                      ?? (WidthEnabled && WidthInDangerZone
-                          ? "Past 120% center vocals start sounding thin and distant."
-                          : "");
+        WidthStatus = WidthEnabled && WidthInDangerZone
+            ? "Past 140% centered vocals start sounding thin and distant."
+            : WidthEnabled
+                ? "Applied to the front left/right only — your centre and surround channels are untouched."
+                : "";
     }
 }

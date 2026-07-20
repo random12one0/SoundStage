@@ -22,4 +22,20 @@ public static class DiagnosticSweep
         ]);
         return doc.Render();
     }
+
+    /// <summary>
+    /// Same unmistakable EQ but inside a <c>Device:</c> section for one endpoint —
+    /// verifies APO's device matching works for the spec we generate. If the global test
+    /// muffles but this one doesn't, device targeting is broken on this machine.
+    /// </summary>
+    public static string BuildScopedChainText(string deviceMatchSpec)
+    {
+        var doc = new ApoDocument([
+            new CommentCommand("Soundstage diagnostic — TEMPORARY device-scoped extreme EQ, auto-reverts."),
+            new DeviceCommand(deviceMatchSpec),
+            new FilterCommand(FilterType.HighShelf, 1000, -18, 0.707),
+            new PreampCommand(-3),
+        ]);
+        return doc.Render();
+    }
 }

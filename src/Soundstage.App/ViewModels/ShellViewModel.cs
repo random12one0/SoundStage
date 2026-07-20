@@ -29,6 +29,18 @@ public partial class ShellViewModel : ObservableObject
     [ObservableProperty]
     private bool _showTakeoverBanner;
 
+    [ObservableProperty]
+    private bool _showUpdateBanner;
+
+    [ObservableProperty]
+    private string _updateBannerText = "";
+
+    [ObservableProperty]
+    private bool _canUndo;
+
+    [ObservableProperty]
+    private bool _isBypassed;
+
     public StatusBarViewModel StatusBar { get; }
 
     public RevertToastViewModel RevertToast { get; }
@@ -53,6 +65,8 @@ public partial class ShellViewModel : ObservableObject
         {
             controller.Changed += () => UiDispatch.Post(RefreshBanners);
         }
+
+        services.Update.Changed += () => UiDispatch.Post(RefreshBanners);
 
         SelectedItem = NavItems[0];
         RefreshBanners();
@@ -81,7 +95,17 @@ public partial class ShellViewModel : ObservableObject
         ShowApoMissingBanner = !_services.ApoAvailable;
         ShowTakeoverBanner = _services.ApoAvailable
                              && _services.Takeover?.GetOwnershipState() is not Core.Configio.OwnershipState.Owned;
+        ShowUpdateBanner = _services.Update.IsUpdateAvailable;
+        UpdateBannerText = _services.Update.Latest is { } latest ? $"{latest.Name} is available." : "An update is available.";
+        CanUndo = _services.Controller?.CanUndo ?? false;
+        IsBypassed = _services.Controller?.State.BypassActive ?? false;
     }
+
+    [RelayCommand]
+    private void OpenUpdateSettings() => NavigateTo("settings");
+
+    [RelayCommand]
+    private void ToggleBypass() => _services.Controller?.ToggleBypass();
 
     [RelayCommand]
     private void TakeOwnership()
@@ -101,4 +125,8 @@ public partial class ShellViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenDiagnostics() => NavigateTo("diagnostics");
+
+    /// <summary>Global Ctrl+Z — steps the sound back one change.</summary>
+    [RelayCommand]
+    private void Undo() => _services.Controller?.Undo();
 }
