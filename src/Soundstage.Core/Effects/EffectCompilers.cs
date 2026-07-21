@@ -197,15 +197,15 @@ public static class EffectCompilers
                 continue; // not installed yet — skip
             }
 
-            var route = effect.ChannelRoute == VstRackEffect.RouteAll ? full : effect.ChannelRoute;
+            var route = string.IsNullOrEmpty(effect.ChannelRoute) ? full : effect.ChannelRoute;
             commands.Add(new CommentCommand($"{effect.Name} ({intensity}%)"));
             if (!string.IsNullOrEmpty(route))
             {
                 commands.Add(new ChannelCommand(route));
             }
 
-            var args = effect.BuildArguments(intensity);
-            commands.Add(new VstPluginCommand(path, string.IsNullOrEmpty(args) ? null : args));
+            // Airwindows are chunk plugins → drive params via ChunkData, not named parameters.
+            commands.Add(new VstPluginCommand(path, $"ChunkData \"{effect.BuildChunkData(intensity)}\""));
             any = true;
         }
 
