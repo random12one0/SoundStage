@@ -49,6 +49,7 @@ public static class RuleSentence
         EffectKind.Loudness => "loudness",
         EffectKind.StereoWidth => "stereo width",
         EffectKind.Ambience => "ambience",
+        EffectKind.Fidelity => "fidelity",
         _ => kind.ToString(),
     };
 

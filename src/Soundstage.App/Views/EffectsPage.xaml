@@ -94,6 +94,33 @@
                 </StackPanel>
             </Border>
 
+            <!-- Fidelity -->
+            <Border Style="{StaticResource Card}">
+                <StackPanel>
+                    <Grid>
+                        <StackPanel>
+                            <TextBlock FontSize="15" FontWeight="SemiBold" Text="Fidelity" />
+                            <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="One-knob clarity. Lifts the presence range (~3–4 kHz, where detail and speech live) and adds a little air up top (~12 kHz) for openness. Great on streaming, podcasts, and anything that sounds dull or far away." />
+                        </StackPanel>
+                        <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal">
+                            <ui:Button Margin="0,0,10,0" Command="{Binding ResetFidelityCommand}" Content="Reset" FontSize="11" Opacity="0.6" ToolTip="Back to defaults" />
+                            <ui:ToggleSwitch IsChecked="{Binding FidelityEnabled}" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding FidelityEnabled}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="46" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Intensity" />
+                        <Slider Grid.Column="1" Margin="12,0" Maximum="100" Minimum="0" Value="{Binding FidelityIntensity}" />
+                        <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding FidelityIntensity, StringFormat={}{0:0}%}" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
             <!-- Stereo width -->
             <Border Style="{StaticResource Card}">
                 <StackPanel>

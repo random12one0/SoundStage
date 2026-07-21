@@ -21,8 +21,8 @@ public sealed record ChainCompilation(ApoDocument Document, string RenderedText,
 /// enabled profile so each endpoint gets exactly its own processing; the analyzer clamps
 /// each section's preamp for clipping safety.
 ///
-/// Section order per device: preamp → preset EQ → night-mode shelf → stereo width →
-/// loudness correction.
+/// Section order per device: preamp → preset EQ → night-mode shelf → fidelity → stereo width →
+/// ambience → loudness correction.
 /// </summary>
 public static class ChainCompiler
 {
@@ -76,11 +76,12 @@ public static class ChainCompiler
 
         var effects = profile.Effects;
         var night = EffectCompilers.CompileNightMode(effects.NightMode);
+        var fidelity = EffectCompilers.CompileFidelity(effects.Fidelity);
         var loudness = EffectCompilers.CompileLoudness(effects.Loudness);
         var width = EffectCompilers.CompileStereoWidth(effects.StereoWidth, capabilities);
         var ambience = EffectCompilers.CompileAmbience(effects.Ambience, capabilities, ambienceIrResolver);
 
-        foreach (var note in new[] { night.Note, loudness.Note, width.Note, ambience.Note })
+        foreach (var note in new[] { night.Note, fidelity.Note, loudness.Note, width.Note, ambience.Note })
         {
             if (note is not null)
             {
@@ -108,6 +109,7 @@ public static class ChainCompiler
         }
 
         analyzedFilters.AddRange(night.Commands.OfType<FilterCommand>());
+        analyzedFilters.AddRange(fidelity.Commands.OfType<FilterCommand>());
 
         var authorPreamp = preset?.PreampDb ?? 0;
         var effectiveAuthorPreamp = authorPreamp - night.ExtraHeadroomDb - ambience.ExtraHeadroomDb;
@@ -141,6 +143,7 @@ public static class ChainCompiler
         }
 
         AppendCommands(document, night.Commands);
+        AppendCommands(document, fidelity.Commands);
         AppendCommands(document, width.Commands);
         AppendCommands(document, ambience.Commands);
         AppendCommands(document, loudness.Commands);

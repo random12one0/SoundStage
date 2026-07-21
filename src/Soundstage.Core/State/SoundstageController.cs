@@ -413,6 +413,7 @@ public sealed class SoundstageController : IDisposable
         EffectKind.Loudness => e with { Loudness = e.Loudness with { Enabled = enabled } },
         EffectKind.StereoWidth => e with { StereoWidth = e.StereoWidth with { Enabled = enabled } },
         EffectKind.Ambience => e with { Ambience = e.Ambience with { Enabled = enabled } },
+        EffectKind.Fidelity => e with { Fidelity = e.Fidelity with { Enabled = enabled } },
         _ => e,
     };
 
@@ -422,6 +423,7 @@ public sealed class SoundstageController : IDisposable
         EffectKind.Loudness => e with { Loudness = e.Loudness with { Intensity = intensity } },
         EffectKind.StereoWidth => e with { StereoWidth = e.StereoWidth with { WidthPercent = intensity } },
         EffectKind.Ambience => e with { Ambience = e.Ambience with { Intensity = intensity } },
+        EffectKind.Fidelity => e with { Fidelity = e.Fidelity with { Intensity = intensity } },
         _ => e,
     };
 

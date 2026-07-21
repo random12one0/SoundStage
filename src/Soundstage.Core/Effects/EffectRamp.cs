@@ -45,7 +45,8 @@ public static class EffectRamp
         LerpNight(from.NightMode, to.NightMode, t),
         LerpLoudness(from.Loudness, to.Loudness, t),
         LerpWidth(from.StereoWidth, to.StereoWidth, t),
-        to.Ambience);
+        to.Ambience,
+        LerpFidelity(from.Fidelity, to.Fidelity, t));
 
     private static NightModeSettings LerpNight(NightModeSettings a, NightModeSettings b, double t)
     {
@@ -84,6 +85,18 @@ public static class EffectRamp
         return new StereoWidthSettings(Enabled: true, WidthPercent: LerpInt(wa, wb, t));
     }
 
+    private static FidelitySettings LerpFidelity(FidelitySettings a, FidelitySettings b, double t)
+    {
+        if (!a.Enabled && !b.Enabled)
+        {
+            return b;
+        }
+
+        var ia = a.Enabled ? a.Intensity : 0;
+        var ib = b.Enabled ? b.Intensity : 0;
+        return new FidelitySettings(Enabled: true, Intensity: LerpInt(ia, ib, t));
+    }
+
     private static int LerpInt(int a, int b, double t) => (int)Math.Round(a + (b - a) * t);
 
     /// <summary>
@@ -95,7 +108,8 @@ public static class EffectRamp
         Math.Abs(NightBassDb(b) - NightBassDb(a))
         + Math.Abs(NightLevelDb(b) - NightLevelDb(a))
         + Math.Abs(LoudnessRefDb(b) - LoudnessRefDb(a)) * 0.4
-        + Math.Abs(WidthDb(b) - WidthDb(a)) * 4.0;
+        + Math.Abs(WidthDb(b) - WidthDb(a)) * 4.0
+        + Math.Abs(FidelityDb(b) - FidelityDb(a));
 
     private static double NightBassDb(EffectSettings e) => e.NightMode.Enabled ? Math.Abs(e.NightMode.EffectiveBassCutDb) : 0;
 
@@ -106,4 +120,6 @@ public static class EffectRamp
         e.Loudness.Enabled ? e.Loudness.EffectiveReferenceLevel : LoudnessSettings.MinReferenceLevel;
 
     private static double WidthDb(EffectSettings e) => e.StereoWidth.Enabled ? e.StereoWidth.MaxGainDb : 0;
+
+    private static double FidelityDb(EffectSettings e) => e.Fidelity.Enabled ? e.Fidelity.PresenceDb + e.Fidelity.AirDb : 0;
 }

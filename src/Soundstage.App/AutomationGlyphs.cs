@@ -30,6 +30,7 @@ public static class AutomationGlyphs
         EffectKind.Loudness => "",     // Volume
         EffectKind.StereoWidth => "",  // Speakers
         EffectKind.Ambience => "",     // Streaming/waves
+        EffectKind.Fidelity => "",  // Brightness — clarity / air
         _ => "",
     };
 }

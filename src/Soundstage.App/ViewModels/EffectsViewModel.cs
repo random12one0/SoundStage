@@ -48,6 +48,13 @@ public partial class EffectsViewModel : ObservableObject
     [ObservableProperty]
     private string _widthStatus = "";
 
+    // Fidelity
+    [ObservableProperty]
+    private bool _fidelityEnabled;
+
+    [ObservableProperty]
+    private double _fidelityIntensity = 50;
+
     // Ambience
     [ObservableProperty]
     private bool _ambienceVisible;
@@ -93,6 +100,8 @@ public partial class EffectsViewModel : ObservableObject
         AmbienceVisible = true;
         AmbienceEnabled = e.Ambience.Enabled;
         AmbienceIntensity = e.Ambience.Intensity;
+        FidelityEnabled = e.Fidelity.Enabled;
+        FidelityIntensity = e.Fidelity.Intensity;
         _syncing = false;
     }
 
@@ -128,6 +137,7 @@ public partial class EffectsViewModel : ObservableObject
             Loudness = e.Loudness with { Enabled = LoudnessEnabled, Intensity = (int)Math.Round(LoudnessIntensity) },
             StereoWidth = e.StereoWidth with { Enabled = WidthEnabled, WidthPercent = (int)Math.Round(WidthPercent) },
             Ambience = e.Ambience with { Enabled = AmbienceEnabled, Intensity = (int)Math.Round(AmbienceIntensity) },
+            Fidelity = e.Fidelity with { Enabled = FidelityEnabled, Intensity = (int)Math.Round(FidelityIntensity) },
         });
     }
 
@@ -180,6 +190,10 @@ public partial class EffectsViewModel : ObservableObject
 
     partial void OnAmbienceIntensityChanged(double value) => Push();
 
+    partial void OnFidelityEnabledChanged(bool value) => Push(immediate: true);
+
+    partial void OnFidelityIntensityChanged(double value) => Push();
+
     [RelayCommand]
     private void ResetNight()
     {
@@ -210,6 +224,14 @@ public partial class EffectsViewModel : ObservableObject
     {
         AmbienceEnabled = false;
         AmbienceIntensity = 30;
+        Push(immediate: true);
+    }
+
+    [RelayCommand]
+    private void ResetFidelity()
+    {
+        FidelityEnabled = false;
+        FidelityIntensity = 50;
         Push(immediate: true);
     }
 

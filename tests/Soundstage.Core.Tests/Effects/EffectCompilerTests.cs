@@ -141,6 +141,35 @@ public class EffectCompilerTests
         Assert.NotNull(result.Note);
     }
 
+    // ---- Fidelity ----
+
+    [Fact]
+    public void Fidelity_Disabled_EmitsNothing()
+    {
+        Assert.Empty(EffectCompilers.CompileFidelity(new FidelitySettings(Enabled: false, Intensity: 100)).Commands);
+    }
+
+    [Fact]
+    public void Fidelity_EmitsPresencePeakAndAirShelf_ScaledByIntensity()
+    {
+        var full = EffectCompilers.CompileFidelity(new FidelitySettings(Enabled: true, Intensity: 100));
+        var filters = full.Commands.OfType<FilterCommand>().ToList();
+        Assert.Equal(2, filters.Count);
+
+        var presence = filters.Single(f => f.Type == FilterType.Peaking);
+        Assert.Equal(FidelitySettings.PresenceHz, presence.FrequencyHz, 1);
+        Assert.Equal(FidelitySettings.MaxPresenceDb, presence.GainDb, 2);
+
+        var air = filters.Single(f => f.Type == FilterType.HighShelf);
+        Assert.Equal(FidelitySettings.AirHz, air.FrequencyHz, 1);
+        Assert.Equal(FidelitySettings.MaxAirDb, air.GainDb, 2);
+
+        // Front-loaded: 50% is already most of the way there, and less than full.
+        var half = EffectCompilers.CompileFidelity(new FidelitySettings(Enabled: true, Intensity: 50))
+            .Commands.OfType<FilterCommand>().Single(f => f.Type == FilterType.HighShelf);
+        Assert.InRange(half.GainDb, FidelitySettings.MaxAirDb * 0.5, FidelitySettings.MaxAirDb);
+    }
+
     // ---- Ambience ----
 
     [Fact]

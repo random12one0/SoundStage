@@ -124,6 +124,7 @@ public sealed class AutomationCoordinator : IDisposable
         EffectKind.Loudness => effects.Loudness.Enabled,
         EffectKind.StereoWidth => effects.StereoWidth.Enabled,
         EffectKind.Ambience => effects.Ambience.Enabled,
+        EffectKind.Fidelity => effects.Fidelity.Enabled,
         _ => false,
     };
 
@@ -133,6 +134,7 @@ public sealed class AutomationCoordinator : IDisposable
         EffectKind.Loudness => effects.Loudness.Intensity,
         EffectKind.StereoWidth => effects.StereoWidth.WidthPercent,
         EffectKind.Ambience => effects.Ambience.Intensity,
+        EffectKind.Fidelity => effects.Fidelity.Intensity,
         _ => 0,
     };
 

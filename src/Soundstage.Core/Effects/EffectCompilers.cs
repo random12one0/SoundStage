@@ -115,6 +115,39 @@ public static class EffectCompilers
     }
 
     /// <summary>
+    /// Fidelity — a fixed "clarity" contour: a presence peak (~3.5 kHz) for detail plus an air
+    /// high-shelf (~12 kHz) for openness, both scaled by intensity. Pure EQ boosts, so the chain
+    /// compiler feeds them to the headroom analyzer and clipping protection covers them.
+    /// </summary>
+    public static EffectCompilation CompileFidelity(FidelitySettings settings)
+    {
+        if (!settings.Enabled)
+        {
+            return EffectCompilation.Empty;
+        }
+
+        var presence = settings.PresenceDb;
+        var air = settings.AirDb;
+        if (presence < 0.05 && air < 0.05)
+        {
+            return EffectCompilation.Empty;
+        }
+
+        var commands = new List<ApoCommand> { new CommentCommand($"Fidelity {settings.Intensity}% — presence + air lift") };
+        if (presence >= 0.05)
+        {
+            commands.Add(new FilterCommand(FilterType.Peaking, FidelitySettings.PresenceHz, presence, FidelitySettings.PresenceQ));
+        }
+
+        if (air >= 0.05)
+        {
+            commands.Add(new FilterCommand(FilterType.HighShelf, FidelitySettings.AirHz, air, FidelitySettings.AirQ));
+        }
+
+        return new EffectCompilation(commands);
+    }
+
+    /// <summary>
     /// Ambience: a short convolution reverb using a generated impulse response. Only emits
     /// when the IR file for the device's sample rate is known to exist (the app generates
     /// them; headless/tests pass a probe).

@@ -222,6 +222,7 @@ public sealed record SetEffectEnabledAction(EffectKind Effect, bool Enabled) : A
         EffectKind.Loudness => "loudness compensation",
         EffectKind.StereoWidth => "stereo width",
         EffectKind.Ambience => "ambience",
+        EffectKind.Fidelity => "fidelity",
         _ => kind.ToString(),
     };
 }

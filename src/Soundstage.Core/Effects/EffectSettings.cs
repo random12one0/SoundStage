@@ -6,6 +6,7 @@ public enum EffectKind
     Loudness,
     StereoWidth,
     Ambience,
+    Fidelity,
 }
 
 /// <summary>
@@ -130,11 +131,36 @@ public sealed record AmbienceSettings(
     bool Enabled = false,
     int Intensity = 50);
 
+/// <summary>
+/// Fidelity — Boom's one-knob "clarity". A fixed psychoacoustic lift that makes audio sound fuller
+/// and more present: a gentle <b>presence</b> boost around 3–4 kHz (where speech and instrument
+/// detail live) plus an <b>air</b> lift up top (~12 kHz) for openness and sparkle. Pure EQ, so it
+/// is fully native and goes through the clipping analyzer like any other boost.
+/// </summary>
+public sealed record FidelitySettings(
+    bool Enabled = false,
+    int Intensity = 50)
+{
+    public const double PresenceHz = 3500.0;
+    public const double PresenceQ = 0.9;
+    public const double MaxPresenceDb = 5.0;
+
+    public const double AirHz = 12000.0;
+    public const double AirQ = 0.707;
+    public const double MaxAirDb = 6.0;
+
+    public double PresenceDb => IntensityCurve.Scale(MaxPresenceDb, Intensity);
+
+    public double AirDb => IntensityCurve.Scale(MaxAirDb, Intensity);
+}
+
 public sealed record EffectSettings(
     NightModeSettings NightMode,
     LoudnessSettings Loudness,
     StereoWidthSettings StereoWidth,
-    AmbienceSettings Ambience)
+    AmbienceSettings Ambience,
+    FidelitySettings Fidelity)
 {
-    public static EffectSettings Default => new(new NightModeSettings(), new LoudnessSettings(), new StereoWidthSettings(), new AmbienceSettings());
+    public static EffectSettings Default =>
+        new(new NightModeSettings(), new LoudnessSettings(), new StereoWidthSettings(), new AmbienceSettings(), new FidelitySettings());
 }
