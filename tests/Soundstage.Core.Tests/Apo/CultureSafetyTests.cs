@@ -49,7 +49,7 @@ public class CultureSafetyTests
                 "Preamp: -6.4 dB\r\n" +
                 "Filter 1: ON PK Fc 1234.5 Hz Gain -3.25 dB Q 1.41\r\n" +
                 "GraphicEQ: 31.5 -2.5\r\n" +
-                "Copy: L=1.15*L-0.15*R\r\n" +
+                "Copy: L=1.15*L+-0.15*R\r\n" +
                 "LoudnessCorrection: State 1 ReferenceLevel -22.5 Attenuation 0\r\n",
                 text);
         });

@@ -100,17 +100,19 @@ public sealed record CopyAssignment(string TargetChannel, IReadOnlyList<CopyTerm
 {
     public string Render()
     {
+        // Equalizer APO joins mix terms with '+', and a negative coefficient is written as '+-0.25'
+        // (see the wiki's own `L=R+-6dB*C`). Emitting a bare '-' as the separator makes APO reject
+        // the whole assignment and silently drop it — which zeroed a channel and silenced audio.
         var sb = new StringBuilder(TargetChannel);
         sb.Append('=');
         for (var i = 0; i < Terms.Count; i++)
         {
-            var rendered = Terms[i].Render();
-            if (i > 0 && !rendered.StartsWith('-'))
+            if (i > 0)
             {
                 sb.Append('+');
             }
 
-            sb.Append(rendered);
+            sb.Append(Terms[i].Render());
         }
 
         return sb.ToString();

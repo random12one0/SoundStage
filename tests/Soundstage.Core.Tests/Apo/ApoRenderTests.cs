@@ -55,7 +55,8 @@ public class ApoRenderTests
             new CopyAssignment("L", [new(1.2, "L"), new(-0.2, "R")]),
             new CopyAssignment("R", [new(-0.2, "L"), new(1.2, "R")]),
         ]);
-        Assert.Equal("Copy: L=1.2*L-0.2*R R=-0.2*L+1.2*R", cmd.Render());
+        // APO joins terms with '+', negatives as '+-' — a bare '-' separator gets the line dropped.
+        Assert.Equal("Copy: L=1.2*L+-0.2*R R=-0.2*L+1.2*R", cmd.Render());
     }
 
     [Fact]

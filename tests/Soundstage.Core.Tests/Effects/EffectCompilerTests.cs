@@ -100,7 +100,7 @@ public class EffectCompilerTests
         var copy = Assert.Single(result.Commands.OfType<CopyCommand>());
         // ONE parallel-evaluated line, names only L/R, invents no virtual channels. 100% = the
         // capped max width factor (1.5) → a=(1+1.5)/2=1.25, b=(1−1.5)/2=−0.25.
-        Assert.Equal("Copy: L=1.25*L-0.25*R R=1.25*R-0.25*L", copy.Render());
+        Assert.Equal("Copy: L=1.25*L+-0.25*R R=1.25*R+-0.25*L", copy.Render());
         Assert.DoesNotContain("SS_", copy.Render());
         // Anti-phase gain: 20·log10(1.5) ≈ 3.52 dB.
         Assert.Equal(3.52, result.BroadbandGainDb, 1);

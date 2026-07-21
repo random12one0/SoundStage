@@ -135,7 +135,7 @@ public class SoundstageControllerTests : IDisposable
 
         var chain = _fs.ReadAllText(_layout.ChainFilePath);
         // Now applies on 5.1 — a single-line L/R matrix (no scratch channels), front pair only.
-        Assert.Contains("Copy: L=1.25*L-0.25*R R=1.25*R-0.25*L", chain);
+        Assert.Contains("Copy: L=1.25*L+-0.25*R R=1.25*R+-0.25*L", chain);
         Assert.DoesNotContain("SS_", chain);
         Assert.DoesNotContain("C=", chain);
         Assert.DoesNotContain("SL=", chain);
