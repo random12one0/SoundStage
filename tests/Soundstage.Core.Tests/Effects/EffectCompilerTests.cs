@@ -185,4 +185,33 @@ public class EffectCompilerTests
         Assert.Empty(result.Commands);
         Assert.NotNull(result.Note);
     }
+
+    // ---- VST rack ----
+
+    [Fact]
+    public void VstRack_EmitsChannelRoutedPluginLines_AndResetsScope()
+    {
+        var bass = new VstRackEffect("bass", "Virtual Bass", "sub", "BassKit.dll", VstRackEffect.RouteSub,
+            [new VstIntensityParam("Drive", 0.0, 1.0)]);
+        var warmth = new VstRackEffect("warmth", "Warmth", "tape", "ToTape.dll", VstRackEffect.RouteAll, []);
+
+        var cmds = EffectCompilers.CompileVstRack([(bass, 100), (warmth, 50)], 6, name => $@"C:\plugins\{name}");
+        var text = string.Join("\r\n", cmds.Select(c => c.Render()));
+
+        // Bass routed to the sub, with its intensity mapped onto the Drive parameter (100% → 1).
+        Assert.Contains("Channel: LFE", text);
+        Assert.Contains("VSTPlugin: Library \"C:\\plugins\\BassKit.dll\" \"Drive\" 1", text);
+        // Warmth across the whole layout, no params.
+        Assert.Contains("VSTPlugin: Library \"C:\\plugins\\ToTape.dll\"", text);
+        // Channel scope handed back to the full 5.1 layout at the end.
+        Assert.EndsWith("Channel: L R C LFE RL RR", text);
+    }
+
+    [Fact]
+    public void VstRack_SkipsEffectsWhosePluginIsNotInstalled()
+    {
+        var bass = new VstRackEffect("bass", "Virtual Bass", "sub", "BassKit.dll", VstRackEffect.RouteSub, []);
+        var cmds = EffectCompilers.CompileVstRack([(bass, 100)], 6, _ => null); // nothing installed yet
+        Assert.Empty(cmds);
+    }
 }

@@ -86,9 +86,10 @@ public sealed class ApplyOrchestrator
         SoundstageState state,
         Func<string, EqPreset?> presetResolver,
         ApplyAttribution attribution,
-        Func<int, string?>? ambienceIrResolver = null)
+        Func<int, string?>? ambienceIrResolver = null,
+        Func<string, string?>? vstPluginResolver = null)
     {
-        var compilation = ChainCompiler.Compile(state, presetResolver, ambienceIrResolver);
+        var compilation = ChainCompiler.Compile(state, presetResolver, ambienceIrResolver, vstPluginResolver);
         var newText = compilation.RenderedText;
         var hash = ComputeHash(newText);
 

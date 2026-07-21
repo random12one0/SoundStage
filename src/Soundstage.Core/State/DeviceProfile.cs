@@ -31,6 +31,9 @@ public sealed class DeviceProfile
     /// the subwoofer down or balancing a too-loud centre. Empty = every speaker at full level.</summary>
     public List<ChannelTrim> SpeakerTrims { get; set; } = [];
 
+    /// <summary>Which VST rack effects are enabled on this device, and at what intensity.</summary>
+    public List<VstRackEntry> VstRack { get; set; } = [];
+
     /// <summary>This device's automation rules, evaluated top-to-bottom (last match wins).</summary>
     public List<AutomationRule> Rules { get; set; } = [];
 

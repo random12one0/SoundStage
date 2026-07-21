@@ -29,7 +29,8 @@ public static class ChainCompiler
     public static ChainCompilation Compile(
         SoundstageState state,
         Func<string, EqPreset?> presetResolver,
-        Func<int, string?>? ambienceIrResolver = null)
+        Func<int, string?>? ambienceIrResolver = null,
+        Func<string, string?>? vstPluginResolver = null)
     {
         var document = new ApoDocument();
         var reports = new List<DeviceChainReport>();
@@ -51,7 +52,7 @@ public static class ChainCompiler
         foreach (var profile in profiles)
         {
             document.Commands.Add(BlankLineCommand.Instance);
-            CompileDevice(document, profile, state, presetResolver, ambienceIrResolver, reports, scopePerDevice);
+            CompileDevice(document, profile, state, presetResolver, ambienceIrResolver, vstPluginResolver, reports, scopePerDevice);
         }
 
         return new ChainCompilation(document, document.Render(), reports);
@@ -63,6 +64,7 @@ public static class ChainCompiler
         SoundstageState state,
         Func<string, EqPreset?> presetResolver,
         Func<int, string?>? ambienceIrResolver,
+        Func<string, string?>? vstPluginResolver,
         List<DeviceChainReport> reports,
         bool scopePerDevice)
     {
@@ -147,6 +149,7 @@ public static class ChainCompiler
         AppendCommands(document, width.Commands);
         AppendCommands(document, ambience.Commands);
         AppendCommands(document, loudness.Commands);
+        AppendVstRack(document, profile, capabilities.Channels, vstPluginResolver);
         AppendSpeakerCalibration(document, profile, capabilities.Channels);
 
         reports.Add(new DeviceChainReport(profile.EndpointId, profile.FriendlyName, preset?.Name, headroom, notes));
@@ -158,6 +161,24 @@ public static class ChainCompiler
         {
             document.Commands.Add(command);
         }
+    }
+
+    /// <summary>Resolves the device's enabled VST rack effects against the catalog and emits them.</summary>
+    private static void AppendVstRack(ApoDocument document, DeviceProfile profile, int channels, Func<string, string?>? vstPluginResolver)
+    {
+        if (vstPluginResolver is null || profile.VstRack.Count == 0)
+        {
+            return;
+        }
+
+        var active = profile.VstRack
+            .Where(e => e.Enabled)
+            .Select(e => (Effect: VstCatalog.Get(e.Id), e.Intensity))
+            .Where(x => x.Effect is not null)
+            .Select(x => (x.Effect!, x.Intensity))
+            .ToList();
+
+        AppendCommands(document, EffectCompilers.CompileVstRack(active, channels, vstPluginResolver));
     }
 
     /// <summary>

@@ -64,6 +64,12 @@ public sealed class SoundstageController : IDisposable
     /// </summary>
     public Func<int, string?>? AmbienceIrResolver { get; set; }
 
+    /// <summary>
+    /// Resolves a VST plugin DLL filename to an absolute path (downloading/locating it if needed),
+    /// or null if it isn't installed. Provided by the app layer; null disables the VST rack.
+    /// </summary>
+    public Func<string, string?>? VstPluginResolver { get; set; }
+
     /// <summary>Raised after any state mutation + apply cycle. UI refreshes off this.</summary>
     public event Action? Changed;
 
@@ -216,7 +222,7 @@ public sealed class SoundstageController : IDisposable
             for (var i = 1; i < count; i++)
             {
                 profile.Effects = EffectRamp.Lerp(from, to, (double)i / count);
-                steps.Add(ChainCompiler.Compile(State, _presets.Get, AmbienceIrResolver).RenderedText);
+                steps.Add(ChainCompiler.Compile(State, _presets.Get, AmbienceIrResolver, VstPluginResolver).RenderedText);
             }
 
             profile.Effects = to; // leave the committed target in place for the final Apply
@@ -412,7 +418,7 @@ public sealed class SoundstageController : IDisposable
         ApplyResult result;
         lock (_gate)
         {
-            result = _orchestrator.Apply(State, _presets.Get, attribution, AmbienceIrResolver);
+            result = _orchestrator.Apply(State, _presets.Get, attribution, AmbienceIrResolver, VstPluginResolver);
         }
 
         SaveState();

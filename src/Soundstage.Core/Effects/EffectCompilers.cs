@@ -173,4 +173,47 @@ public static class EffectCompilers
             ],
             ExtraHeadroomDb: IrGenerator.ExtraHeadroomDbFor(settings.Intensity));
     }
+
+    /// <summary>
+    /// Compiles the VST effect rack: for each active effect, a channel-scoped <c>VSTPlugin:</c> line
+    /// (routed to the whole layout or a single speaker like the sub/centre), then a scope reset. An
+    /// effect whose plugin isn't installed yet resolves to null and is skipped silently. Nonlinear
+    /// plugins can't be headroom-analyzed, so each is expected to guard its own level.
+    /// </summary>
+    public static IReadOnlyList<ApoCommand> CompileVstRack(
+        IReadOnlyList<(VstRackEffect Effect, int Intensity)> active,
+        int channels,
+        Func<string, string?> pluginResolver)
+    {
+        var commands = new List<ApoCommand>();
+        var full = SpeakerLayout.ResetSpec(channels);
+        var any = false;
+
+        foreach (var (effect, intensity) in active)
+        {
+            var path = pluginResolver(effect.DllFileName);
+            if (path is null)
+            {
+                continue; // not installed yet — skip
+            }
+
+            var route = effect.ChannelRoute == VstRackEffect.RouteAll ? full : effect.ChannelRoute;
+            commands.Add(new CommentCommand($"{effect.Name} ({intensity}%)"));
+            if (!string.IsNullOrEmpty(route))
+            {
+                commands.Add(new ChannelCommand(route));
+            }
+
+            var args = effect.BuildArguments(intensity);
+            commands.Add(new VstPluginCommand(path, string.IsNullOrEmpty(args) ? null : args));
+            any = true;
+        }
+
+        if (any && !string.IsNullOrEmpty(full))
+        {
+            commands.Add(new ChannelCommand(full)); // hand channel scope back to the full layout
+        }
+
+        return commands;
+    }
 }
