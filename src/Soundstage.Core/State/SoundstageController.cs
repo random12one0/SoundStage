@@ -116,6 +116,30 @@ public sealed class SoundstageController : IDisposable
     /// <summary>Re-applies after a preset's content changed (EQ editing).</summary>
     public void NotifyPresetContentChanged() => Apply(ApplyAttribution.Manual());
 
+    /// <summary>
+    /// Panic button: clears every effect and the preset on the active device back to stock (flat,
+    /// no effects) and reapplies. Undoable, and scoped to the active device only.
+    /// </summary>
+    public void ResetToDefaults()
+    {
+        if (ActiveProfile is null)
+        {
+            return;
+        }
+
+        PushUndoSnapshot();
+        lock (_gate)
+        {
+            if (ActiveProfile is { } profile)
+            {
+                profile.Effects = EffectSettings.Default;
+                profile.ActivePresetId = "flat";
+            }
+        }
+
+        Apply(ApplyAttribution.Manual());
+    }
+
     // ---- Effects ----
 
     public void UpdateEffects(Func<EffectSettings, EffectSettings> mutate, ApplyAttribution? attribution = null)

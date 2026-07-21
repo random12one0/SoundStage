@@ -179,6 +179,23 @@ public class SoundstageControllerTests : IDisposable
     }
 
     [Fact]
+    public void ResetToDefaults_ClearsPresetAndEffects_AndIsUndoable()
+    {
+        _controller.Initialize();
+        _controller.ApplyPreset("music");
+        _controller.UpdateEffects(e => e with { NightMode = new NightModeSettings(Enabled: true, Intensity: 80) });
+
+        _controller.ResetToDefaults();
+
+        Assert.Equal("flat", _controller.ActiveProfile!.ActivePresetId);
+        Assert.False(_controller.ActiveProfile.Effects.NightMode.Enabled);
+
+        // Panic button, but reversible.
+        Assert.True(_controller.Undo());
+        Assert.True(_controller.ActiveProfile!.Effects.NightMode.Enabled);
+    }
+
+    [Fact]
     public void Bypass_TogglesSwitchFileOnly_AndPersists()
     {
         _controller.Initialize();

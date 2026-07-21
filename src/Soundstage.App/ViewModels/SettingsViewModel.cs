@@ -232,6 +232,19 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnSafetyMarginChanged(double value) => Persist(reapply: true);
 
     [RelayCommand]
+    private void ResetProcessing()
+    {
+        if (_services.Controller is null)
+        {
+            StatusMessage = "Equalizer APO isn't set up yet — nothing to reset.";
+            return;
+        }
+
+        _services.Controller.ResetToDefaults();
+        StatusMessage = "Reset this device to stock: Flat preset, all effects off. Undo with Ctrl+Z if that wasn't what you wanted.";
+    }
+
+    [RelayCommand]
     private void RefreshBackups()
     {
         var entries = _services.Backups?.List() ?? [];
