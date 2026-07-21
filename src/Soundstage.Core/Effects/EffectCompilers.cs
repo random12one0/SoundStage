@@ -91,23 +91,24 @@ public static class EffectCompilers
             return EffectCompilation.Empty; // 0% → untouched
         }
 
-        // Mid/side widening via SCRATCH channels. Doing it as a single `Copy: L=… R=…` is unsafe
-        // because Equalizer APO can evaluate the R assignment using the ALREADY-updated L, skewing
-        // the image. Instead we freeze mid = ½(L+R) and side = ½(L−R) into scratch channels first,
-        // then rebuild L = mid + w·side, R = mid − w·side from those frozen values — correct no
-        // matter how APO orders the assignments. w is capped at MaxWidthFactor so the anti-phase
-        // side term can never dominate and pull the image into one speaker. Only L and R are ever
-        // written, so a 5.1/7.1 centre, LFE and surrounds pass through untouched.
+        // Mid/side widening as a SINGLE-LINE direct matrix — no scratch/virtual channels.
+        // Equalizer APO evaluates every assignment on one Copy line in parallel (each right-hand
+        // side reads the ORIGINAL pre-Copy value), so `L=a*L+b*R  R=a*R+b*L` is a correct
+        // simultaneous 2×2 matrix. Expanding L'=mid+w·side, R'=mid−w·side gives a=(1+w)/2,
+        // b=(1−w)/2. This was the fix for "everything collapsed into one speaker": the previous
+        // version created named virtual channels (SS_MID/SS_SIDE), which on a fixed 7.1 device is
+        // exactly the kind of thing that misroutes the real channels. This names ONLY L and R, so a
+        // 5.1/7.1 centre, LFE and surrounds pass straight through, and it invents nothing. w is
+        // capped at MaxWidthFactor so the anti-phase term can never dominate. All coefficients are
+        // fractional and rendered with InvariantCulture, so APO never mistakes one for a channel index.
+        var a = (1.0 + w) / 2.0;
+        var b = (1.0 - w) / 2.0;
         var commands = new List<ApoCommand>
         {
             new CommentCommand($"Stereo width {settings.WidthPercent}% — amplifies existing L/R separation (front L/R only)"),
             new CopyCommand([
-                new CopyAssignment("SS_MID", [new CopyTerm(0.5, "L"), new CopyTerm(0.5, "R")]),
-                new CopyAssignment("SS_SIDE", [new CopyTerm(0.5, "L"), new CopyTerm(-0.5, "R")]),
-            ]),
-            new CopyCommand([
-                new CopyAssignment("L", [new CopyTerm(1.0, "SS_MID"), new CopyTerm(w, "SS_SIDE")]),
-                new CopyAssignment("R", [new CopyTerm(1.0, "SS_MID"), new CopyTerm(-w, "SS_SIDE")]),
+                new CopyAssignment("L", [new CopyTerm(a, "L"), new CopyTerm(b, "R")]),
+                new CopyAssignment("R", [new CopyTerm(a, "R"), new CopyTerm(b, "L")]),
             ]),
         };
 
