@@ -15,9 +15,8 @@ namespace Soundstage.App.Services;
 /// </summary>
 public sealed class VstPluginService
 {
-    /// <summary>Airwindows 64-bit VST2 bundle. Confirm the exact link from https://www.airwindows.com/vsts/
-    /// (the "64 Bit Windows VST2s" zip) before enabling one-click install; empty = manual install only.</summary>
-    public const string BundleUrl = "";
+    /// <summary>Airwindows 64-bit VST2 bundle (the whole pack; we extract just the rack's DLLs). MIT.</summary>
+    public const string BundleUrl = "https://www.airwindows.com/wp-content/uploads/WinVST64s.zip";
 
     public const string DownloadPageUrl = "https://www.airwindows.com/vsts/";
 
