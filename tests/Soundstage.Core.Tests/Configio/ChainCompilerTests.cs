@@ -112,7 +112,7 @@ public class ChainCompilerTests
         };
 
         var compilation = ChainCompiler.Compile(StateWith(profile), _ => null);
-        Assert.Contains("Copy: L=1.1*L-0.1*R R=-0.1*L+1.1*R", compilation.RenderedText);
+        Assert.Contains("Copy: L=SS_MID+1.2*SS_SIDE R=SS_MID-1.2*SS_SIDE", compilation.RenderedText);
     }
 
     [Fact]

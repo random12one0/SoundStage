@@ -39,8 +39,9 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource CardHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentGradient}" />
-                                <Setter Property="Foreground" Value="#0B0B10" />
+                                <Setter TargetName="Bd" Property="Background" Value="#334CC2FF" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -68,9 +69,10 @@
                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource CardHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentGradient}" />
-                                <Setter TargetName="Ico" Property="Foreground" Value="#0B0B10" />
-                                <Setter Property="Foreground" Value="#0B0B10" />
+                                <Setter TargetName="Bd" Property="Background" Value="#334CC2FF" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter TargetName="Ico" Property="Foreground" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -93,8 +95,9 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentGradient}" />
-                                <Setter Property="Foreground" Value="#0B0B10" />
+                                <Setter TargetName="Bd" Property="Background" Value="#334CC2FF" />
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
                                 <Setter Property="FontWeight" Value="SemiBold" />
                             </Trigger>
                         </ControlTemplate.Triggers>

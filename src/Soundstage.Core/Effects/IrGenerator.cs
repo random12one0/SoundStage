@@ -14,16 +14,21 @@ namespace Soundstage.Core.Effects;
 /// </summary>
 public static class IrGenerator
 {
-    public const double MinTailSeconds = 0.12;
-    public const double MaxTailSeconds = 0.35;   // a bigger space as intensity rises
+    public const double MinTailSeconds = 0.18;
+    public const double MaxTailSeconds = 0.7;    // a big, obviously audible hall at high intensity
     public const double PreDelaySeconds = 0.02;  // 20 ms gap between the direct sound and the reverb
-    public const double WetHighPassHz = 250.0;   // keep the reverb out of the low end → no boom/mud
+    public const double WetHighPassHz = 180.0;   // keep the reverb out of the deep bass → no mud
 
-    private const int EarlyReflections = 8;
-    private const double EarlyReflectionSpanSeconds = 0.04;
+    private const int EarlyReflections = 12;
+    private const double EarlyReflectionSpanSeconds = 0.05;
 
-    /// <summary>Peak wet L1 (at 100% intensity); the dry impulse fills the rest so the total is unity.</summary>
-    private const double MaxWetL1 = 0.5;
+    /// <summary>
+    /// Peak wet L1 (at 100% intensity). The dry impulse stays at full level (1.0) so ambience
+    /// doesn't just sound "quieter" — the wet reverb is added ON TOP, and the extra energy is
+    /// paid for with preamp headroom (<see cref="ExtraHeadroomDbFor"/>) rather than by ducking
+    /// the dry signal. This is what makes it an obvious, hearable reverb instead of a faint haze.
+    /// </summary>
+    public const double MaxWetL1 = 0.8;
 
     private static int TailSampleCount(int sampleRate, int intensity)
     {
@@ -35,6 +40,13 @@ public static class IrGenerator
     public static int FrameCountFor(int sampleRate, int intensity) =>
         1 + (int)(sampleRate * PreDelaySeconds) + TailSampleCount(sampleRate, intensity);
 
+    /// <summary>
+    /// Extra preamp headroom (dB) the ambience mix needs so the wet-on-top reverb can't clip:
+    /// the convolution's worst-case gain is the IR's L1 = dry(1.0) + wet. 0 at 0% intensity.
+    /// </summary>
+    public static double ExtraHeadroomDbFor(int intensity) =>
+        20.0 * Math.Log10(1.0 + MaxWetL1 * IntensityCurve.Fraction(Math.Clamp(intensity, 0, 100)));
+
     /// <summary>Builds a 32-bit float stereo WAV for the given sample rate and intensity (0–100).</summary>
     public static byte[] BuildWav(int sampleRate, int intensity)
     {
@@ -45,7 +57,7 @@ public static class IrGenerator
         var totalFrames = 1 + preDelay + tailSamples;
 
         var wetL1 = MaxWetL1 * curve;
-        var dry = 1.0 - wetL1;
+        var dry = 1.0; // keep the direct sound at full level; the wet reverb is added on top
 
         var left = new double[totalFrames];
         var right = new double[totalFrames];

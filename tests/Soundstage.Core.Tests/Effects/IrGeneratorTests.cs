@@ -51,7 +51,7 @@ public class IrGeneratorTests
     }
 
     [Fact]
-    public void Samples_NeverExceedUnity_AndTotalGainIsSafe()
+    public void Samples_NeverExceedUnity_AndRequestedHeadroomKeepsItSafe()
     {
         foreach (var intensity in new[] { 0, 50, 100 })
         {
@@ -68,9 +68,11 @@ public class IrGeneratorTests
                 l1Right += Math.Abs(right);
             }
 
-            // Worst-case convolution gain (L1 norm) stays at or below unity per channel.
-            Assert.True(l1Left <= 1.0 + 1e-3, $"L1 left {l1Left} at intensity {intensity}");
-            Assert.True(l1Right <= 1.0 + 1e-3, $"L1 right {l1Right} at intensity {intensity}");
+            // The wet reverb is added on top of a full-level dry, so per-channel L1 exceeds 1;
+            // the headroom the effect requests must bring the worst-case gain back to ≤ unity.
+            var afterHeadroom = Math.Pow(10, -IrGenerator.ExtraHeadroomDbFor(intensity) / 20.0);
+            Assert.True(l1Left * afterHeadroom <= 1.0 + 1e-3, $"L1 left {l1Left} at intensity {intensity}");
+            Assert.True(l1Right * afterHeadroom <= 1.0 + 1e-3, $"L1 right {l1Right} at intensity {intensity}");
         }
     }
 

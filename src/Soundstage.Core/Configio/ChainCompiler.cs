@@ -112,7 +112,7 @@ public static class ChainCompiler
         analyzedFilters.AddRange(night.Commands.OfType<FilterCommand>());
 
         var authorPreamp = preset?.PreampDb ?? 0;
-        var effectiveAuthorPreamp = authorPreamp - night.ExtraHeadroomDb;
+        var effectiveAuthorPreamp = authorPreamp - night.ExtraHeadroomDb - ambience.ExtraHeadroomDb;
         var headroom = HeadroomAnalyzer.Analyze(
             effectiveAuthorPreamp,
             analyzedFilters,

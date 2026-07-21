@@ -116,7 +116,11 @@
                                     <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Night mode" />
                                     <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding NightEnabled}" />
                                 </Grid>
-                                <Slider Margin="0,6,0,0" Maximum="100" Minimum="0" IsEnabled="{Binding NightEnabled}" Value="{Binding NightIntensity}" />
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="38" /></Grid.ColumnDefinitions>
+                                    <Slider VerticalAlignment="Center" Maximum="100" Minimum="0" IsEnabled="{Binding NightEnabled}" Value="{Binding NightIntensity}" />
+                                    <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Text="{Binding NightIntensity, StringFormat={}{0:0}%}" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                         <Border Margin="3,0,3,0" Padding="12,10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
@@ -125,7 +129,11 @@
                                     <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Loudness" />
                                     <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding LoudnessEnabled}" />
                                 </Grid>
-                                <Slider Margin="0,6,0,0" Maximum="100" Minimum="0" IsEnabled="{Binding LoudnessEnabled}" Value="{Binding LoudnessIntensity}" />
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="38" /></Grid.ColumnDefinitions>
+                                    <Slider VerticalAlignment="Center" Maximum="100" Minimum="0" IsEnabled="{Binding LoudnessEnabled}" Value="{Binding LoudnessIntensity}" />
+                                    <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Text="{Binding LoudnessIntensity, StringFormat={}{0:0}%}" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                         <Border Margin="6,0,0,0" Padding="12,10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
@@ -134,7 +142,11 @@
                                     <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Stereo width" />
                                     <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding WidthEnabled}" />
                                 </Grid>
-                                <Slider Margin="0,6,0,0" Maximum="200" Minimum="0" IsEnabled="{Binding WidthEnabled}" Value="{Binding WidthPercent}" />
+                                <Grid Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
+                                    <Slider VerticalAlignment="Center" Maximum="200" Minimum="0" IsEnabled="{Binding WidthEnabled}" Value="{Binding WidthPercent}" />
+                                    <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Text="{Binding WidthPercent, StringFormat={}{0:0}%}" />
+                                </Grid>
                             </StackPanel>
                         </Border>
                     </UniformGrid>

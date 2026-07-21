@@ -93,11 +93,15 @@ public class EffectCompilerTests
     }
 
     [Fact]
-    public void Width_140Percent_EmitsExpectedMatrix()
+    public void Width_140Percent_EmitsMidSideScratchMatrix()
     {
         var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 140), Stereo48);
-        var copy = Assert.Single(result.Commands.OfType<CopyCommand>());
-        Assert.Equal("Copy: L=1.2*L-0.2*R R=-0.2*L+1.2*R", copy.Render());
+        var copies = result.Commands.OfType<CopyCommand>().ToList();
+        Assert.Equal(2, copies.Count);
+        // Mid/side frozen into scratch channels first…
+        Assert.Equal("Copy: SS_MID=0.5*L+0.5*R SS_SIDE=0.5*L-0.5*R", copies[0].Render());
+        // …then L/R rebuilt from the frozen values (w = 1.4), immune to APO's assignment order.
+        Assert.Equal("Copy: L=SS_MID+1.4*SS_SIDE R=SS_MID-1.4*SS_SIDE", copies[1].Render());
         // Anti-phase gain: 20·log10(1.4) ≈ 2.92 dB.
         Assert.Equal(2.92, result.BroadbandGainDb, 1);
     }
@@ -113,14 +117,14 @@ public class EffectCompilerTests
     [Fact]
     public void Width_OnSurroundDevice_AppliesToFrontLR_LeavingOtherChannelsUntouched()
     {
-        // Surround-safe: width now works on 5.1/7.1 by only reassigning L and R.
+        // Surround-safe: width works on 5.1/7.1 by only rebuilding L and R.
         var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 160), Surround48);
-        var copy = Assert.Single(result.Commands.OfType<CopyCommand>());
-        var line = copy.Render();
+        var line = string.Join("\n", result.Commands.OfType<CopyCommand>().Select(c => c.Render()));
         Assert.Contains("L=", line);
         Assert.Contains("R=", line);
-        // Only L and R are targets — centre/LFE/surrounds are never assigned, so they pass through.
+        // Only L and R are assignment targets — centre/LFE/surrounds are never written, so they pass through.
         Assert.DoesNotContain("C=", line);
+        Assert.DoesNotContain("LFE=", line);
         Assert.DoesNotContain("SL=", line);
     }
 
