@@ -94,6 +94,52 @@ public sealed class VstPluginService
         }
     }
 
+    /// <summary>
+    /// Copies the rack's DLLs out of a folder the user already downloaded (searched recursively,
+    /// case-insensitive) into the plugin folder. Returns how many were found. This is the "I already
+    /// have the pack — just wire them in" path, so there's no re-download.
+    /// </summary>
+    public int ImportFromFolder(string sourceDir)
+    {
+        if (string.IsNullOrWhiteSpace(sourceDir) || !Directory.Exists(sourceDir))
+        {
+            return 0;
+        }
+
+        Directory.CreateDirectory(UserPluginDirectory);
+        var wanted = VstCatalog.All.Select(e => e.DllFileName)
+            .ToDictionary(n => n, n => n, StringComparer.OrdinalIgnoreCase);
+
+        var copied = 0;
+        IEnumerable<string> files;
+        try
+        {
+            files = Directory.EnumerateFiles(sourceDir, "*.dll", SearchOption.AllDirectories);
+        }
+        catch
+        {
+            return 0;
+        }
+
+        foreach (var file in files)
+        {
+            if (wanted.TryGetValue(Path.GetFileName(file), out var canonical))
+            {
+                try
+                {
+                    File.Copy(file, Path.Combine(UserPluginDirectory, canonical), overwrite: true);
+                    copied++;
+                }
+                catch
+                {
+                    // Skip a locked/unreadable file; the rest still import.
+                }
+            }
+        }
+
+        return copied;
+    }
+
     public void OpenPluginFolder()
     {
         try

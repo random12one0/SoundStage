@@ -199,6 +199,8 @@
                                 <ui:Button Appearance="Primary" Command="{Binding InstallCommand}" Content="Install effects"
                                            IsEnabled="{Binding IsInstalling, Converter={StaticResource InverseBool}}"
                                            Visibility="{Binding CanAutoInstall, Converter={StaticResource BoolToVisibility}}" />
+                                <ui:Button Margin="8,0,0,0" Command="{Binding ImportFolderCommand}" Content="I already downloaded it…"
+                                           ToolTip="Pick the folder you unzipped and I'll copy the effect DLLs in for you" />
                                 <ui:Button Margin="8,0,0,0" Command="{Binding GetFromAirwindowsCommand}" Content="Get from Airwindows" />
                                 <ui:Button Margin="8,0,0,0" Command="{Binding OpenFolderCommand}" Content="Open plugins folder" />
                                 <ui:Button Margin="8,0,0,0" Command="{Binding RecheckCommand}" Content="Recheck" ToolTip="Re-scan the plugins folder after dropping the DLLs in" />

@@ -152,6 +152,24 @@ public partial class VstRackViewModel : ObservableObject
     [RelayCommand]
     private void OpenFolder() => _services.Vst.OpenPluginFolder();
 
+    /// <summary>Point at a folder the user already downloaded and auto-copy the rack's DLLs in.</summary>
+    [RelayCommand]
+    private void ImportFolder()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog { Title = "Pick the Airwindows folder you downloaded" };
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var count = _services.Vst.ImportFromFolder(dialog.FolderName);
+        Rebuild();
+        InstallStatus = count > 0
+            ? $"Imported {count} effect{(count == 1 ? "" : "s")} — {InstallStatus}"
+            : "No matching effect DLLs in that folder. Look for BassKit.dll, PurestDrive.dll, Air2.dll, Pressure4.dll and ADClip7.dll.";
+        _services.Controller?.Apply(ApplyAttribution.Manual());
+    }
+
     [RelayCommand]
     private void GetFromAirwindows() => _services.Vst.OpenDownloadPage();
 
