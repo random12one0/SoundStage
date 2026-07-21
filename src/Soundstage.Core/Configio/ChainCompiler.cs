@@ -147,6 +147,7 @@ public static class ChainCompiler
         AppendCommands(document, width.Commands);
         AppendCommands(document, ambience.Commands);
         AppendCommands(document, loudness.Commands);
+        AppendSpeakerCalibration(document, profile, capabilities.Channels);
 
         reports.Add(new DeviceChainReport(profile.EndpointId, profile.FriendlyName, preset?.Name, headroom, notes));
     }
@@ -156,6 +157,33 @@ public static class ChainCompiler
         foreach (var command in commands)
         {
             document.Commands.Add(command);
+        }
+    }
+
+    /// <summary>
+    /// Emits per-speaker level trims as channel-scoped preamp cuts, last in the device section.
+    /// Attenuation only (a cut can't clip; a trim on an absent channel is a no-op), then the channel
+    /// scope is reset to the full layout so nothing downstream inherits a narrowed selection.
+    /// </summary>
+    private static void AppendSpeakerCalibration(ApoDocument document, DeviceProfile profile, int channels)
+    {
+        var trims = profile.SpeakerTrims.Where(t => t.TrimDb < -0.05).ToList();
+        if (trims.Count == 0)
+        {
+            return;
+        }
+
+        document.Commands.Add(new CommentCommand("Speaker calibration (per-channel level)"));
+        foreach (var trim in trims)
+        {
+            document.Commands.Add(new ChannelCommand(trim.Channel));
+            document.Commands.Add(new PreampCommand(trim.TrimDb));
+        }
+
+        var reset = SpeakerLayout.ResetSpec(channels);
+        if (!string.IsNullOrEmpty(reset))
+        {
+            document.Commands.Add(new ChannelCommand(reset));
         }
     }
 

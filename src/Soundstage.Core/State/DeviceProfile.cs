@@ -27,6 +27,10 @@ public sealed class DeviceProfile
 
     public EffectSettings Effects { get; set; } = EffectSettings.Default;
 
+    /// <summary>Per-speaker level trims (attenuation) for calibrating a surround rig — e.g. turning
+    /// the subwoofer down or balancing a too-loud centre. Empty = every speaker at full level.</summary>
+    public List<ChannelTrim> SpeakerTrims { get; set; } = [];
+
     /// <summary>This device's automation rules, evaluated top-to-bottom (last match wins).</summary>
     public List<AutomationRule> Rules { get; set; } = [];
 

@@ -61,6 +61,7 @@ public partial class ShellViewModel : ObservableObject
         [
             new NavItem("dashboard", "Dashboard", "", () => new DashboardPage(services)),
             new NavItem("effects", "Effects", "", () => new EffectsPage(services)),
+            new NavItem("speakers", "Speakers", "", () => new SpeakersPage(services)),
             new NavItem("automations", "Automations", "", () => new AutomationsPage(services)),
             new NavItem("devices", "Devices", "", () => new DevicesPage(services)),
             new NavItem("diagnostics", "Diagnostics", "", () => new DiagnosticsPage(services)),

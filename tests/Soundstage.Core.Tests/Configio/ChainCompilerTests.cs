@@ -133,6 +133,30 @@ public class ChainCompilerTests
     }
 
     [Fact]
+    public void SpeakerCalibration_EmitsChannelScopedCuts_AndResetsScope()
+    {
+        var profile = SpeakerProfile(); // 5.1 (6 channels)
+        profile.SpeakerTrims = [new ChannelTrim("LFE", -4.0), new ChannelTrim("C", -1.5)];
+
+        var text = ChainCompiler.Compile(StateWith(profile), _ => MusicPreset).RenderedText;
+
+        Assert.Contains("Speaker calibration", text);
+        Assert.Contains("Channel: LFE\r\nPreamp: -4.0 dB", text);
+        Assert.Contains("Channel: C\r\nPreamp: -1.5 dB", text);
+        // Scope is handed back to the full 5.1 layout so nothing downstream inherits it.
+        Assert.Contains("Channel: L R C LFE RL RR", text);
+    }
+
+    [Fact]
+    public void SpeakerCalibration_ZeroTrims_EmitNothing()
+    {
+        var profile = SpeakerProfile();
+        profile.SpeakerTrims = [new ChannelTrim("LFE", 0), new ChannelTrim("C", -0.01)];
+        var text = ChainCompiler.Compile(StateWith(profile), _ => MusicPreset).RenderedText;
+        Assert.DoesNotContain("Speaker calibration", text);
+    }
+
+    [Fact]
     public void NightShelf_ComesBeforeLoudness_AndNeverEmitsAPlugin()
     {
         var profile = SpeakerProfile();
