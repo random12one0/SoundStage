@@ -129,8 +129,9 @@ public class SoundstageControllerTests : IDisposable
         _controller.UpdateEffects(e => e with { StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 140) });
 
         var chain = _fs.ReadAllText(_layout.ChainFilePath);
-        // Now applies on 5.1 — but only remixes the front L/R pair.
-        Assert.Contains("Copy: L=1.2*L-0.2*R R=-0.2*L+1.2*R", chain);
+        // Now applies on 5.1 — mid/side scratch matrix, but only rebuilds the front L/R pair.
+        Assert.Contains("Copy: SS_MID=0.5*L+0.5*R SS_SIDE=0.5*L-0.5*R", chain);
+        Assert.Contains("Copy: L=SS_MID+1.4*SS_SIDE R=SS_MID-1.4*SS_SIDE", chain);
         Assert.DoesNotContain("C=", chain);
         Assert.DoesNotContain("SL=", chain);
     }
