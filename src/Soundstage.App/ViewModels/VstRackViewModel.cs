@@ -154,4 +154,12 @@ public partial class VstRackViewModel : ObservableObject
 
     [RelayCommand]
     private void GetFromAirwindows() => _services.Vst.OpenDownloadPage();
+
+    /// <summary>Re-scans the plugin folder — used after a manual drop of the DLLs.</summary>
+    [RelayCommand]
+    private void Recheck()
+    {
+        Rebuild();
+        _services.Controller?.Apply(ApplyAttribution.Manual());
+    }
 }
