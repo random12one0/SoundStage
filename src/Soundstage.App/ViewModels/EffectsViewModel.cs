@@ -67,9 +67,13 @@ public partial class EffectsViewModel : ObservableObject
 
     public bool ApoAvailable => _services.ApoAvailable;
 
+    /// <summary>The bundled VST effect rack (virtual bass, warmth, air, leveler, loudness).</summary>
+    public VstRackViewModel Rack { get; }
+
     public EffectsViewModel(AppServices services)
     {
         _services = services;
+        Rack = new VstRackViewModel(services);
         if (services.Controller is { } controller)
         {
             controller.Changed += () => UiDispatch.Post(SyncFromState);

@@ -38,6 +38,8 @@ public sealed class AppServices : IDisposable
 
     public StartupManager Startup { get; } = new();
 
+    public Services.VstPluginService Vst { get; } = new();
+
     public Services.UpdateService Update { get; private set; } = null!;
 
     /// <summary>Null when Equalizer APO is not installed (UI runs in guidance mode).</summary>
@@ -110,6 +112,7 @@ public sealed class AppServices : IDisposable
         Controller = new SoundstageController(StateStore, Presets, Orchestrator, Environment, Coordinator, Scheduler)
         {
             AmbienceIrResolver = ResolveAmbienceIr,
+            VstPluginResolver = Vst.Resolve,
         };
     }
 
