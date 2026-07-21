@@ -41,12 +41,14 @@ public static class EffectRamp
     /// from zero; disabling ramps it down to zero (the caller's final committed apply then removes it).
     /// Overrides are dropped for interior steps so the value moves smoothly with intensity.
     /// </summary>
-    public static EffectSettings Lerp(EffectSettings from, EffectSettings to, double t) => new(
-        LerpNight(from.NightMode, to.NightMode, t),
-        LerpLoudness(from.Loudness, to.Loudness, t),
-        LerpWidth(from.StereoWidth, to.StereoWidth, t),
-        to.Ambience,
-        LerpFidelity(from.Fidelity, to.Fidelity, t));
+    public static EffectSettings Lerp(EffectSettings from, EffectSettings to, double t) => new()
+    {
+        NightMode = LerpNight(from.NightMode, to.NightMode, t),
+        Loudness = LerpLoudness(from.Loudness, to.Loudness, t),
+        StereoWidth = LerpWidth(from.StereoWidth, to.StereoWidth, t),
+        Ambience = to.Ambience,
+        Fidelity = LerpFidelity(from.Fidelity, to.Fidelity, t),
+    };
 
     private static NightModeSettings LerpNight(NightModeSettings a, NightModeSettings b, double t)
     {

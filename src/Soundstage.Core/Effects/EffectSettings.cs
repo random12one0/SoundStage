@@ -154,13 +154,23 @@ public sealed record FidelitySettings(
     public double AirDb => IntensityCurve.Scale(MaxAirDb, Intensity);
 }
 
-public sealed record EffectSettings(
-    NightModeSettings NightMode,
-    LoudnessSettings Loudness,
-    StereoWidthSettings StereoWidth,
-    AmbienceSettings Ambience,
-    FidelitySettings Fidelity)
+/// <summary>
+/// The full set of effects for a device. Uses init-only properties with non-null defaults (rather
+/// than a positional record) so that loading a settings file written by an OLDER build — one that
+/// predates a newer effect like Fidelity — deserializes the missing effect to its default instead
+/// of null. A positional record would pass null for an absent member and crash the first read.
+/// </summary>
+public sealed record EffectSettings
 {
-    public static EffectSettings Default =>
-        new(new NightModeSettings(), new LoudnessSettings(), new StereoWidthSettings(), new AmbienceSettings(), new FidelitySettings());
+    public NightModeSettings NightMode { get; init; } = new();
+
+    public LoudnessSettings Loudness { get; init; } = new();
+
+    public StereoWidthSettings StereoWidth { get; init; } = new();
+
+    public AmbienceSettings Ambience { get; init; } = new();
+
+    public FidelitySettings Fidelity { get; init; } = new();
+
+    public static EffectSettings Default => new();
 }
