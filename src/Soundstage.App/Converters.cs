@@ -38,3 +38,16 @@ public sealed class EnumEqualsConverter : IValueConverter
             ? Enum.Parse(targetType, parameter.ToString()!)
             : System.Windows.Data.Binding.DoNothing;
 }
+
+/// <summary>
+/// True when the bound string equals the ConverterParameter — the string-valued sibling of
+/// <see cref="EnumEqualsConverter"/>, for tap-to-select pills backed by a string property.
+/// </summary>
+public sealed class StringEqualsConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value?.ToString() == parameter?.ToString();
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        value is true && parameter is not null ? parameter.ToString()! : System.Windows.Data.Binding.DoNothing;
+}

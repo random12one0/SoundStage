@@ -33,6 +33,8 @@
                         <ui:Button Margin="0,0,0,0" Command="{Binding DisownCommand}" Content="Hand back control"
                                    ToolTip="Restores your pre-Soundstage config.txt"
                                    Visibility="{Binding NeedsTakeover, Converter={StaticResource BoolToVisibilityInverse}}" />
+                        <ui:Button Margin="8,0,0,0" Command="{Binding CopyConfigCommand}" Content="Copy my config"
+                                   ToolTip="Copies the exact Equalizer APO config Soundstage is generating, so you can paste it to report a problem." />
                     </StackPanel>
                     <TextBlock Margin="0,8,0,0" FontSize="12" Foreground="#E6C19C00" Text="{Binding StatusMessage}" TextWrapping="Wrap"
                                Visibility="{Binding StatusMessage, Converter={StaticResource StringToVisibility}}" />

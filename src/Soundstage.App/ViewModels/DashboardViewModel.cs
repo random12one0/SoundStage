@@ -151,9 +151,13 @@ public partial class DashboardViewModel : ObservableObject
 
     public int AutoEqModelCount => _services.AutoEq.Count;
 
+    /// <summary>Live effect toggles, shared with the Effects page so the dashboard can drive them too.</summary>
+    public EffectsViewModel Effects { get; }
+
     public DashboardViewModel(AppServices services)
     {
         _services = services;
+        Effects = new EffectsViewModel(services);
         if (services.Controller is { } controller)
         {
             controller.Changed += () => UiDispatch.Post(SyncFromState);

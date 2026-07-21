@@ -50,10 +50,23 @@ Ordered by the priorities you picked. Items marked **Proposed** get a design wal
       is provably correct (symmetric, centred vocals can't move) — the earlier one-speaker glitch
       was not this code.
 
-### Still open in v0.6.0
-- [ ] **Fidelity** one-knob clarity effect; re-tune the effect intensities; a few more presets.
-- [ ] **Automations "new rule" redesign** + 12-hour time + zero-default grid *(Proposed — review first)*.
-- [ ] **Dashboard effect toggles** + move the full status to a top strip *(Proposed)*.
+### ✅ Shipped in v0.7.0
+- [x] **Automations "new rule" rebuilt** — the dropdowns are gone; action kind, effect, and
+      channel-count are now tap-to-select **pills** (matching the trigger pills). **12-hour time**
+      by default ("10:00 PM"), still accepts 24-hour.
+- [x] **Zero automations by default** — new devices start empty; the prebuilt rules are offered
+      as **Quick-start cards** you add. Nothing fires until you opt in.
+- [x] **Dashboard drives the effects** — Night mode / Loudness / Stereo width toggles + sliders
+      right on the dashboard, sharing the Effects-page logic.
+- [x] **Diagnostics → "Copy my config"** — one click copies the exact APO config Soundstage
+      generates, so a problem is easy to report.
+
+### Still open
+- [ ] **Night mode still drops audio on an Atmos rig** — root cause pending the user's copied
+      config (the generated chain is provably just a bass cut + trim, so this is machine-specific).
+- [ ] **Fidelity** one-knob clarity effect; re-tune effect intensities; more presets; un-gate ambience once confirmed audible.
+- [ ] **Stereo width above 100% goes lopsided on a 7.1 Atmos stream** — investigate once the config is in hand.
+- [ ] Move the full status to a top strip / further dashboard cockpit polish.
 
 ### P2 — Effects rework (Boom-inspired, all native)   ← your #1 next priority
 Boom's effects feel good because they commit to *confident, immediately-audible* settings. Ours

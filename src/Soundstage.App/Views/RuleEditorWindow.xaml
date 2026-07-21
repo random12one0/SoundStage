@@ -22,6 +22,32 @@
         <app:StringToVisibilityConverter x:Key="StringToVisibility" />
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <app:EnumEqualsConverter x:Key="EnumEquals" />
+        <app:StringEqualsConverter x:Key="StringEquals" />
+
+        <!-- A plain selectable pill (no icon) for action/effect/channel choices. -->
+        <Style x:Key="ChoicePill" TargetType="RadioButton">
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Bd" Padding="13,7" Background="{StaticResource CardBrush}"
+                                BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource CardHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentGradient}" />
+                                <Setter Property="Foreground" Value="#0B0B10" />
+                                <Setter Property="FontWeight" Value="SemiBold" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
 
         <!-- A selectable pill (RadioButton) for the trigger kind -->
         <Style x:Key="Pill" TargetType="RadioButton">
@@ -137,7 +163,7 @@
                                 <ui:TextBox Width="78" Margin="8,0" Text="{Binding StartTimeText, UpdateSourceTrigger=PropertyChanged}" />
                                 <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="until" />
                                 <ui:TextBox Width="78" Margin="8,0" Text="{Binding EndTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                                <TextBlock VerticalAlignment="Center" FontSize="11.5" Opacity="0.5" Text="24-hour · 22:00→06:00 spans midnight" />
+                                <TextBlock VerticalAlignment="Center" FontSize="11.5" Opacity="0.5" Text="e.g. 10:00 PM → 6:00 AM (spans midnight)" />
                             </StackPanel>
                         </StackPanel>
 
@@ -159,10 +185,21 @@
                         </StackPanel>
 
                         <!-- Channels -->
-                        <StackPanel Orientation="Horizontal" Visibility="{Binding IsChannelCount, Converter={StaticResource BoolToVisibility}}">
-                            <ComboBox MinWidth="180" ItemsSource="{Binding ChannelConditions}" SelectedItem="{Binding ChannelCondition}" />
-                            <ui:TextBox Width="70" Margin="10,0,0,0" Text="{Binding ExactChannels, StringFormat=0}"
-                                        Visibility="{Binding IsExactChannels, Converter={StaticResource BoolToVisibility}}" />
+                        <StackPanel Visibility="{Binding IsChannelCount, Converter={StaticResource BoolToVisibility}}">
+                            <WrapPanel>
+                                <RadioButton Style="{StaticResource ChoicePill}" Content="Stereo (2.0)"
+                                             IsChecked="{Binding ChannelCondition, Converter={StaticResource EnumEquals}, ConverterParameter=Stereo}" />
+                                <RadioButton Style="{StaticResource ChoicePill}" Content="Surround (5.1 / 7.1)"
+                                             IsChecked="{Binding ChannelCondition, Converter={StaticResource EnumEquals}, ConverterParameter=Multichannel}" />
+                                <RadioButton Style="{StaticResource ChoicePill}" Content="Exactly…"
+                                             IsChecked="{Binding ChannelCondition, Converter={StaticResource EnumEquals}, ConverterParameter=Exactly}" />
+                            </WrapPanel>
+                            <StackPanel Orientation="Horizontal" Margin="2,4,0,0"
+                                        Visibility="{Binding IsExactChannels, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="exactly" />
+                                <ui:TextBox Width="64" Margin="8,0" Text="{Binding ExactChannels, StringFormat=0}" />
+                                <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="channels" />
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- Device -->
@@ -201,21 +238,44 @@
                                     </Border>
 
                                     <StackPanel Grid.Column="1" Margin="12,0,0,0">
-                                        <ComboBox HorizontalAlignment="Left" MinWidth="200" ItemsSource="{Binding ActionKinds}" SelectedItem="{Binding Kind}" />
-                                        <ComboBox Margin="0,8,0,0" MinWidth="220" HorizontalAlignment="Left" DisplayMemberPath="Name"
+                                        <!-- Action kind — tap to choose (no dropdowns) -->
+                                        <WrapPanel>
+                                            <RadioButton Style="{StaticResource ChoicePill}" Content="Switch preset"
+                                                         IsChecked="{Binding Kind, Converter={StaticResource StringEquals}, ConverterParameter=Switch preset}" />
+                                            <RadioButton Style="{StaticResource ChoicePill}" Content="Turn effect on/off"
+                                                         IsChecked="{Binding Kind, Converter={StaticResource StringEquals}, ConverterParameter=Turn effect on/off}" />
+                                            <RadioButton Style="{StaticResource ChoicePill}" Content="Set effect intensity"
+                                                         IsChecked="{Binding Kind, Converter={StaticResource StringEquals}, ConverterParameter=Set effect intensity}" />
+                                        </WrapPanel>
+
+                                        <!-- Switch preset -->
+                                        <ComboBox Margin="0,6,0,0" MinWidth="220" HorizontalAlignment="Left" DisplayMemberPath="Name"
                                                   ItemsSource="{Binding Presets}" SelectedItem="{Binding SelectedPreset}"
                                                   Visibility="{Binding IsPresetKind, Converter={StaticResource BoolToVisibility}}" />
-                                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
-                                                    Visibility="{Binding IsEnabledKind, Converter={StaticResource BoolToVisibility}}">
-                                            <ComboBox MinWidth="150" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
-                                            <ui:ToggleSwitch Margin="12,0,0,0" VerticalAlignment="Center" IsChecked="{Binding EffectOn}"
-                                                             OnContent="On" OffContent="Off" />
+
+                                        <!-- Turn effect on/off -->
+                                        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsEnabledKind, Converter={StaticResource BoolToVisibility}}">
+                                            <WrapPanel>
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Night mode" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=NightMode}" />
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Loudness" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=Loudness}" />
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Stereo width" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=StereoWidth}" />
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Ambience" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=Ambience}" />
+                                            </WrapPanel>
+                                            <ui:ToggleSwitch VerticalAlignment="Center" IsChecked="{Binding EffectOn}" OnContent="On" OffContent="Off" />
                                         </StackPanel>
-                                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal"
-                                                    Visibility="{Binding IsIntensityKind, Converter={StaticResource BoolToVisibility}}">
-                                            <ComboBox MinWidth="150" VerticalAlignment="Center" ItemsSource="{Binding Effects}" SelectedItem="{Binding Effect}" />
-                                            <Slider Width="160" Margin="12,0" VerticalAlignment="Center" Maximum="100" Minimum="0" Value="{Binding Intensity}" />
-                                            <TextBlock VerticalAlignment="Center" Text="{Binding Intensity, StringFormat={}{0:0}%}" />
+
+                                        <!-- Set effect intensity -->
+                                        <StackPanel Margin="0,6,0,0" Visibility="{Binding IsIntensityKind, Converter={StaticResource BoolToVisibility}}">
+                                            <WrapPanel>
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Night mode" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=NightMode}" />
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Loudness" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=Loudness}" />
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Stereo width" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=StereoWidth}" />
+                                                <RadioButton Style="{StaticResource ChoicePill}" Content="Ambience" IsChecked="{Binding Effect, Converter={StaticResource EnumEquals}, ConverterParameter=Ambience}" />
+                                            </WrapPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <Slider Width="180" VerticalAlignment="Center" Maximum="100" Minimum="0" Value="{Binding Intensity}" />
+                                                <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" Text="{Binding Intensity, StringFormat={}{0:0}%}" />
+                                            </StackPanel>
                                         </StackPanel>
                                     </StackPanel>
 

@@ -131,6 +131,40 @@ public partial class DiagnosticsViewModel : ObservableObject
         Refresh();
     }
 
+    /// <summary>
+    /// Copies the full Equalizer APO config Soundstage generates (config stub, switch, user and
+    /// the generated chain) to the clipboard — the fastest way to share exactly what's being
+    /// written when diagnosing "an effect did X".
+    /// </summary>
+    [RelayCommand]
+    private void CopyConfig()
+    {
+        try
+        {
+            if (_services.Layout is not { } layout)
+            {
+                StatusMessage = "Equalizer APO config location isn't set up yet.";
+                return;
+            }
+
+            var fs = _services.FileSystem;
+            string Read(string path) => fs.FileExists(path) ? fs.ReadAllText(path) : "(missing)";
+
+            var text =
+                $"# ===== config.txt =====\r\n{Read(layout.ConfigTxtPath)}\r\n\r\n"
+                + $"# ===== Soundstage switch =====\r\n{Read(layout.SwitchFilePath)}\r\n\r\n"
+                + $"# ===== user.txt =====\r\n{Read(layout.UserFilePath)}\r\n\r\n"
+                + $"# ===== chain.txt (generated processing) =====\r\n{Read(layout.ChainFilePath)}\r\n";
+
+            System.Windows.Clipboard.SetText(text);
+            StatusMessage = "Copied your full Equalizer APO config to the clipboard — paste it here to share.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Couldn't copy the config: {ex.Message}";
+        }
+    }
+
     [RelayCommand]
     private void RunSweep() => StartSweep(DiagnosticSweep.BuildChainText());
 

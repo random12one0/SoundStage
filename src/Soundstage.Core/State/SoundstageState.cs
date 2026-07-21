@@ -96,11 +96,13 @@ public sealed class SoundstageState
             return existing;
         }
 
+        // Start with ZERO automations. The prebuilt rules are offered as Quick-start cards on the
+        // Automations page instead, so nothing fires until the user opts in by adding one.
         var profile = new DeviceProfile
         {
             EndpointId = endpointId,
             FriendlyName = friendlyName,
-            Rules = Automation.PrebuiltRules.CreateDefaultSet(),
+            Rules = [],
         };
         Profiles.Add(profile);
         return profile;

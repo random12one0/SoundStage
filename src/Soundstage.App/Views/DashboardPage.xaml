@@ -102,6 +102,45 @@
                            Text="{Binding HeadroomSummary}" />
             </Grid>
 
+            <!-- Quick effects — drive the main effects without leaving the dashboard -->
+            <Border Margin="0,12,0,0" Style="{StaticResource Card}" DataContext="{Binding Effects}">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Style="{StaticResource SectionTitle}" Text="Effects" />
+                        <TextBlock HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Opacity="0.5" Text="Full controls on the Effects tab" />
+                    </Grid>
+                    <UniformGrid Margin="0,10,0,0" Rows="1">
+                        <Border Margin="0,0,6,0" Padding="12,10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Night mode" />
+                                    <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding NightEnabled}" />
+                                </Grid>
+                                <Slider Margin="0,6,0,0" Maximum="100" Minimum="0" IsEnabled="{Binding NightEnabled}" Value="{Binding NightIntensity}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="3,0,3,0" Padding="12,10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Loudness" />
+                                    <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding LoudnessEnabled}" />
+                                </Grid>
+                                <Slider Margin="0,6,0,0" Maximum="100" Minimum="0" IsEnabled="{Binding LoudnessEnabled}" Value="{Binding LoudnessIntensity}" />
+                            </StackPanel>
+                        </Border>
+                        <Border Margin="6,0,0,0" Padding="12,10" Background="{StaticResource CardBrush}" BorderBrush="{StaticResource CardStrokeBrush}" BorderThickness="1" CornerRadius="9">
+                            <StackPanel>
+                                <Grid>
+                                    <TextBlock VerticalAlignment="Center" FontWeight="SemiBold" Text="Stereo width" />
+                                    <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding WidthEnabled}" />
+                                </Grid>
+                                <Slider Margin="0,6,0,0" Maximum="200" Minimum="0" IsEnabled="{Binding WidthEnabled}" Value="{Binding WidthPercent}" />
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+                </StackPanel>
+            </Border>
+
             <TextBlock
                 Margin="2,8,0,0"
                 Opacity="0.7"
