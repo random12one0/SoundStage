@@ -37,7 +37,13 @@
                     <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontWeight="SemiBold" FontSize="14" Text="{Binding StatusDevice}" />
-                            <Border Margin="10,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#264CC2FF">
+                            <Border Margin="10,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#2650C878"
+                                    ToolTip="What's coming IN from the app that's playing — your receiver/Atmos upmixes it to the output layout."
+                                    Visibility="{Binding StatusSource, Converter={StaticResource StringToVisibility}}">
+                                <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#7DDDA0" Text="{Binding StatusSource}" />
+                            </Border>
+                            <Border Margin="8,0,0,0" Padding="7,1" VerticalAlignment="Center" CornerRadius="9" Background="#264CC2FF"
+                                    ToolTip="Your output device's speaker layout (what everything is mixed to).">
                                 <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource AccentBrush}" Text="{Binding StatusLayout}" />
                             </Border>
                             <TextBlock Margin="10,0,0,0" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" Text="{Binding StatusFormat}" />
@@ -75,6 +81,15 @@
                                 </StackPanel>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
+                        <ComboBox.GroupStyle>
+                            <GroupStyle>
+                                <GroupStyle.HeaderTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Margin="2,6,0,2" FontSize="11" FontWeight="SemiBold" Opacity="0.55" Text="{Binding Name}" />
+                                    </DataTemplate>
+                                </GroupStyle.HeaderTemplate>
+                            </GroupStyle>
+                        </ComboBox.GroupStyle>
                     </ComboBox>
                     <ui:Button Margin="8,0,0,0" Command="{Binding DuplicateCommand}" Content="Duplicate" ToolTip="Copy this preset so you can edit it" />
                     <ui:Button Margin="6,0,0,0" Command="{Binding RenameCommand}" Content="Rename" />

@@ -30,6 +30,9 @@ public partial class SettingsViewModel : ObservableObject
     private bool _minimizeToTray;
 
     [ObservableProperty]
+    private bool _automationNotifications = true;
+
+    [ObservableProperty]
     private bool _ambienceFeature;
 
     [ObservableProperty]
@@ -93,6 +96,7 @@ public partial class SettingsViewModel : ObservableObject
         var settings = _services.Controller?.State.Settings ?? _services.StateStore.Load().Settings;
         StartMinimized = settings.StartMinimized;
         MinimizeToTray = settings.MinimizeToTray;
+        AutomationNotifications = settings.AutomationNotifications;
         AmbienceFeature = settings.AmbienceFeatureEnabled;
         ConfirmNewSounds = settings.ConfirmNewSounds;
         GuardSeconds = settings.RevertGuardSeconds;
@@ -128,6 +132,7 @@ public partial class SettingsViewModel : ObservableObject
         var settings = controller.State.Settings;
         settings.StartMinimized = StartMinimized;
         settings.MinimizeToTray = MinimizeToTray;
+        settings.AutomationNotifications = AutomationNotifications;
         settings.AmbienceFeatureEnabled = AmbienceFeature;
         settings.ConfirmNewSounds = ConfirmNewSounds;
         settings.RevertGuardSeconds = (int)Math.Clamp(GuardSeconds, 3, 60);
@@ -158,6 +163,8 @@ public partial class SettingsViewModel : ObservableObject
     partial void OnStartMinimizedChanged(bool value) => Persist();
 
     partial void OnMinimizeToTrayChanged(bool value) => Persist();
+
+    partial void OnAutomationNotificationsChanged(bool value) => Persist();
 
     partial void OnAmbienceFeatureChanged(bool value) => Persist(reapply: true);
 

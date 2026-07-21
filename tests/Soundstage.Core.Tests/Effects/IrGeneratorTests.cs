@@ -34,14 +34,20 @@ public class IrGeneratorTests
     }
 
     [Fact]
-    public void Wav_LengthMatchesTailDuration()
+    public void Wav_LengthMatchesGeneratedFrameCount()
     {
         const int rate = 44100;
         var bytes = IrGenerator.BuildWav(rate, 50);
-        var expectedFrames = 1 + (int)(rate * IrGenerator.TailSeconds);
+        var expectedFrames = IrGenerator.FrameCountFor(rate, 50);
         // data chunk is the last one: 8-byte header + frames*2ch*4bytes.
         var dataBytes = expectedFrames * 2 * 4;
         Assert.Equal(56 + dataBytes, bytes.Length);
+    }
+
+    [Fact]
+    public void HigherIntensity_ProducesALongerTail()
+    {
+        Assert.True(IrGenerator.FrameCountFor(48000, 100) > IrGenerator.FrameCountFor(48000, 20));
     }
 
     [Fact]

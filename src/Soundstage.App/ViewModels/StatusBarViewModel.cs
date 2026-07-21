@@ -21,6 +21,9 @@ public partial class StatusBarViewModel : ObservableObject
     private string _channelText = "";
 
     [ObservableProperty]
+    private string _sourceText = "";
+
+    [ObservableProperty]
     private string _formatText = "";
 
     [ObservableProperty]
@@ -70,10 +73,15 @@ public partial class StatusBarViewModel : ObservableObject
         // "out": this is the device's configured speaker layout (what Windows mixes to),
         // not the content's channel count — stereo Spotify still shows 7.1 on a 7.1 rig.
         ChannelText = $"{ChainCompiler.FormatChannels(snapshot.Channels)} out";
+        // What's coming IN from the app that's playing (2.0 vs 5.1 vs 7.1) — the counterpart to
+        // the "out" layout above. Empty when nothing's playing or metering is unavailable.
+        SourceText = snapshot.SourceChannels > 0
+            ? $"{ChainCompiler.FormatChannels(snapshot.SourceChannels)} in"
+            : "";
         FormatText = snapshot.BitDepth > 0
             ? $"{snapshot.SampleRateHz / 1000.0:0.#} kHz · {snapshot.BitDepth}-bit"
             : $"{snapshot.SampleRateHz / 1000.0:0.#} kHz";
-        NowPlayingText = FormatNowPlaying(snapshot.ActiveAudioProcesses);
+        NowPlayingText = FormatNowPlaying(snapshot);
         SpatialText = snapshot.Spatial switch
         {
             SpatialAudioState.On => "Spatial audio on",
@@ -109,21 +117,25 @@ public partial class StatusBarViewModel : ObservableObject
         Refresh();
     }
 
-    /// <summary>"♪ Spotify" / "♪ Spotify · Chrome" from the processes with active audio sessions.</summary>
-    internal static string FormatNowPlaying(IReadOnlyList<string> processes)
+    /// <summary>"♪ YouTube" / "♪ Spotify · YouTube" for what's currently playing audio.</summary>
+    internal static string FormatNowPlaying(Core.Automation.AudioEnvironmentSnapshot snapshot)
     {
-        var pretty = processes
-            .Where(p => !Core.Automation.AudioApps.IsNoise(p))
-            .Select(Core.Automation.AudioApps.Pretty)
-            .Distinct()
-            .ToList();
-        if (pretty.Count == 0)
+        // Prefer the source's enriched labels (a browser tab resolved to "YouTube"); fall back to
+        // prettifying the raw process names for sources that didn't enrich them (tests, non-Windows).
+        var labels = snapshot.NowPlaying.Count > 0
+            ? snapshot.NowPlaying
+            : snapshot.ActiveAudioProcesses
+                .Where(p => !Core.Automation.AudioApps.IsNoise(p))
+                .Select(Core.Automation.AudioApps.Pretty);
+
+        var distinct = labels.Distinct().ToList();
+        if (distinct.Count == 0)
         {
             return "";
         }
 
-        var shown = pretty.Take(2).ToList();
-        var extra = pretty.Count - shown.Count;
+        var shown = distinct.Take(2).ToList();
+        var extra = distinct.Count - shown.Count;
         return "♪ " + string.Join(" · ", shown) + (extra > 0 ? $" +{extra}" : "");
     }
 

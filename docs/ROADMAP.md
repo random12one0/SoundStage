@@ -35,6 +35,26 @@ headphone illusion the way Boom does.
 
 Ordered by the priorities you picked. Items marked **Proposed** get a design walkthrough first.
 
+### ✅ Shipped in v0.6.0 (this release)
+- [x] **Ambience reworked** into a real room: direct → 20 ms pre-delay → discrete early
+      reflections → decaying diffuse tail, with the wet send **high-passed ~250 Hz** so it never
+      muddies, a longer tail at high intensity, and L/R decorrelation. Unity-safe (can't clip).
+      *(Still behind the experimental flag until you confirm it sounds good by ear.)*
+- [x] **"What's playing" nailed:** friendly app names, browser **tab-title → service** so it says
+      **YouTube / Netflix / Twitch**, and the **incoming source format** ("5.1 in" vs "2.0 in")
+      shown next to the "7.1 out" on both the dashboard card and the status bar.
+- [x] **Automation toast notifications** — a Windows notification when a rule switches your
+      preset/effect, with a Settings toggle to silence it.
+- [x] **Preset picker grouped** into "Built-in presets" vs "Your presets".
+- [x] **Stereo width smoothed** (removed the 10 %-step snapping). The width matrix was audited and
+      is provably correct (symmetric, centred vocals can't move) — the earlier one-speaker glitch
+      was not this code.
+
+### Still open in v0.6.0
+- [ ] **Fidelity** one-knob clarity effect; re-tune the effect intensities; a few more presets.
+- [ ] **Automations "new rule" redesign** + 12-hour time + zero-default grid *(Proposed — review first)*.
+- [ ] **Dashboard effect toggles** + move the full status to a top strip *(Proposed)*.
+
 ### P2 — Effects rework (Boom-inspired, all native)   ← your #1 next priority
 Boom's effects feel good because they commit to *confident, immediately-audible* settings. Ours
 have been too timid. Plan:
@@ -93,6 +113,17 @@ APO (no VST). Surround-first is where we can *out-feature* Boom.
 **Boom parity, done surround-safely:**
 - [ ] Equal-loudness low-volume enhancement (a static, channel-safe cousin of "night") — *easy*
 - [ ] Master pre-amp / volume boost with headroom guard — *easy* (we have the guard)
+- [ ] **Optional native "ambience upmix" (no Atmos)** — a simple static stereo→5.1/7.1 matrix
+      (center = ½(L+R), delayed/quieted/band-limited surrounds via `Copy`), off by default, for
+      users without Atmos. *Feasible-now* per research. Guardrails: virtual scratch channels for
+      the sums, a manual on/off (auto channel-count detection is unreliable), keep surrounds
+      subtle. NOT instrument separation.
+
+**Upmix research (done) — "Gong 31" ≈ Boom 3D.** Real-time instrument/stem separation is
+**not feasible** for a reliable, low-latency, system-wide app (it's DAW-plugin-only, 0.25–2.8 s
+latency, 4 fixed stems, no spatial placement) — and it isn't how Boom gets its sound anyway.
+Keep letting **Atmos** upmix; the "Boom feeling" comes from ambience + width + decorrelation,
+which is our effects work. The only upmix worth ever adding is the simple native matrix above.
 
 **Explicitly NOT doing (conflicts with surround-first):**
 - 3D headphone virtualization (HRTF) — it collapses multichannel into stereo; the opposite of our thesis.

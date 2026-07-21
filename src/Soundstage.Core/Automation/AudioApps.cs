@@ -51,27 +51,98 @@ public static class AudioApps
         return Noise.Any(n => p.Contains(n, StringComparison.Ordinal));
     }
 
+    /// <summary>True when the process is a known web browser (so we try to read its tab title).</summary>
+    public static bool IsBrowser(string processName) => Browsers.Contains(processName.ToLowerInvariant());
+
+    /// <summary>
+    /// Streaming/media services recognisable from a browser tab title, longest/most-specific
+    /// token first. A browser process alone only tells us "Chrome"; the tab title tells us
+    /// "YouTube" or "Netflix", which is what the user actually cares about.
+    /// </summary>
+    private static readonly (string Token, string Label)[] StreamingServices =
+    [
+        ("youtube music", "YouTube Music"),
+        ("youtube", "YouTube"),
+        ("netflix", "Netflix"),
+        ("twitch", "Twitch"),
+        ("disney+", "Disney+"),
+        ("disneyplus", "Disney+"),
+        ("hulu", "Hulu"),
+        ("hbo max", "Max"),
+        ("prime video", "Prime Video"),
+        ("crunchyroll", "Crunchyroll"),
+        ("apple tv", "Apple TV"),
+        ("apple music", "Apple Music"),
+        ("spotify", "Spotify"),
+        ("soundcloud", "SoundCloud"),
+        ("bandcamp", "Bandcamp"),
+        ("pandora", "Pandora"),
+        ("tidal", "Tidal"),
+        ("deezer", "Deezer"),
+        ("plex", "Plex"),
+        ("vimeo", "Vimeo"),
+        ("dailymotion", "Dailymotion"),
+    ];
+
+    /// <summary>
+    /// The streaming service named in a browser window/tab title, or null. Case-insensitive
+    /// substring match — a Chrome title like "Song - YouTube - Google Chrome" resolves to
+    /// "YouTube". Deliberately avoids over-generic tokens (e.g. bare "max"/"amazon").
+    /// </summary>
+    public static string? DetectStreamingService(string? windowTitle)
+    {
+        if (string.IsNullOrWhiteSpace(windowTitle))
+        {
+            return null;
+        }
+
+        var title = windowTitle.ToLowerInvariant();
+        foreach (var (token, label) in StreamingServices)
+        {
+            if (title.Contains(token, StringComparison.Ordinal))
+            {
+                return label;
+            }
+        }
+
+        return null;
+    }
+
     /// <summary>Friendly display name for a known process (falls back to the raw name, Title Cased).</summary>
     public static string Pretty(string processName) => processName.ToLowerInvariant() switch
     {
         "spotify" => "Spotify",
         "chrome" => "Chrome",
+        "chromium" => "Chromium",
         "msedge" or "edge" => "Edge",
         "firefox" => "Firefox",
+        "librewolf" => "LibreWolf",
+        "waterfox" => "Waterfox",
         "brave" => "Brave",
-        "opera" or "operagx" => "Opera",
+        "opera" => "Opera",
+        "operagx" => "Opera GX",
         "vivaldi" => "Vivaldi",
         "arc" => "Arc",
         "zen" => "Zen",
         "comet" => "Comet",
+        "iexplore" => "Internet Explorer",
         "vlc" => "VLC",
         "mpv" => "mpv",
+        "mpc-hc" or "mpc-hc64" => "MPC-HC",
         "potplayer" or "potplayermini64" => "PotPlayer",
+        "wmplayer" => "Windows Media Player",
+        "nplayer" => "nPlayer",
         "tidal" => "Tidal",
+        "deezer" => "Deezer",
         "foobar2000" => "foobar2000",
         "musicbee" => "MusicBee",
         "itunes" => "iTunes",
+        "applemusic" => "Apple Music",
         "amazonmusic" => "Amazon Music",
+        "qobuz" => "Qobuz",
+        "audirvana" => "Audirvana",
+        "aimp" => "AIMP",
+        "winamp" => "Winamp",
         "steam" => "Steam",
         "discord" => "Discord",
         _ => processName.Length == 0 ? processName : char.ToUpperInvariant(processName[0]) + processName[1..],
