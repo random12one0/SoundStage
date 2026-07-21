@@ -135,6 +135,33 @@ public partial class App : Application
                 bypassItem.IsChecked = controller.State.BypassActive;
                 automationsItem.IsChecked = controller.State.AutomationsEnabled;
             });
+
+            // Pop a Windows notification when an automation actually changes something, so the
+            // user can see the app react (like Boom announcing a switch). Only when the rule
+            // applied a real change, and only if the user hasn't silenced it.
+            controller.Coordinator.DecisionMade += decision => UiDispatch.Post(() => NotifyAutomation(controller, decision));
+        }
+    }
+
+    private void NotifyAutomation(Core.State.SoundstageController controller, Core.Automation.AutomationDecision decision)
+    {
+        if (_trayIcon is null
+            || decision.AppliedChanges.Count == 0
+            || !controller.State.Settings.AutomationNotifications)
+        {
+            return;
+        }
+
+        var rule = decision.Evaluation.WinningRule?.Name;
+        var what = string.Join(", ", decision.AppliedChanges);
+        var message = string.IsNullOrEmpty(rule) ? what : $"{rule} — {what}";
+        try
+        {
+            _trayIcon.ShowBalloonTip("Soundstage automation", message, BalloonIcon.Info);
+        }
+        catch
+        {
+            // Notifications are best-effort; never let one bubble up.
         }
     }
 

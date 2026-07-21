@@ -211,9 +211,17 @@
                     <TextBlock
                         Margin="14,0,0,0"
                         VerticalAlignment="Center"
+                        FontWeight="SemiBold"
+                        Foreground="{StaticResource AccentBrush}"
+                        Text="{Binding SourceText}"
+                        ToolTip="The channel layout coming IN from the app that's playing (2.0 = stereo, 5.1, 7.1). Your receiver/Atmos upmixes this to the 'out' layout."
+                        Visibility="{Binding SourceText, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock
+                        Margin="14,0,0,0"
+                        VerticalAlignment="Center"
                         Opacity="0.75"
                         Text="{Binding ChannelText}"
-                        ToolTip="Your output device's speaker configuration — what Windows mixes everything to. Stereo content (like Spotify) still shows the full layout here; the receiver/Atmos handles the upmix." />
+                        ToolTip="Your output device's speaker configuration — what Windows mixes everything to. The receiver/Atmos handles any upmix from the source layout on the left." />
                     <TextBlock Margin="14,0,0,0" VerticalAlignment="Center" Opacity="0.75" Text="{Binding FormatText}" />
                     <TextBlock
                         Margin="14,0,0,0"

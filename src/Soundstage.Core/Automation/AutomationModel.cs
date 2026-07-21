@@ -23,8 +23,27 @@ public sealed record AudioEnvironmentSnapshot(
     int SampleRateHz,
     int BitDepth,
     SpatialAudioState Spatial,
-    IReadOnlyList<string> ActiveAudioProcesses)
+    IReadOnlyList<string> ActiveAudioProcesses,
+    IReadOnlyList<string>? NowPlaying = null,
+    int SourceChannels = 0)
 {
+    /// <summary>
+    /// Friendly "what's playing" labels for display — browser processes resolved to the
+    /// streaming service in the tab title (e.g. "YouTube") where possible. Automation matching
+    /// still uses the raw <see cref="ActiveAudioProcesses"/>; this is display-only. Empty when
+    /// the source didn't enrich it (tests, non-Windows), in which case the UI falls back to
+    /// prettifying the process names.
+    /// </summary>
+    public IReadOnlyList<string> NowPlaying { get; init; } = NowPlaying ?? [];
+
+    /// <summary>
+    /// Best-effort channel count of the audio actually coming IN from the loudest active app
+    /// (2 = stereo source, 6 = 5.1, 8 = 7.1), from per-session metering. This is what lets the
+    /// UI say "2.0 source → upmixed to 7.1". 0 when unknown (nothing playing, or metering
+    /// unavailable). Distinct from <see cref="Channels"/>, which is the device's OUTPUT layout.
+    /// </summary>
+    public int SourceChannels { get; init; } = SourceChannels;
+
     public static AudioEnvironmentSnapshot Empty(DateTimeOffset localTime) =>
         new(localTime, null, null, 2, 48000, 0, SpatialAudioState.Unknown, []);
 }

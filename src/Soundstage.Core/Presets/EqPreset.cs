@@ -60,6 +60,10 @@ public sealed class EqPreset
 
     public bool IsBuiltIn { get; set; }
 
+    /// <summary>UI grouping key for the preset picker — the user's own presets vs the built-ins.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string GroupLabel => IsBuiltIn ? "Built-in presets" : "Your presets";
+
     public DateTimeOffset ModifiedUtc { get; set; }
 
     /// <summary>Provenance for imported presets ("AutoEq: Sennheiser HD 650", "Peace import").</summary>

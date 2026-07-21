@@ -115,7 +115,7 @@
                             <ColumnDefinition Width="52" />
                         </Grid.ColumnDefinitions>
                         <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Width" />
-                        <Slider Grid.Column="1" Margin="12,0" Maximum="200" Minimum="0" TickFrequency="10" IsSnapToTickEnabled="True" Value="{Binding WidthPercent}" />
+                        <Slider Grid.Column="1" Margin="12,0" Maximum="200" Minimum="0" Value="{Binding WidthPercent}" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding WidthPercent, StringFormat={}{0:0}%}" />
                     </Grid>
                     <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.55" Text="Safe zone up to 120% — beyond that, centered vocals start to thin out." />

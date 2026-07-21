@@ -36,6 +36,9 @@ public sealed class AppSettings
 
     public bool MinimizeToTray { get; set; } = true;
 
+    /// <summary>Show a Windows notification when an automation switches your preset or effect.</summary>
+    public bool AutomationNotifications { get; set; } = true;
+
     /// <summary>Global A/B bypass hotkey.</summary>
     public string BypassHotkey { get; set; } = "Ctrl+Alt+B";
 

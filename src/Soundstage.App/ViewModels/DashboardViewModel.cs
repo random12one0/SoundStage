@@ -136,6 +136,9 @@ public partial class DashboardViewModel : ObservableObject
     private string _statusLayout = "";
 
     [ObservableProperty]
+    private string _statusSource = "";
+
+    [ObservableProperty]
     private string _statusFormat = "";
 
     [ObservableProperty]
@@ -170,6 +173,9 @@ public partial class DashboardViewModel : ObservableObject
         var snapshot = _services.Environment.GetSnapshot();
         StatusDevice = snapshot.DeviceName ?? "No output device";
         StatusLayout = Core.Configio.ChainCompiler.FormatChannels(snapshot.Channels);
+        StatusSource = snapshot.SourceChannels > 0
+            ? $"{Core.Configio.ChainCompiler.FormatChannels(snapshot.SourceChannels)} in"
+            : "";
         StatusFormat = snapshot.BitDepth > 0
             ? $"{snapshot.SampleRateHz / 1000.0:0.#} kHz · {snapshot.BitDepth}-bit"
             : $"{snapshot.SampleRateHz / 1000.0:0.#} kHz";
@@ -179,7 +185,7 @@ public partial class DashboardViewModel : ObservableObject
             Core.Automation.SpatialAudioState.Off => "Spatial audio off",
             _ => "",
         };
-        StatusNowPlaying = StatusBarViewModel.FormatNowPlaying(snapshot.ActiveAudioProcesses);
+        StatusNowPlaying = StatusBarViewModel.FormatNowPlaying(snapshot);
     }
 
     // ---- Preset picking ----
@@ -189,6 +195,13 @@ public partial class DashboardViewModel : ObservableObject
         var selectedId = SelectedPreset?.Id;
         _syncing = true;
         Presets = new ObservableCollection<EqPreset>(_services.Presets.All);
+
+        // Group the picker into "Built-in presets" and "Your presets" so a long list is easy
+        // to scan (the ComboBox renders the group headers via its GroupStyle).
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(Presets);
+        view.GroupDescriptions.Clear();
+        view.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(EqPreset.GroupLabel)));
+
         SelectedPreset = Presets.FirstOrDefault(p => p.Id == (selectedId ?? _services.Controller?.ActiveProfile?.ActivePresetId));
         _syncing = false;
 

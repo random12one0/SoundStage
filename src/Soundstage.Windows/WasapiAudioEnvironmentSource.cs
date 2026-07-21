@@ -114,7 +114,8 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
                 // Keep defaults.
             }
 
-            var processes = GetActiveAudioProcesses(device);
+            var (processes, sourceChannels) = GetActiveAudio(device);
+            var nowPlaying = BuildNowPlaying(processes);
             var spatial = SpatialAudioProbe.Probe(device.ID);
 
             return new AudioEnvironmentSnapshot(
@@ -125,7 +126,9 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
                 sampleRate,
                 bitDepth,
                 spatial,
-                processes);
+                processes,
+                nowPlaying,
+                sourceChannels);
         }
     }
 
@@ -141,9 +144,10 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
         }
     }
 
-    private static IReadOnlyList<string> GetActiveAudioProcesses(MMDevice device)
+    private static (IReadOnlyList<string> Processes, int SourceChannels) GetActiveAudio(MMDevice device)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+        var sourceChannels = 0;
         try
         {
             var sessions = device.AudioSessionManager.Sessions;
@@ -166,9 +170,27 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
                     using var process = Process.GetProcessById(pid);
                     // Ignore background utilities (RGB software, system chimes) so they don't
                     // masquerade as "what's playing" and mis-trigger automations.
-                    if (!string.IsNullOrEmpty(process.ProcessName) && !Core.Automation.AudioApps.IsNoise(process.ProcessName))
+                    if (string.IsNullOrEmpty(process.ProcessName) || Core.Automation.AudioApps.IsNoise(process.ProcessName))
                     {
-                        names.Add(process.ProcessName);
+                        continue;
+                    }
+
+                    names.Add(process.ProcessName);
+
+                    // The session meter reports the app's own stream channel count — the SOURCE
+                    // format (2 = stereo, 6 = 5.1, 8 = 7.1). Take the loudest/widest so "5.1
+                    // content is playing" wins over a silent stereo browser tab. Best-effort.
+                    try
+                    {
+                        var channels = session.AudioMeterInformation.PeakValues.Count;
+                        if (channels > sourceChannels)
+                        {
+                            sourceChannels = channels;
+                        }
+                    }
+                    catch
+                    {
+                        // Per-session metering unavailable — leave source channels unknown.
                     }
                 }
                 catch
@@ -182,7 +204,66 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
             // Session manager unavailable.
         }
 
-        return names.ToList();
+        return (names.ToList(), sourceChannels);
+    }
+
+    /// <summary>
+    /// Friendly "what's playing" labels: browsers are resolved to the streaming service in their
+    /// tab title (so "chrome" becomes "YouTube"), everything else uses its pretty app name. All
+    /// best-effort — reading another process's window title can fail, and we never throw.
+    /// </summary>
+    private static IReadOnlyList<string> BuildNowPlaying(IReadOnlyList<string> processes)
+    {
+        var labels = new List<string>();
+        foreach (var name in processes)
+        {
+            var label = AudioApps.IsBrowser(name) && DetectBrowserService(name) is { } service
+                ? service
+                : AudioApps.Pretty(name);
+
+            if (!labels.Contains(label))
+            {
+                labels.Add(label);
+            }
+        }
+
+        return labels;
+    }
+
+    /// <summary>
+    /// The streaming service showing in a browser's active tab, read from its main window title.
+    /// The audio session usually belongs to a title-less renderer child, so we scan every process
+    /// of that browser and take the first recognisable service. Best-effort and defensive.
+    /// </summary>
+    private static string? DetectBrowserService(string processName)
+    {
+        try
+        {
+            foreach (var process in Process.GetProcessesByName(processName))
+            {
+                try
+                {
+                    if (AudioApps.DetectStreamingService(process.MainWindowTitle) is { } service)
+                    {
+                        return service;
+                    }
+                }
+                catch
+                {
+                    // MainWindowTitle can throw for an exiting process — skip it.
+                }
+                finally
+                {
+                    process.Dispose();
+                }
+            }
+        }
+        catch
+        {
+            // Process enumeration failed — no enrichment this round.
+        }
+
+        return null;
     }
 
     private void PollForChanges()
@@ -195,7 +276,7 @@ public sealed class WasapiAudioEnvironmentSource : IAudioEnvironmentSource, IDis
         try
         {
             var snapshot = GetSnapshot();
-            var fingerprint = $"{snapshot.DeviceId}|{snapshot.Channels}|{snapshot.SampleRateHz}|{snapshot.Spatial}|{string.Join(",", snapshot.ActiveAudioProcesses)}";
+            var fingerprint = $"{snapshot.DeviceId}|{snapshot.Channels}|{snapshot.SampleRateHz}|{snapshot.Spatial}|{snapshot.SourceChannels}|{string.Join(",", snapshot.ActiveAudioProcesses)}|{string.Join(",", snapshot.NowPlaying)}";
             if (fingerprint != _lastFingerprint)
             {
                 _lastFingerprint = fingerprint;

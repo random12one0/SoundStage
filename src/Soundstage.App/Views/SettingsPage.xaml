@@ -80,6 +80,14 @@
                     </Grid>
 
                     <Grid Margin="0,12,0,0">
+                        <StackPanel Margin="0,0,80,0">
+                            <TextBlock VerticalAlignment="Center" Text="Notify me when an automation switches something" />
+                            <TextBlock FontSize="12" Opacity="0.6" Text="A Windows notification when a rule changes your preset or effects." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AutomationNotifications}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
                         <StackPanel>
                             <TextBlock Text="Bypass hotkey" />
                             <TextBlock FontSize="12" Opacity="0.6" Text="Takes effect the next time Soundstage starts." />
