@@ -101,7 +101,7 @@
                         <StackPanel>
                             <TextBlock FontSize="15" FontWeight="SemiBold" Text="Stereo width" />
                             <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
-                                       Text="Spreads panned instruments further apart. 100% is untouched. Works on any output — it only widens the front left/right pair, so your centre, LFE and surround channels are never touched." />
+                                       Text="Makes the left/right separation already in your music feel wider and more open. It amplifies the difference that's there — it does NOT move sounds between speakers. 0% is untouched; turn it up for more space. Front left/right only, so your centre, LFE and surround channels are never touched." />
                         </StackPanel>
                         <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal">
                             <ui:Button Margin="0,0,10,0" Command="{Binding ResetWidthCommand}" Content="Reset" FontSize="11" Opacity="0.6" ToolTip="Back to defaults" />
@@ -114,34 +114,29 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="52" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Width" />
-                        <Slider Grid.Column="1" Margin="12,0" Maximum="200" Minimum="0" Value="{Binding WidthPercent}" />
+                        <TextBlock VerticalAlignment="Center" Opacity="0.75" Text="Amount" />
+                        <Slider Grid.Column="1" Margin="12,0" Maximum="100" Minimum="0" Value="{Binding WidthPercent}" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding WidthPercent, StringFormat={}{0:0}%}" />
                     </Grid>
-                    <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.55" Text="Safe zone up to 120% — beyond that, centered vocals start to thin out." />
-                    <TextBlock Margin="0,6,0,0" FontSize="12" Foreground="#E6D83B01" TextWrapping="Wrap"
-                               Text="{Binding WidthStatus}"
-                               Visibility="{Binding WidthStatus, Converter={StaticResource StringToVisibility}}" />
+                    <TextBlock Margin="0,6,0,0" FontSize="12" Opacity="0.55" TextWrapping="Wrap"
+                               Text="Kept in a musical range — it stays mono-safe and never collapses your mix into one speaker." />
                 </StackPanel>
             </Border>
 
-            <!-- Ambience (experimental, feature-flagged) -->
-            <Border Style="{StaticResource Card}"
-                    Visibility="{Binding AmbienceVisible, Converter={StaticResource BoolToVisibility}}">
+            <!-- Ambience -->
+            <Border Style="{StaticResource Card}">
                 <StackPanel>
                     <Grid>
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel>
                             <TextBlock FontSize="15" FontWeight="SemiBold" Text="Ambience" />
-                            <Border Margin="8,0,0,0" Padding="6,1" VerticalAlignment="Center" Background="#446C2EB0" CornerRadius="4">
-                                <TextBlock FontSize="10" Text="EXPERIMENTAL" />
-                            </Border>
+                            <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
+                                       Text="A real room reverb. Low settings add a subtle sense of space; crank it and it becomes a big hall that keeps ringing out for a second or two after the music stops. Best on stereo music." />
                         </StackPanel>
                         <StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" Orientation="Horizontal">
                             <ui:Button Margin="0,0,10,0" Command="{Binding ResetAmbienceCommand}" Content="Reset" FontSize="11" Opacity="0.6" ToolTip="Back to defaults" />
                             <ui:ToggleSwitch IsChecked="{Binding AmbienceEnabled}" />
                         </StackPanel>
                     </Grid>
-                    <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" Text="A touch of room reverb for stereo music." />
                     <Grid Margin="0,12,0,0" IsEnabled="{Binding AmbienceEnabled}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

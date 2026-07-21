@@ -83,34 +83,52 @@ public sealed record LoudnessSettings(
 }
 
 /// <summary>
-/// Mid/side stereo width applied to the front L/R pair only. 100% is untouched; below
-/// narrows, above widens by boosting side (unique) relative to mid (common) content. Because
-/// it only ever remixes the front left/right channels, it is safe on any layout — a 5.1/7.1
-/// centre, LFE and surrounds pass through untouched. Center-panned vocals live in the mid
-/// signal, so the UI marks everything past <see cref="DangerThresholdPercent"/> as the
-/// thin-vocals zone.
+/// Stereo width — Boom's "Spatial" done honestly. It does NOT move sounds between speakers or
+/// invent new content; it takes the left/right difference that is <i>already in the recording</i>
+/// (the "side" signal) and amplifies it relative to the shared centre ("mid"), so a stereo mix
+/// feels wider and more open. The slider runs 0 → 100% in one direction: 0% is untouched, 100% is
+/// the widest. It is deliberately capped at a musical maximum (<see cref="MaxWidthFactor"/>) so it
+/// never reaches the over-widened zone where centred vocals hollow out and hard-panned material
+/// collapses toward one side — the "everything went to one speaker" problem. Because it only ever
+/// rebuilds the front L/R pair, it is safe on any layout: a 5.1/7.1 centre, LFE and surrounds pass
+/// through untouched.
 /// </summary>
 public sealed record StereoWidthSettings(
     bool Enabled = false,
-    int WidthPercent = 100)
+    int WidthPercent = 50)
 {
     public const int MinPercent = 0;
-    public const int MaxPercent = 200;
-    public const int DangerThresholdPercent = 140;
-
-    public double Width => Math.Clamp(WidthPercent, MinPercent, MaxPercent) / 100.0;
+    public const int MaxPercent = 100;
 
     /// <summary>
-    /// Worst-case broadband gain of the width matrix: in-phase (mono) content passes at
-    /// unity (a+b = 1); anti-phase content sees gain w. Only widening adds gain.
+    /// The widest the matrix ever goes (at 100%). Kept modest on purpose: past ~1.5× the side
+    /// signal starts to dominate, thinning centred vocals and hollowing hard-panned mixes. This is
+    /// the "amplify what's already there" range, not a novelty extreme.
+    /// </summary>
+    public const double MaxWidthFactor = 1.5;
+
+    /// <summary>
+    /// Width factor for the mid/side matrix: 1.0 (untouched) at 0% → <see cref="MaxWidthFactor"/> at
+    /// 100%, front-loaded so the middle of the slider is already clearly wider.
+    /// </summary>
+    public double Width => 1.0 + IntensityCurve.Fraction(Math.Clamp(WidthPercent, MinPercent, MaxPercent)) * (MaxWidthFactor - 1.0);
+
+    /// <summary>
+    /// Worst-case broadband gain of the width matrix: in-phase (mono/centre) content passes at
+    /// unity (a+b = 1); anti-phase content sees gain w.
     /// </summary>
     public double MaxGainDb => 20.0 * Math.Log10(Math.Max(1.0, Width));
 }
 
-/// <summary>Light convolution reverb for stereo music. Experimental, ships behind a flag.</summary>
+/// <summary>
+/// Ambience — a real convolution reverb for stereo music. At higher intensities it adds an
+/// obvious sense of space, and because it is a genuine reverb tail the sound keeps ringing out for
+/// a couple of seconds after the source stops (the tail is the last audio convolved with the long
+/// impulse response). Intensity is the wet amount.
+/// </summary>
 public sealed record AmbienceSettings(
     bool Enabled = false,
-    int Intensity = 40);
+    int Intensity = 50);
 
 public sealed record EffectSettings(
     NightModeSettings NightMode,

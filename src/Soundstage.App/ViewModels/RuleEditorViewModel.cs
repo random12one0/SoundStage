@@ -308,8 +308,13 @@ public partial class RuleEditorViewModel : ObservableObject
 
     partial void OnDevicePatternTextChanged(string value) => RecomputeSentence();
 
-    /// <summary>Suggestion chips shown under the app-trigger field.</summary>
-    public static IReadOnlyList<string> AppSuggestions { get; } = ["Spotify", "Chrome", "VLC", "Discord", "Steam"];
+    /// <summary>Suggestion chips shown under the app-trigger field — common apps that hold an audio
+    /// session. These are matched as case-insensitive substrings of the running process name.</summary>
+    public static IReadOnlyList<string> AppSuggestions { get; } =
+    [
+        "Spotify", "Chrome", "Firefox", "Edge", "VLC", "mpv", "Discord", "Steam",
+        "iTunes", "MusicBee", "foobar2000", "PotPlayer", "Tidal",
+    ];
 
     /// <summary>Suggestion chips shown under the device-trigger field.</summary>
     public static IReadOnlyList<string> DeviceSuggestions { get; } = ["headphone", "speaker", "receiver", "HDMI"];

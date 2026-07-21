@@ -88,6 +88,15 @@
                     </Grid>
 
                     <Grid Margin="0,12,0,0">
+                        <StackPanel Margin="0,0,80,0">
+                            <TextBlock VerticalAlignment="Center" Text="Smoothly ramp big effect changes" />
+                            <TextBlock FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                                       Text="Eases into large night-mode / width / loudness changes over a fraction of a second instead of jumping, so they don't pop — no matter whether you, a slider, or an automation makes the change. Turn off for instant changes." />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding SmoothEffectTransitions}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0">
                         <StackPanel>
                             <TextBlock Text="Bypass hotkey" />
                             <TextBlock FontSize="12" Opacity="0.6" Text="Takes effect the next time Soundstage starts." />
@@ -125,6 +134,15 @@
                     </Grid>
 
                     <Grid Margin="0,12,0,0">
+                        <StackPanel Margin="0,0,80,0">
+                            <TextBlock Text="Clipping protection" />
+                            <TextBlock FontSize="12" Opacity="0.6" TextWrapping="Wrap"
+                                       Text="Automatically trims the preamp so a boosted EQ curve can't exceed full scale and crackle. If you never push levels that hard and would rather keep every last dB of output, turn it off. (Night mode and ambience keep their own headroom either way.)" />
+                        </StackPanel>
+                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding ClippingProtection}" />
+                    </Grid>
+
+                    <Grid Margin="0,12,0,0" IsEnabled="{Binding ClippingProtection}">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="220" />
@@ -136,14 +154,6 @@
                         </StackPanel>
                         <Slider Grid.Column="1" VerticalAlignment="Center" Maximum="3" Minimum="0" TickFrequency="0.25" IsSnapToTickEnabled="True" Value="{Binding SafetyMargin}" />
                         <TextBlock Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Text="{Binding SafetyMargin, StringFormat={}{0:0.00}}" />
-                    </Grid>
-
-                    <Grid Margin="0,12,0,0">
-                        <StackPanel>
-                            <TextBlock Text="Ambience effect (experimental)" />
-                            <TextBlock FontSize="12" Opacity="0.6" Text="Shows the ambience card on the Effects page." />
-                        </StackPanel>
-                        <ui:ToggleSwitch HorizontalAlignment="Right" IsChecked="{Binding AmbienceFeature}" />
                     </Grid>
                 </StackPanel>
             </Border>

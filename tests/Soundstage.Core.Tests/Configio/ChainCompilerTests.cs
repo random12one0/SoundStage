@@ -87,6 +87,22 @@ public class ChainCompilerTests
     }
 
     [Fact]
+    public void ClippingProtectionOff_MeasuresPeakButSkipsAutoTrim()
+    {
+        var state = StateWith(SpeakerProfile());
+        state.Settings.ClippingProtection = false;
+
+        var compilation = ChainCompiler.Compile(state, _ => MusicPreset);
+        var report = Assert.Single(compilation.Devices);
+
+        // The boost is still measured…
+        Assert.True(report.Headroom.PeakBoostDb > 1.5);
+        // …but no protective trim is applied, so the author's (0 dB) preamp stands and no line is emitted.
+        Assert.Equal(0, report.Headroom.AutoTrimDb, 3);
+        Assert.DoesNotContain("Preamp:", compilation.RenderedText);
+    }
+
+    [Fact]
     public void WidthOnSurroundProfile_EmitsFrontLRCopy_SurroundSafe()
     {
         var profile = SpeakerProfile(); // 5.1
@@ -108,11 +124,11 @@ public class ChainCompilerTests
         var profile = HeadphoneProfile();
         profile.Effects = EffectSettings.Default with
         {
-            StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 120),
+            StereoWidth = new StereoWidthSettings(Enabled: true, WidthPercent: 100),
         };
 
         var compilation = ChainCompiler.Compile(StateWith(profile), _ => null);
-        Assert.Contains("Copy: L=SS_MID+1.2*SS_SIDE R=SS_MID-1.2*SS_SIDE", compilation.RenderedText);
+        Assert.Contains("Copy: L=SS_MID+1.5*SS_SIDE R=SS_MID-1.5*SS_SIDE", compilation.RenderedText);
     }
 
     [Fact]

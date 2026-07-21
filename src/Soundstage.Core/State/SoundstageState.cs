@@ -28,7 +28,23 @@ public sealed class AppSettings
 
     public int RevertGuardSeconds { get; set; } = 10;
 
+    /// <summary>
+    /// Clipping protection (preamp auto-trim). When on, the headroom analyzer pulls the preamp down
+    /// so a boosted EQ curve can't exceed 0 dBFS and crackle. Some users never push levels that far
+    /// and would rather keep full output — turning this off leaves the preamp at the preset's own
+    /// value. Effect-specific headroom (night mode / ambience) is always applied either way.
+    /// </summary>
+    public bool ClippingProtection { get; set; } = true;
+
     public double SafetyMarginDb { get; set; } = 0.5;
+
+    /// <summary>
+    /// Smoothly ramp to big effect changes instead of jumping. Equalizer APO applies a static config
+    /// on every reload, so a large night-mode/width/loudness change lands in one step and can pop.
+    /// With this on, the controller writes a short series of interpolated configs so the change eases
+    /// in — for every source (slider, toggle, automation). On by default; off restores instant jumps.
+    /// </summary>
+    public bool SmoothEffectTransitions { get; set; } = true;
 
     public bool LaunchOnBoot { get; set; }
 
@@ -41,9 +57,6 @@ public sealed class AppSettings
 
     /// <summary>Global A/B bypass hotkey.</summary>
     public string BypassHotkey { get; set; } = "Ctrl+Alt+B";
-
-    /// <summary>Ambience is experimental and ships behind this flag.</summary>
-    public bool AmbienceFeatureEnabled { get; set; }
 
     /// <summary>Manual override when registry detection is unavailable/wrong.</summary>
     public string? ApoConfigDirectoryOverride { get; set; }

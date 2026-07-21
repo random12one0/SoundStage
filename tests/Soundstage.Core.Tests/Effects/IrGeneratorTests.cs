@@ -88,9 +88,19 @@ public class IrGeneratorTests
     }
 
     [Fact]
-    public void FileName_IsStablePerRateAndIntensity()
+    public void FileName_IsStablePerRateAndIntensity_AndCarriesTheVersion()
     {
-        Assert.Equal("ambience-48000-30.wav", IrGenerator.FileNameFor(48000, 30));
-        Assert.Equal("ambience-44100-100.wav", IrGenerator.FileNameFor(44100, 150));
+        // The version token means a reworked IR always lands as a new file — the fix for
+        // "ambience does nothing after an update" (a stale cached IR being reused by name).
+        Assert.Equal($"ambience-v{IrGenerator.Version}-48000-30.wav", IrGenerator.FileNameFor(48000, 30));
+        Assert.Equal($"ambience-v{IrGenerator.Version}-44100-100.wav", IrGenerator.FileNameFor(44100, 150));
+    }
+
+    [Fact]
+    public void Tail_RingsOutForSeconds_AtHighIntensity()
+    {
+        // "If I pause the music it should reverb for a second or two" — the tail must be long.
+        var seconds = IrGenerator.FrameCountFor(48000, 100) / 48000.0;
+        Assert.True(seconds >= 2.0, $"tail was only {seconds:0.00}s");
     }
 }

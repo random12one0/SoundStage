@@ -149,6 +149,15 @@ public sealed class ApplyOrchestrator
     }
 
     /// <summary>
+    /// Writes one intermediate chain directly — no backup, no hash bookkeeping, no revert guard.
+    /// Used only by the smooth-transition ramp to step the config toward a committed target so APO
+    /// reloads ease in instead of popping. The committed target still goes through the full
+    /// <see cref="Apply"/>, which owns persistence, events and guarding. Fail-soft like every other
+    /// write here, so a blocked ramp step can never crash.
+    /// </summary>
+    public void WriteRampStep(string chainText) => TryWrite(_layout.ChainFilePath, chainText);
+
+    /// <summary>
     /// A/B bypass: rewrites only the tiny switch file. Instant, never guarded, and the
     /// chain file is untouched so toggling back is equally instant.
     /// </summary>

@@ -92,8 +92,34 @@ public partial class DashboardViewModel : ObservableObject
     [ObservableProperty]
     private ObservableCollection<EqPreset> _presets = [];
 
+    /// <summary>Built-in presets — shown in their own dropdown, separate from the user's.</summary>
+    [ObservableProperty]
+    private ObservableCollection<EqPreset> _builtInPresets = [];
+
+    /// <summary>The user's own (custom/imported) presets — their own dropdown.</summary>
+    [ObservableProperty]
+    private ObservableCollection<EqPreset> _customPresets = [];
+
+    /// <summary>A few common built-ins surfaced as one-tap chips so you don't have to open a dropdown.</summary>
+    [ObservableProperty]
+    private ObservableCollection<EqPreset> _pinnedPresets = [];
+
+    [ObservableProperty]
+    private bool _hasCustomPresets;
+
     [ObservableProperty]
     private EqPreset? _selectedPreset;
+
+    // The two dropdowns bind here; only one holds a value at a time (whichever list the active
+    // preset lives in). Selecting in one clears the other and applies.
+    [ObservableProperty]
+    private EqPreset? _selectedBuiltIn;
+
+    [ObservableProperty]
+    private EqPreset? _selectedCustom;
+
+    /// <summary>Built-in preset ids surfaced as pinned quick-pick chips, in display order.</summary>
+    private static readonly string[] PinnedIds = ["flat", "music", "film-dialogue", "gaming", "bass-boost"];
 
     [ObservableProperty]
     private bool _isBypassed;
@@ -198,15 +224,23 @@ public partial class DashboardViewModel : ObservableObject
     {
         var selectedId = SelectedPreset?.Id;
         _syncing = true;
-        Presets = new ObservableCollection<EqPreset>(_services.Presets.All);
 
-        // Group the picker into "Built-in presets" and "Your presets" so a long list is easy
-        // to scan (the ComboBox renders the group headers via its GroupStyle).
-        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(Presets);
-        view.GroupDescriptions.Clear();
-        view.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(EqPreset.GroupLabel)));
+        var all = _services.Presets.All.ToList();
+        Presets = new ObservableCollection<EqPreset>(all);
 
-        SelectedPreset = Presets.FirstOrDefault(p => p.Id == (selectedId ?? _services.Controller?.ActiveProfile?.ActivePresetId));
+        // Two completely separate dropdowns — built-in on one, the user's own on the other —
+        // instead of one long combined list.
+        BuiltInPresets = new ObservableCollection<EqPreset>(all.Where(p => p.IsBuiltIn));
+        CustomPresets = new ObservableCollection<EqPreset>(all.Where(p => !p.IsBuiltIn));
+        HasCustomPresets = CustomPresets.Count > 0;
+
+        // Pinned quick-pick chips: the common built-ins, in a fixed order, so the everyday presets
+        // are one tap away without opening a dropdown.
+        PinnedPresets = new ObservableCollection<EqPreset>(
+            PinnedIds.Select(id => all.FirstOrDefault(p => p.Id == id)).OfType<EqPreset>());
+
+        SelectedPreset = all.FirstOrDefault(p => p.Id == (selectedId ?? _services.Controller?.ActiveProfile?.ActivePresetId));
+        SyncPickers();
         _syncing = false;
 
         // Rebuild the editor only when the selection actually changed — a refresh caused
@@ -214,6 +248,40 @@ public partial class DashboardViewModel : ObservableObject
         if (SelectedPreset?.Id != selectedId)
         {
             RebuildEditor();
+        }
+    }
+
+    /// <summary>Points each dropdown at the active preset (built-in in one, custom in the other), the
+    /// other showing nothing. Guarded by <c>_syncing</c> so it never re-triggers an apply.</summary>
+    private void SyncPickers()
+    {
+        SelectedBuiltIn = SelectedPreset is { IsBuiltIn: true } ? BuiltInPresets.FirstOrDefault(p => p.Id == SelectedPreset.Id) : null;
+        SelectedCustom = SelectedPreset is { IsBuiltIn: false } ? CustomPresets.FirstOrDefault(p => p.Id == SelectedPreset.Id) : null;
+    }
+
+    partial void OnSelectedBuiltInChanged(EqPreset? value)
+    {
+        if (!_syncing && value is not null)
+        {
+            SelectedPreset = value;
+        }
+    }
+
+    partial void OnSelectedCustomChanged(EqPreset? value)
+    {
+        if (!_syncing && value is not null)
+        {
+            SelectedPreset = value;
+        }
+    }
+
+    /// <summary>Applies a pinned quick-pick chip.</summary>
+    [RelayCommand]
+    private void ApplyPreset(EqPreset? preset)
+    {
+        if (preset is not null)
+        {
+            SelectedPreset = preset;
         }
     }
 
@@ -232,6 +300,7 @@ public partial class DashboardViewModel : ObservableObject
         if (SelectedPreset?.Id != activeId)
         {
             SelectedPreset = Presets.FirstOrDefault(p => p.Id == activeId);
+            SyncPickers();
             RebuildEditor();
         }
 
@@ -242,8 +311,13 @@ public partial class DashboardViewModel : ObservableObject
     {
         if (_syncing)
         {
-            return;
+            return; // programmatic refresh already synced the pickers; don't re-apply
         }
+
+        // User picked from a dropdown or a pinned chip: keep both pickers consistent, then apply.
+        _syncing = true;
+        SyncPickers();
+        _syncing = false;
 
         if (value is not null)
         {

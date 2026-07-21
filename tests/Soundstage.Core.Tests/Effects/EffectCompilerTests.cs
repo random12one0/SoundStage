@@ -85,33 +85,37 @@ public class EffectCompilerTests
     // ---- Stereo width ----
 
     [Fact]
-    public void Width_At100Percent_IsANoOp()
+    public void Width_At0Percent_IsANoOp()
     {
-        var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 100), Stereo48);
+        // 0% is untouched now (the slider is one-directional: 0 → widest).
+        var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 0), Stereo48);
         Assert.Empty(result.Commands);
         Assert.Equal(0, result.BroadbandGainDb, 3);
     }
 
     [Fact]
-    public void Width_140Percent_EmitsMidSideScratchMatrix()
+    public void Width_AtMax_EmitsMidSideScratchMatrix_CappedForMonoSafety()
     {
-        var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 140), Stereo48);
+        var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 100), Stereo48);
         var copies = result.Commands.OfType<CopyCommand>().ToList();
         Assert.Equal(2, copies.Count);
         // Mid/side frozen into scratch channels first…
         Assert.Equal("Copy: SS_MID=0.5*L+0.5*R SS_SIDE=0.5*L-0.5*R", copies[0].Render());
-        // …then L/R rebuilt from the frozen values (w = 1.4), immune to APO's assignment order.
-        Assert.Equal("Copy: L=SS_MID+1.4*SS_SIDE R=SS_MID-1.4*SS_SIDE", copies[1].Render());
-        // Anti-phase gain: 20·log10(1.4) ≈ 2.92 dB.
-        Assert.Equal(2.92, result.BroadbandGainDb, 1);
+        // …then L/R rebuilt from the frozen values. 100% = the capped max width factor (1.5),
+        // deliberately modest so hard-panned content never collapses toward one speaker.
+        Assert.Equal("Copy: L=SS_MID+1.5*SS_SIDE R=SS_MID-1.5*SS_SIDE", copies[1].Render());
+        // Anti-phase gain: 20·log10(1.5) ≈ 3.52 dB.
+        Assert.Equal(3.52, result.BroadbandGainDb, 1);
     }
 
     [Fact]
-    public void Width_Narrowing_AddsNoBroadbandGain()
+    public void Width_ScalesBetweenNeutralAndMax()
     {
-        var result = EffectCompilers.CompileStereoWidth(new StereoWidthSettings(Enabled: true, WidthPercent: 60), Stereo48);
-        Assert.NotEmpty(result.Commands);
-        Assert.Equal(0, result.BroadbandGainDb, 3);
+        // Every amount widens (w > 1) and never exceeds the mono-safe cap.
+        var mid = new StereoWidthSettings(Enabled: true, WidthPercent: 50).Width;
+        Assert.InRange(mid, 1.0, StereoWidthSettings.MaxWidthFactor);
+        Assert.Equal(StereoWidthSettings.MaxWidthFactor, new StereoWidthSettings(Enabled: true, WidthPercent: 100).Width, 3);
+        Assert.Equal(1.0, new StereoWidthSettings(Enabled: true, WidthPercent: 0).Width, 3);
     }
 
     [Fact]

@@ -107,7 +107,7 @@ public sealed class AppServices : IDisposable
         Takeover = new TakeoverService(FileSystem, Layout, Backups);
         Orchestrator = new ApplyOrchestrator(FileSystem, Layout, Backups, new RevertGuard(Scheduler));
         Coordinator = new AutomationCoordinator(Environment, Clock, Scheduler);
-        Controller = new SoundstageController(StateStore, Presets, Orchestrator, Environment, Coordinator)
+        Controller = new SoundstageController(StateStore, Presets, Orchestrator, Environment, Coordinator, Scheduler)
         {
             AmbienceIrResolver = ResolveAmbienceIr,
         };
@@ -128,10 +128,11 @@ public sealed class AppServices : IDisposable
             var intensity = controller?.ActiveProfile?.Effects.Ambience.Intensity ?? 30;
             var fileName = Core.Effects.IrGenerator.FileNameFor(sampleRate, intensity);
             var fullPath = Path.Combine(layout.IrDirectory, fileName);
+            Directory.CreateDirectory(layout.IrDirectory);
             if (!File.Exists(fullPath))
             {
-                Directory.CreateDirectory(layout.IrDirectory);
                 File.WriteAllBytes(fullPath, Core.Effects.IrGenerator.BuildWav(sampleRate, intensity));
+                CleanStaleIrFiles(layout.IrDirectory);
             }
 
             return $"ir\\{fileName}";
@@ -139,6 +140,27 @@ public sealed class AppServices : IDisposable
         catch
         {
             return null; // ambience silently skips; the compiler notes it
+        }
+    }
+
+    /// <summary>Deletes impulse responses from older IR-generator versions so the cache folder
+    /// doesn't accumulate stale files after an ambience rework. Best-effort — failures are ignored.</summary>
+    private static void CleanStaleIrFiles(string irDirectory)
+    {
+        var current = $"ambience-v{Core.Effects.IrGenerator.Version}-";
+        foreach (var path in Directory.EnumerateFiles(irDirectory, "ambience-*.wav"))
+        {
+            if (!Path.GetFileName(path).StartsWith(current, StringComparison.Ordinal))
+            {
+                try
+                {
+                    File.Delete(path);
+                }
+                catch
+                {
+                    // Leftover file is harmless; ignore.
+                }
+            }
         }
     }
 

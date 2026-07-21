@@ -33,13 +33,16 @@ public partial class SettingsViewModel : ObservableObject
     private bool _automationNotifications = true;
 
     [ObservableProperty]
-    private bool _ambienceFeature;
-
-    [ObservableProperty]
     private bool _confirmNewSounds;
 
     [ObservableProperty]
+    private bool _smoothEffectTransitions = true;
+
+    [ObservableProperty]
     private double _guardSeconds = 10;
+
+    [ObservableProperty]
+    private bool _clippingProtection = true;
 
     [ObservableProperty]
     private double _safetyMargin = 0.5;
@@ -97,9 +100,10 @@ public partial class SettingsViewModel : ObservableObject
         StartMinimized = settings.StartMinimized;
         MinimizeToTray = settings.MinimizeToTray;
         AutomationNotifications = settings.AutomationNotifications;
-        AmbienceFeature = settings.AmbienceFeatureEnabled;
         ConfirmNewSounds = settings.ConfirmNewSounds;
+        SmoothEffectTransitions = settings.SmoothEffectTransitions;
         GuardSeconds = settings.RevertGuardSeconds;
+        ClippingProtection = settings.ClippingProtection;
         SafetyMargin = settings.SafetyMarginDb;
         BypassHotkeyText = settings.BypassHotkey;
         CheckForUpdatesOnStartup = settings.CheckForUpdatesOnStartup;
@@ -133,9 +137,10 @@ public partial class SettingsViewModel : ObservableObject
         settings.StartMinimized = StartMinimized;
         settings.MinimizeToTray = MinimizeToTray;
         settings.AutomationNotifications = AutomationNotifications;
-        settings.AmbienceFeatureEnabled = AmbienceFeature;
         settings.ConfirmNewSounds = ConfirmNewSounds;
+        settings.SmoothEffectTransitions = SmoothEffectTransitions;
         settings.RevertGuardSeconds = (int)Math.Clamp(GuardSeconds, 3, 60);
+        settings.ClippingProtection = ClippingProtection;
         settings.SafetyMarginDb = Math.Clamp(SafetyMargin, 0, 3);
         settings.BypassHotkey = BypassHotkeyText;
         controller.SaveState();
@@ -166,9 +171,11 @@ public partial class SettingsViewModel : ObservableObject
 
     partial void OnAutomationNotificationsChanged(bool value) => Persist();
 
-    partial void OnAmbienceFeatureChanged(bool value) => Persist(reapply: true);
-
     partial void OnConfirmNewSoundsChanged(bool value) => Persist();
+
+    partial void OnSmoothEffectTransitionsChanged(bool value) => Persist();
+
+    partial void OnClippingProtectionChanged(bool value) => Persist(reapply: true);
 
     partial void OnGuardSecondsChanged(double value) => Persist();
 

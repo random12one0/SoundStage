@@ -42,7 +42,12 @@ public class SoundstageControllerTests : IDisposable
             presets,
             orchestrator,
             _environment,
-            coordinator);
+            coordinator,
+            _scheduler);
+
+        // Most tests assert on the chain synchronously, so keep transitions instant here; the
+        // dedicated ramp test flips this on and pumps the scheduler.
+        _controller.State.Settings.SmoothEffectTransitions = false;
 
         new TakeoverService(_fs, _layout, backups).TakeOwnership();
     }
@@ -131,9 +136,46 @@ public class SoundstageControllerTests : IDisposable
         var chain = _fs.ReadAllText(_layout.ChainFilePath);
         // Now applies on 5.1 — mid/side scratch matrix, but only rebuilds the front L/R pair.
         Assert.Contains("Copy: SS_MID=0.5*L+0.5*R SS_SIDE=0.5*L-0.5*R", chain);
-        Assert.Contains("Copy: L=SS_MID+1.4*SS_SIDE R=SS_MID-1.4*SS_SIDE", chain);
+        Assert.Contains("Copy: L=SS_MID+1.5*SS_SIDE R=SS_MID-1.5*SS_SIDE", chain);
         Assert.DoesNotContain("C=", chain);
         Assert.DoesNotContain("SL=", chain);
+    }
+
+    [Fact]
+    public void SmoothTransitions_RampToTarget_ThenLandExactlyOnIt()
+    {
+        _controller.Initialize();
+        _controller.State.Settings.SmoothEffectTransitions = true;
+
+        // A big night-mode change would pop if applied in one jump — it should ramp instead.
+        _controller.UpdateEffects(e => e with { NightMode = new NightModeSettings(Enabled: true, Intensity: 100) });
+
+        // Intermediate ramp steps are scheduled; the committed apply is the final step.
+        Assert.True(_scheduler.PendingCount > 0, "expected ramp steps to be scheduled");
+
+        // Each ramp step schedules the next, so pump a bounded number of times (the coordinator's
+        // self-rescheduling tick shares this scheduler, so an unbounded drain would never end).
+        for (var i = 0; i < 20; i++)
+        {
+            _scheduler.FireAll();
+        }
+
+        // After the ramp completes the chain is exactly the target (full-intensity night shelf).
+        var chain = _fs.ReadAllText(_layout.ChainFilePath);
+        Assert.Contains("Night mode: bass shelf", chain);
+        Assert.Equal(100, _controller.ActiveProfile!.Effects.NightMode.Intensity);
+    }
+
+    [Fact]
+    public void SmoothTransitions_Off_AppliesInOneStep()
+    {
+        _controller.Initialize();
+        _controller.State.Settings.SmoothEffectTransitions = false;
+
+        _controller.UpdateEffects(e => e with { NightMode = new NightModeSettings(Enabled: true, Intensity: 100) });
+
+        // No ramp scheduled — the change is already on disk.
+        Assert.Contains("Night mode: bass shelf", _fs.ReadAllText(_layout.ChainFilePath));
     }
 
     [Fact]

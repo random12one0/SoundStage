@@ -60,8 +60,6 @@ public partial class EffectsViewModel : ObservableObject
 
     public bool ApoAvailable => _services.ApoAvailable;
 
-    public bool WidthInDangerZone => WidthPercent > StereoWidthSettings.DangerThresholdPercent;
-
     public EffectsViewModel(AppServices services)
     {
         _services = services;
@@ -92,11 +90,10 @@ public partial class EffectsViewModel : ObservableObject
         LoudnessIntensity = e.Loudness.Intensity;
         WidthEnabled = e.StereoWidth.Enabled;
         WidthPercent = e.StereoWidth.WidthPercent;
-        AmbienceVisible = _services.Controller!.State.Settings.AmbienceFeatureEnabled;
+        AmbienceVisible = true;
         AmbienceEnabled = e.Ambience.Enabled;
         AmbienceIntensity = e.Ambience.Intensity;
         _syncing = false;
-        OnPropertyChanged(nameof(WidthInDangerZone));
     }
 
     private void Push(bool immediate = false)
@@ -177,11 +174,7 @@ public partial class EffectsViewModel : ObservableObject
 
     partial void OnWidthEnabledChanged(bool value) => Push(immediate: true);
 
-    partial void OnWidthPercentChanged(double value)
-    {
-        OnPropertyChanged(nameof(WidthInDangerZone));
-        Push();
-    }
+    partial void OnWidthPercentChanged(double value) => Push();
 
     partial void OnAmbienceEnabledChanged(bool value) => Push(immediate: true);
 
@@ -222,10 +215,8 @@ public partial class EffectsViewModel : ObservableObject
 
     private void OnApplied(Core.Configio.ApplyResult result)
     {
-        WidthStatus = WidthEnabled && WidthInDangerZone
-            ? "Past 140% centered vocals start sounding thin and distant."
-            : WidthEnabled
-                ? "Applied to the front left/right only — your centre and surround channels are untouched."
-                : "";
+        WidthStatus = WidthEnabled
+            ? "Amplifies the left/right separation already in your music — front L/R only, so your centre and surround channels are untouched."
+            : "";
     }
 }

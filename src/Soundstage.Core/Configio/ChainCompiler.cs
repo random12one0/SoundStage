@@ -78,9 +78,7 @@ public static class ChainCompiler
         var night = EffectCompilers.CompileNightMode(effects.NightMode);
         var loudness = EffectCompilers.CompileLoudness(effects.Loudness);
         var width = EffectCompilers.CompileStereoWidth(effects.StereoWidth, capabilities);
-        var ambience = state.Settings.AmbienceFeatureEnabled
-            ? EffectCompilers.CompileAmbience(effects.Ambience, capabilities, ambienceIrResolver)
-            : EffectCompilation.Empty;
+        var ambience = EffectCompilers.CompileAmbience(effects.Ambience, capabilities, ambienceIrResolver);
 
         foreach (var note in new[] { night.Note, loudness.Note, width.Note, ambience.Note })
         {
@@ -119,7 +117,8 @@ public static class ChainCompiler
             graphicPoints,
             broadbandGainsDb: [width.BroadbandGainDb],
             sampleRate: capabilities.SampleRateHz,
-            safetyMarginDb: state.Settings.SafetyMarginDb);
+            safetyMarginDb: state.Settings.SafetyMarginDb,
+            applyPeakTrim: state.Settings.ClippingProtection);
 
         // ---- Emit the section ----
         document.Commands.Add(new CommentCommand($"── {profile.FriendlyName} ({FormatChannels(capabilities.Channels)}) — preset: {preset?.Name ?? "none"}"));

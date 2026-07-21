@@ -41,13 +41,20 @@ public static class HeadroomAnalyzer
     /// <param name="broadbandGainsDb">Frequency-independent worst-case gains (e.g. stereo width's anti-phase gain).</param>
     /// <param name="sampleRate">Device sample rate for biquad design.</param>
     /// <param name="safetyMarginDb">Required distance below 0 dBFS.</param>
+    /// <param name="applyPeakTrim">
+    /// When false (the user turned clipping protection off), the analyzer still measures the peak
+    /// boost but never pulls the preamp down to prevent EQ clipping — it emits the author's preamp
+    /// as-is. Effect-specific headroom (night mode / ambience) is folded into
+    /// <paramref name="authorPreampDb"/> upstream, so those stay protected regardless.
+    /// </param>
     public static HeadroomReport Analyze(
         double authorPreampDb,
         IEnumerable<FilterCommand> filters,
         IReadOnlyList<GraphicEqPoint>? graphicPoints = null,
         IEnumerable<double>? broadbandGainsDb = null,
         double sampleRate = 48000,
-        double safetyMarginDb = 0.5)
+        double safetyMarginDb = 0.5,
+        bool applyPeakTrim = true)
     {
         var coefficients = filters
             .Where(f => f.Enabled)
@@ -98,7 +105,8 @@ public static class HeadroomAnalyzer
         // Keep authorPreamp + peakBoost <= -margin; never raise the author's preamp.
         // A chain with no positive boost cannot clip on its own — leave it untouched so a
         // flat preset stays bit-transparent instead of getting a pointless margin trim.
-        var recommended = peakBoost > 1e-9
+        // With clipping protection off, we skip the protective trim entirely (the user's call).
+        var recommended = applyPeakTrim && peakBoost > 1e-9
             ? Math.Min(authorPreampDb, -safetyMarginDb - peakBoost)
             : authorPreampDb;
 

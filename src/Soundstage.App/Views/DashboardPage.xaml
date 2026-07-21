@@ -60,46 +60,57 @@
                 </Grid>
             </Border>
 
-            <!-- Preset row -->
-            <Grid Margin="0,8,0,0">
+            <!-- Pinned quick-pick presets — the common ones, one tap, no dropdown -->
+            <ItemsControl Margin="0,10,0,0" ItemsSource="{Binding PinnedPresets}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <ui:Button Margin="0,0,8,0" Padding="14,6"
+                                   Command="{Binding DataContext.ApplyPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                   CommandParameter="{Binding}"
+                                   Content="{Binding Name}"
+                                   ToolTip="{Binding Description}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Two separate dropdowns: built-in presets, and your own -->
+            <Grid Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                    <ComboBox
-                        MinWidth="260"
-                        VerticalAlignment="Center"
-                        ItemsSource="{Binding Presets}"
-                        SelectedItem="{Binding SelectedPreset}">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" />
-                                    <TextBlock Margin="8,0,0,0" Opacity="0.55" FontSize="11" VerticalAlignment="Center" Text="{Binding Category}" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                        <ComboBox.GroupStyle>
-                            <GroupStyle>
-                                <GroupStyle.HeaderTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Margin="2,6,0,2" FontSize="11" FontWeight="SemiBold" Opacity="0.55" Text="{Binding Name}" />
-                                    </DataTemplate>
-                                </GroupStyle.HeaderTemplate>
-                            </GroupStyle>
-                        </ComboBox.GroupStyle>
-                    </ComboBox>
-                    <ui:Button Margin="8,0,0,0" Command="{Binding DuplicateCommand}" Content="Duplicate" ToolTip="Copy this preset so you can edit it" />
+                <StackPanel Grid.Column="0" Margin="0,0,14,0">
+                    <TextBlock Margin="2,0,0,3" FontSize="11" FontWeight="SemiBold" Opacity="0.55" Text="PRESETS" />
+                    <ComboBox MinWidth="200" VerticalAlignment="Center"
+                              ItemsSource="{Binding BuiltInPresets}"
+                              SelectedItem="{Binding SelectedBuiltIn}"
+                              DisplayMemberPath="Name" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1">
+                    <TextBlock Margin="2,0,0,3" FontSize="11" FontWeight="SemiBold" Opacity="0.55" Text="YOUR PRESETS" />
+                    <ComboBox MinWidth="200" VerticalAlignment="Center"
+                              IsEnabled="{Binding HasCustomPresets}"
+                              ItemsSource="{Binding CustomPresets}"
+                              SelectedItem="{Binding SelectedCustom}"
+                              DisplayMemberPath="Name" />
+                </StackPanel>
+
+                <!-- Manage buttons + headroom, aligned to the dropdowns' baseline -->
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Bottom">
+                    <ui:Button Command="{Binding DuplicateCommand}" Content="Duplicate" ToolTip="Copy this preset so you can edit it" />
                     <ui:Button Margin="6,0,0,0" Command="{Binding RenameCommand}" Content="Rename" />
                     <ui:Button Margin="6,0,0,0" Command="{Binding DeleteCommand}" Content="Delete" />
                     <ui:Button Margin="6,0,0,0" Command="{Binding ImportFileCommand}" Content="Import…" ToolTip="Import Peace or AutoEq preset files" />
                 </StackPanel>
-
-                <!-- Undo and A/B bypass live in the persistent top toolbar now (every page). -->
-                <TextBlock Grid.Column="1" VerticalAlignment="Center" Opacity="0.55" FontSize="12"
-                           Text="{Binding HeadroomSummary}" />
             </Grid>
 
             <!-- Quick effects — drive the main effects without leaving the dashboard -->
@@ -144,7 +155,7 @@
                                 </Grid>
                                 <Grid Margin="0,6,0,0">
                                     <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="42" /></Grid.ColumnDefinitions>
-                                    <Slider VerticalAlignment="Center" Maximum="200" Minimum="0" IsEnabled="{Binding WidthEnabled}" Value="{Binding WidthPercent}" />
+                                    <Slider VerticalAlignment="Center" Maximum="100" Minimum="0" IsEnabled="{Binding WidthEnabled}" Value="{Binding WidthPercent}" />
                                     <TextBlock Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="11" Opacity="0.7" Text="{Binding WidthPercent, StringFormat={}{0:0}%}" />
                                 </Grid>
                             </StackPanel>

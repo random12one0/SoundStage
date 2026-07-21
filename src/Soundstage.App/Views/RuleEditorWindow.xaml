@@ -185,6 +185,10 @@
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
+                            <Border Margin="0,10,0,0" Padding="10,8" Background="#22000000" CornerRadius="6">
+                                <TextBlock FontSize="11.5" Opacity="0.7" TextWrapping="Wrap"
+                                           Text="How matching works: Soundstage looks at the apps currently playing sound and checks whether any name contains the text you typed, ignoring case — so &quot;spot&quot; matches Spotify and you don't need the exact process name or the .exe. List several, separated by commas, and the rule fires when any one of them is playing. Watching something in a browser? Match the browser itself (Chrome, Edge, Firefox) — that's the app holding the audio; YouTube/Netflix show up in the now-playing readout but aren't separate apps to match here." />
+                            </Border>
                         </StackPanel>
 
                         <!-- Channels -->

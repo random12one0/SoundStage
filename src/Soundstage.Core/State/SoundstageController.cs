@@ -18,6 +18,7 @@ public sealed class SoundstageController : IDisposable
     private readonly ApplyOrchestrator _orchestrator;
     private readonly IAudioEnvironmentSource _environment;
     private readonly AutomationCoordinator _coordinator;
+    private readonly Abstractions.IDelayScheduler? _scheduler;
     private readonly object _gate = new();
 
     public SoundstageController(
@@ -25,13 +26,15 @@ public sealed class SoundstageController : IDisposable
         PresetStore presets,
         ApplyOrchestrator orchestrator,
         IAudioEnvironmentSource environment,
-        AutomationCoordinator coordinator)
+        AutomationCoordinator coordinator,
+        Abstractions.IDelayScheduler? scheduler = null)
     {
         _stateStore = stateStore;
         _presets = presets;
         _orchestrator = orchestrator;
         _environment = environment;
         _coordinator = coordinator;
+        _scheduler = scheduler;
 
         State = _stateStore.Load();
 
@@ -117,7 +120,7 @@ public sealed class SoundstageController : IDisposable
 
     public void UpdateEffects(Func<EffectSettings, EffectSettings> mutate, ApplyAttribution? attribution = null)
     {
-        EffectSettings updated;
+        EffectSettings previous, updated;
         lock (_gate)
         {
             var profile = ActiveProfile;
@@ -126,8 +129,9 @@ public sealed class SoundstageController : IDisposable
                 return;
             }
 
-            updated = mutate(profile.Effects);
-            if (updated == profile.Effects)
+            previous = profile.Effects;
+            updated = mutate(previous);
+            if (updated == previous)
             {
                 return;
             }
@@ -146,7 +150,80 @@ public sealed class SoundstageController : IDisposable
             }
         }
 
-        Apply(attribution ?? ApplyAttribution.Manual());
+        var attr = attribution ?? ApplyAttribution.Manual();
+        if (!TryStartRamp(previous, updated, attr))
+        {
+            Apply(attr);
+        }
+    }
+
+    // ---- Smooth transitions (ramp) ----
+
+    private int _rampGeneration;
+
+    /// <summary>Wall-clock spacing between ramp steps. Small because on a healthy setup an APO
+    /// config reload is silent — it's the size of each gain step that must stay tiny, not the count.</summary>
+    private static readonly TimeSpan RampStepInterval = TimeSpan.FromMilliseconds(40);
+
+    /// <summary>
+    /// If the effect change is big enough to pop, eases into it: writes a series of interpolated
+    /// configs over a few hundred ms, then does the real committed <see cref="Apply"/> as the final
+    /// step. Returns false (caller applies normally) when smoothing is off, there's no scheduler,
+    /// audio is bypassed, or the change is too small to bother. Works for every attribution source.
+    /// </summary>
+    private bool TryStartRamp(EffectSettings from, EffectSettings to, ApplyAttribution attribution)
+    {
+        if (_scheduler is null || !State.Settings.SmoothEffectTransitions || State.BypassActive)
+        {
+            return false;
+        }
+
+        List<string> steps;
+        lock (_gate)
+        {
+            var profile = ActiveProfile;
+            if (profile is null || !EffectRamp.ShouldRamp(from, to))
+            {
+                return false;
+            }
+
+            var count = EffectRamp.StepCount(from, to);
+            steps = new List<string>(count - 1);
+            for (var i = 1; i < count; i++)
+            {
+                profile.Effects = EffectRamp.Lerp(from, to, (double)i / count);
+                steps.Add(ChainCompiler.Compile(State, _presets.Get, AmbienceIrResolver).RenderedText);
+            }
+
+            profile.Effects = to; // leave the committed target in place for the final Apply
+        }
+
+        if (steps.Count == 0)
+        {
+            return false;
+        }
+
+        var generation = Interlocked.Increment(ref _rampGeneration);
+        RunRampStep(steps, 0, generation, attribution);
+        return true;
+    }
+
+    private void RunRampStep(List<string> steps, int index, int generation, ApplyAttribution attribution)
+    {
+        if (Volatile.Read(ref _rampGeneration) != generation)
+        {
+            return; // a newer change superseded this ramp — stop writing stale steps
+        }
+
+        if (index < steps.Count)
+        {
+            _orchestrator.WriteRampStep(steps[index]);
+            _scheduler!.Schedule(RampStepInterval, () => RunRampStep(steps, index + 1, generation, attribution));
+        }
+        else
+        {
+            Apply(attribution); // committed target: full pipeline (persist, events, guard)
+        }
     }
 
     // ---- Bypass & kill switch ----
@@ -304,6 +381,10 @@ public sealed class SoundstageController : IDisposable
 
     public ApplyResult? Apply(ApplyAttribution attribution)
     {
+        // Any committed apply supersedes an in-flight ramp: a preset switch (or the ramp's own final
+        // step) bumps the generation so no stale interpolated step can overwrite the new chain.
+        Interlocked.Increment(ref _rampGeneration);
+
         ApplyResult result;
         lock (_gate)
         {

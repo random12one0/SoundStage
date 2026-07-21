@@ -14,8 +14,16 @@ namespace Soundstage.Core.Effects;
 /// </summary>
 public static class IrGenerator
 {
-    public const double MinTailSeconds = 0.18;
-    public const double MaxTailSeconds = 0.7;    // a big, obviously audible hall at high intensity
+    /// <summary>
+    /// Bumped whenever the IR-generation algorithm changes. It is part of the cache file name so a
+    /// new algorithm always writes a NEW file instead of silently reusing a stale one on disk. This
+    /// is the fix for "ambience does nothing after an update": the old, faint IR was cached by name
+    /// and never regenerated. Bump this any time the tail/level/shape below changes audibly.
+    /// </summary>
+    public const int Version = 3;
+
+    public const double MinTailSeconds = 0.8;    // even the gentlest setting has a clearly audible tail
+    public const double MaxTailSeconds = 2.6;    // a big hall that rings out for a couple of seconds after the music stops
     public const double PreDelaySeconds = 0.02;  // 20 ms gap between the direct sound and the reverb
     public const double WetHighPassHz = 180.0;   // keep the reverb out of the deep bass → no mud
 
@@ -28,7 +36,7 @@ public static class IrGenerator
     /// paid for with preamp headroom (<see cref="ExtraHeadroomDbFor"/>) rather than by ducking
     /// the dry signal. This is what makes it an obvious, hearable reverb instead of a faint haze.
     /// </summary>
-    public const double MaxWetL1 = 0.8;
+    public const double MaxWetL1 = 1.0;
 
     private static int TailSampleCount(int sampleRate, int intensity)
     {
@@ -115,8 +123,12 @@ public static class IrGenerator
         return WriteFloatStereoWav(sampleRate, leftF, rightF);
     }
 
-    /// <summary>Stable file name for a given sample rate + intensity (relative to the IR directory).</summary>
-    public static string FileNameFor(int sampleRate, int intensity) => $"ambience-{sampleRate}-{Math.Clamp(intensity, 0, 100)}.wav";
+    /// <summary>
+    /// Stable file name for a given sample rate + intensity (relative to the IR directory). The
+    /// <see cref="Version"/> token means a changed algorithm lands as a brand-new file — old caches
+    /// are never mistaken for the current IR.
+    /// </summary>
+    public static string FileNameFor(int sampleRate, int intensity) => $"ambience-v{Version}-{sampleRate}-{Math.Clamp(intensity, 0, 100)}.wav";
 
     /// <summary>One-pole high-pass (6 dB/oct) applied in place — trims sub-bass from the reverb send.</summary>
     private static void HighPass(double[] samples, int sampleRate, double cutoffHz)
