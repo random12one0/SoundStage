@@ -25,10 +25,10 @@ public class IrGeneratorTests
         var riffSize = BitConverter.ToInt32(bytes, 4);
         Assert.Equal(bytes.Length - 8, riffSize);
 
-        // fmt: IEEE float, stereo, requested rate.
+        // fmt: IEEE float, MONO (so APO applies it to every channel), requested rate.
         Assert.Equal("fmt "u8.ToArray(), bytes[12..16]);
         Assert.Equal(3, BitConverter.ToInt16(bytes, 20));
-        Assert.Equal(2, BitConverter.ToInt16(bytes, 22));
+        Assert.Equal(1, BitConverter.ToInt16(bytes, 22));
         Assert.Equal(48000, BitConverter.ToInt32(bytes, 24));
         Assert.Equal(32, BitConverter.ToInt16(bytes, 34));
     }
@@ -39,8 +39,8 @@ public class IrGeneratorTests
         const int rate = 44100;
         var bytes = IrGenerator.BuildWav(rate, 50);
         var expectedFrames = IrGenerator.FrameCountFor(rate, 50);
-        // data chunk is the last one: 8-byte header + frames*2ch*4bytes.
-        var dataBytes = expectedFrames * 2 * 4;
+        // data chunk is the last one: 8-byte header + frames*1ch*4bytes (mono).
+        var dataBytes = expectedFrames * 1 * 4;
         Assert.Equal(56 + dataBytes, bytes.Length);
     }
 
@@ -56,23 +56,19 @@ public class IrGeneratorTests
         foreach (var intensity in new[] { 0, 50, 100 })
         {
             var bytes = IrGenerator.BuildWav(48000, intensity);
-            double l1Left = 0, l1Right = 0;
-            var frames = (bytes.Length - 56) / 8;
+            double l1 = 0;
+            var frames = (bytes.Length - 56) / 4; // mono, 4 bytes/frame
             for (var i = 0; i < frames; i++)
             {
-                var left = BitConverter.ToSingle(bytes, 56 + i * 8);
-                var right = BitConverter.ToSingle(bytes, 56 + i * 8 + 4);
-                Assert.True(Math.Abs(left) <= 1.0f);
-                Assert.True(Math.Abs(right) <= 1.0f);
-                l1Left += Math.Abs(left);
-                l1Right += Math.Abs(right);
+                var sample = BitConverter.ToSingle(bytes, 56 + i * 4);
+                Assert.True(Math.Abs(sample) <= 1.0f);
+                l1 += Math.Abs(sample);
             }
 
-            // The wet reverb is added on top of a full-level dry, so per-channel L1 exceeds 1;
-            // the headroom the effect requests must bring the worst-case gain back to ≤ unity.
+            // The wet reverb is added on top of a full-level dry, so L1 exceeds 1; the headroom
+            // the effect requests must bring the worst-case convolution gain back to ≤ unity.
             var afterHeadroom = Math.Pow(10, -IrGenerator.ExtraHeadroomDbFor(intensity) / 20.0);
-            Assert.True(l1Left * afterHeadroom <= 1.0 + 1e-3, $"L1 left {l1Left} at intensity {intensity}");
-            Assert.True(l1Right * afterHeadroom <= 1.0 + 1e-3, $"L1 right {l1Right} at intensity {intensity}");
+            Assert.True(l1 * afterHeadroom <= 1.0 + 1e-3, $"L1 {l1} at intensity {intensity}");
         }
     }
 

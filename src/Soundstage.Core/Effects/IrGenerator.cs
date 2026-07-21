@@ -1,16 +1,18 @@
 namespace Soundstage.Core.Effects;
 
 /// <summary>
-/// Generates the small stereo impulse response the ambience effect convolves with. Rather than a
-/// flat noise haze (which is why the old version "didn't do much"), it models a real space: a
-/// full-band <b>direct</b> impulse, a short <b>pre-delay</b> gap (so transients stay crisp and the
-/// room sounds larger), a handful of discrete <b>early reflections</b>, then an exponentially
-/// decaying <b>diffuse tail</b>. The wet path is high-passed (~250 Hz) so the reverb never muddies
-/// the bass, and the two channels are decorrelated for width. Fully deterministic — same inputs,
-/// same bytes — so tests can hash it and repeated applies never rewrite the file.
+/// Generates the small <b>mono</b> impulse response the ambience effect convolves with. Mono is
+/// deliberate and important: Equalizer APO applies a single-channel IR to <b>every</b> output
+/// channel, so the reverb works identically on 2.0, 5.1 and 7.1 — a stereo (2-channel) IR, by
+/// contrast, can't be mapped onto a 7.1 stream and APO silently drops it (that was the real
+/// "ambience does nothing on my receiver" bug). It models a real space: a full-band <b>direct</b>
+/// impulse, a short <b>pre-delay</b> gap, a handful of discrete <b>early reflections</b>, then an
+/// exponentially decaying <b>diffuse tail</b>. The wet path is high-passed (~180 Hz) so the reverb
+/// never muddies the bass (and so the LFE channel stays effectively dry). Fully deterministic —
+/// same inputs, same bytes — so repeated applies never rewrite the file.
 ///
-/// Level safety: the wet path is normalised so <c>dry + Σ|wet| == 1.0</c> per channel, keeping the
-/// convolution's worst-case gain at unity — ambience needs no extra preamp headroom.
+/// Level safety: the wet path is normalised so <c>dry + Σ|wet| == 1.0 + wet</c>, and the extra wet
+/// energy is paid for with preamp headroom (<see cref="ExtraHeadroomDbFor"/>).
 /// </summary>
 public static class IrGenerator
 {
@@ -20,7 +22,7 @@ public static class IrGenerator
     /// is the fix for "ambience does nothing after an update": the old, faint IR was cached by name
     /// and never regenerated. Bump this any time the tail/level/shape below changes audibly.
     /// </summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     public const double MinTailSeconds = 0.8;    // even the gentlest setting has a clearly audible tail
     public const double MaxTailSeconds = 2.6;    // a big hall that rings out for a couple of seconds after the music stops
@@ -55,7 +57,7 @@ public static class IrGenerator
     public static double ExtraHeadroomDbFor(int intensity) =>
         20.0 * Math.Log10(1.0 + MaxWetL1 * IntensityCurve.Fraction(Math.Clamp(intensity, 0, 100)));
 
-    /// <summary>Builds a 32-bit float stereo WAV for the given sample rate and intensity (0–100).</summary>
+    /// <summary>Builds a 32-bit float <b>mono</b> WAV for the given sample rate and intensity (0–100).</summary>
     public static byte[] BuildWav(int sampleRate, int intensity)
     {
         intensity = Math.Clamp(intensity, 0, 100);
@@ -67,11 +69,8 @@ public static class IrGenerator
         var wetL1 = MaxWetL1 * curve;
         var dry = 1.0; // keep the direct sound at full level; the wet reverb is added on top
 
-        var left = new double[totalFrames];
-        var right = new double[totalFrames];
-
-        var rngL = new XorShift(0x5057_1234u);
-        var rngR = new XorShift(0xA0D1_9876u);
+        var samples = new double[totalFrames];
+        var rng = new XorShift(0x5057_1234u);
 
         // Early reflections: discrete taps just after the pre-delay, loudest first. These distinct
         // echoes are what make ambience read as a real room instead of a wash.
@@ -80,16 +79,10 @@ public static class IrGenerator
         for (var tap = 0; tap < EarlyReflections; tap++)
         {
             var level = 1.0 - (double)tap / EarlyReflections;
-            var posL = wetStart + (int)(erSpan * rngL.NextUnit());
-            var posR = wetStart + (int)(erSpan * rngR.NextUnit());
-            if (posL < totalFrames)
+            var pos = wetStart + (int)(erSpan * rng.NextUnit());
+            if (pos < totalFrames)
             {
-                left[posL] += rngL.NextBipolar() * level;
-            }
-
-            if (posR < totalFrames)
-            {
-                right[posR] += rngR.NextBipolar() * level;
+                samples[pos] += rng.NextBipolar() * level;
             }
         }
 
@@ -98,29 +91,23 @@ public static class IrGenerator
         for (var i = wetStart; i < totalFrames; i++)
         {
             var envelope = Math.Exp(-decayPerSample * (i - wetStart));
-            left[i] += rngL.NextBipolar() * envelope;
-            right[i] += rngR.NextBipolar() * envelope;
+            samples[i] += rng.NextBipolar() * envelope;
         }
 
         // High-pass the wet path so ambience never adds boom, then normalise it to the wet L1
         // budget. The direct impulse is added afterwards and stays full-band.
-        HighPass(left, sampleRate, WetHighPassHz);
-        HighPass(right, sampleRate, WetHighPassHz);
-        NormalizeL1(left, wetL1);
-        NormalizeL1(right, wetL1);
+        HighPass(samples, sampleRate, WetHighPassHz);
+        NormalizeL1(samples, wetL1);
 
-        left[0] = dry;
-        right[0] = dry;
+        samples[0] = dry;
 
-        var leftF = new float[totalFrames];
-        var rightF = new float[totalFrames];
+        var mono = new float[totalFrames];
         for (var i = 0; i < totalFrames; i++)
         {
-            leftF[i] = (float)left[i];
-            rightF[i] = (float)right[i];
+            mono[i] = (float)samples[i];
         }
 
-        return WriteFloatStereoWav(sampleRate, leftF, rightF);
+        return WriteFloatMonoWav(sampleRate, mono);
     }
 
     /// <summary>
@@ -168,11 +155,11 @@ public static class IrGenerator
         }
     }
 
-    private static byte[] WriteFloatStereoWav(int sampleRate, float[] left, float[] right)
+    private static byte[] WriteFloatMonoWav(int sampleRate, float[] samples)
     {
-        const short channels = 2;
+        const short channels = 1;
         const short bitsPerSample = 32;
-        var frames = left.Length;
+        var frames = samples.Length;
         var dataBytes = frames * channels * (bitsPerSample / 8);
 
         // File layout: RIFF(12) + fmt(8+16) + fact(8+4, required for IEEE float) + data(8+n).
@@ -198,10 +185,9 @@ public static class IrGenerator
 
         writer.Write("data"u8);
         writer.Write(dataBytes);
-        for (var i = 0; i < frames; i++)
+        foreach (var sample in samples)
         {
-            writer.Write(left[i]);
-            writer.Write(right[i]);
+            writer.Write(sample);
         }
 
         writer.Flush();

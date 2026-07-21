@@ -135,7 +135,10 @@ public sealed class AppServices : IDisposable
                 CleanStaleIrFiles(layout.IrDirectory);
             }
 
-            return $"ir\\{fileName}";
+            // Return the ABSOLUTE path. Equalizer APO's resolution of relative Convolution paths
+            // (relative to the config root vs. the included file's folder) is ambiguous enough that
+            // a wrong guess means the reverb silently never loads — an absolute path removes all doubt.
+            return fullPath;
         }
         catch
         {
