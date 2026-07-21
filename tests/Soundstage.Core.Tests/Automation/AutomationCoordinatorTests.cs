@@ -205,15 +205,19 @@ public class AutomationCoordinatorTests
     }
 
     [Fact]
-    public void PrebuiltRules_ShipDisabled_AndDoNothingUntilEnabled()
+    public void NewProfiles_StartWithZeroRules_AndPrebuiltsShipDisabledAndInert()
     {
+        // Zero automations by default — nothing fires until the user adds a quick-start card.
         var freshProfile = new SoundstageState().GetOrCreateProfile("{d}", "X");
-        Assert.Equal(5, freshProfile.Rules.Count);
-        Assert.All(freshProfile.Rules, r => Assert.False(r.Enabled));
-        Assert.All(freshProfile.Rules, r => Assert.True(r.IsPrebuilt));
+        Assert.Empty(freshProfile.Rules);
+
+        // The prebuilt set offered for adding ships disabled and does nothing until enabled.
+        var prebuilt = PrebuiltRules.CreateDefaultSet();
+        Assert.All(prebuilt, r => Assert.False(r.Enabled));
+        Assert.All(prebuilt, r => Assert.True(r.IsPrebuilt));
 
         var result = AutomationEngine.Evaluate(
-            freshProfile.Rules,
+            prebuilt,
             new AudioEnvironmentSnapshot(DateTimeOffset.Parse("2026-07-20T23:00:00+02:00"), "{d}", "X", 6, 48000, 24, SpatialAudioState.Unknown, ["Spotify"]));
         Assert.Empty(result.EffectiveActions);
     }

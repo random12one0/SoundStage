@@ -50,14 +50,15 @@ public class SoundstageControllerTests : IDisposable
     public void Dispose() => _controller.Dispose();
 
     [Fact]
-    public void Initialize_AdoptsDevice_CreatesProfileWithPrebuiltRules_AndApplies()
+    public void Initialize_AdoptsDevice_CreatesEmptyProfile_AndApplies()
     {
         _controller.Initialize();
 
         var profile = Assert.Single(_controller.State.Profiles);
         Assert.Equal("Onkyo Receiver", profile.FriendlyName);
         Assert.Equal(6, profile.LastKnownChannels);
-        Assert.Equal(5, profile.Rules.Count);
+        // Zero automations by default — prebuilts are offered as quick-start cards to add.
+        Assert.Empty(profile.Rules);
         Assert.True(_fs.FileExists(_layout.ChainFilePath));
         Assert.True(_fs.FileExists(@"C:\AppData\Soundstage\state.json"));
     }

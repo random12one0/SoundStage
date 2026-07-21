@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Soundstage.Core.Automation;
@@ -145,10 +146,20 @@ public partial class RuleEditorViewModel : ObservableObject
         new(ScheduleTrigger.EveryDay.Select(d => new DayChoiceViewModel(d, selected: true)));
 
     [ObservableProperty]
-    private string _startTimeText = "22:00";
+    private string _startTimeText = "10:00 PM";
 
     [ObservableProperty]
-    private string _endTimeText = "06:00";
+    private string _endTimeText = "6:00 AM";
+
+    /// <summary>Accepted time formats — 12-hour (default) and 24-hour, so both "10:00 PM" and "22:00" work.</summary>
+    private static readonly string[] TimeFormats = ["h:mm tt", "hh:mm tt", "h:mmtt", "htt", "H:mm", "HH:mm"];
+
+    internal static bool TryParseTime(string text, out TimeOnly time) =>
+        TimeOnly.TryParseExact(text.Trim(), TimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.None, out time)
+        || TimeOnly.TryParse(text.Trim(), CultureInfo.CurrentCulture, DateTimeStyles.None, out time);
+
+    /// <summary>12-hour display, e.g. "10:00 PM".</summary>
+    internal static string FormatTime(TimeOnly time) => time.ToString("h:mm tt", CultureInfo.InvariantCulture);
 
     // Audio app
     [ObservableProperty]
@@ -239,8 +250,8 @@ public partial class RuleEditorViewModel : ObservableObject
         {
             TriggerKindChoice.Schedule => new ScheduleTrigger(
                 Days.Where(d => d.Selected).Select(d => d.Day).DefaultIfEmpty(DayOfWeek.Monday).ToList(),
-                TimeOnly.TryParseExact(StartTimeText.Trim(), "HH:mm", out var s) ? s : new TimeOnly(22, 0),
-                TimeOnly.TryParseExact(EndTimeText.Trim(), "HH:mm", out var e) ? e : new TimeOnly(6, 0)),
+                TryParseTime(StartTimeText, out var s) ? s : new TimeOnly(22, 0),
+                TryParseTime(EndTimeText, out var e) ? e : new TimeOnly(6, 0)),
             TriggerKindChoice.AudioApp => new AudioAppTrigger(
                 ProcessesText.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                     .DefaultIfEmpty("an app").ToList()),
@@ -264,8 +275,8 @@ public partial class RuleEditorViewModel : ObservableObject
                     day.Selected = s.Days.Contains(day.Day);
                 }
 
-                StartTimeText = s.Start.ToString("HH\\:mm");
-                EndTimeText = s.End.ToString("HH\\:mm");
+                StartTimeText = FormatTime(s.Start);
+                EndTimeText = FormatTime(s.End);
                 break;
             case AudioAppTrigger a:
                 TriggerKind = TriggerKindChoice.AudioApp;
@@ -357,10 +368,9 @@ public partial class RuleEditorViewModel : ObservableObject
                     return null;
                 }
 
-                if (!TimeOnly.TryParseExact(StartTimeText.Trim(), "HH:mm", out var start)
-                    || !TimeOnly.TryParseExact(EndTimeText.Trim(), "HH:mm", out var end))
+                if (!TryParseTime(StartTimeText, out var start) || !TryParseTime(EndTimeText, out var end))
                 {
-                    ValidationError = "Times must look like 22:00.";
+                    ValidationError = "Times must look like 10:00 PM (or 22:00).";
                     return null;
                 }
 
