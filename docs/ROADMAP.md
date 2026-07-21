@@ -26,7 +26,26 @@ headphone illusion the way Boom does.
 - [x] **v0.8.0** — width mid/side scratch-channel matrix fix; bolder ambience IR; dashboard `%`
       readouts; softer selected pills.
 
-## ✅ v0.9.0 — effects that sound right + the repeated asks (this release)
+## ✅ v0.10.0 — real fixes + surround calibration + a VST effect rack (this release)
+
+- [x] **Stereo width — the actual root-cause fix.** Equalizer APO evaluates a single `Copy:` line
+      in parallel, so the scratch/virtual channels we used were unnecessary and were themselves the
+      likely cause of "everything collapses into one speaker" on 7.1. Replaced with a correct
+      single-line L/R matrix that invents no channels and can't misroute surrounds.
+- [x] **Ambience — the deeper fix.** The impulse response was a 2-channel *stereo* file, which APO
+      can't map onto a 7.1 stream, so it silently dropped it. It's now a **mono** IR (APO applies it
+      to every speaker) referenced by absolute path — so it finally loads on a surround receiver.
+- [x] **Fidelity** — a one-knob clarity effect (native presence + air lift).
+- [x] **Speaker calibration tab** — a per-channel level trim (turn the subwoofer down, balance the
+      centre/surrounds) like an AV receiver. Attenuation-only, so it's always safe.
+- [x] **Reset-to-stock** panic button in Settings (Flat preset, all effects off; undoable).
+- [x] **VST effect rack (Enhancers)** — bundled Airwindows (MIT) plug-ins for the DSP native APO
+      can't do: **Virtual Bass, Warmth, Air (a real exciter), Leveler (a real compressor), and a
+      Loudness ceiling**. Parameters are driven via APO's `ChunkData` (verified byte-for-byte), each
+      routed to the front L/R pair. One-click install downloads the pack and extracts just these
+      five DLLs; missing plug-ins are skipped, never breaking audio.
+
+## ✅ v0.9.0 — effects that sound right + the repeated asks
 
 - [x] **Ambience actually works now.** The real bug: the impulse-response file was cached by name,
       so every rework since v0.6 was never written to disk — you kept hearing the old faint one.

@@ -30,6 +30,7 @@ public class XamlSmokeTests
             using var services = AppServices.Build();
             _ = new DashboardPage(services);
             _ = new EffectsPage(services);
+            _ = new SpeakersPage(services);
             _ = new AutomationsPage(services);
             _ = new DevicesPage(services);
             _ = new DiagnosticsPage(services);
