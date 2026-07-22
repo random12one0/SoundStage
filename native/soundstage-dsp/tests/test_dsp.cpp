@@ -1,6 +1,7 @@
 // Unit tests for the Soundstage DSP engine core. Dependency-free (no gtest) so it builds anywhere
 // with a C++17 compiler — including this Linux build host, where we verify the math before it ships.
 #include "soundstage/Biquad.h"
+#include "soundstage/Reverb.h"
 #include "soundstage/SmoothedValue.h"
 
 #include <algorithm>
@@ -109,6 +110,45 @@ void testSmoothing() {
     check(!s.isSmoothing() && s.current() == 0.25, "setCurrentAndTarget jumps immediately");
 }
 
+// The reverb must stay finite, actually decay (a tail that dies away), and bypass cleanly at mix 0.
+void testReverb() {
+    soundstage::Reverb rev;
+    rev.prepare(kFs);
+    rev.setDecaySeconds(2.0);
+    rev.setSize(0.7);
+    rev.setDamping(0.5);
+    rev.setPreDelayMs(20.0);
+    rev.setWidth(0.8);
+    rev.setMix(1.0);  // full wet, so we measure the tail
+
+    // Impulse in, then silence.
+    double eEarly = 0.0, eLate = 0.0, eVeryLate = 0.0;
+    bool allFinite = true;
+    double l = 1.0, r = 1.0;
+    for (int n = 0; n < static_cast<int>(kFs * 5); ++n) {
+        rev.process(l, r);
+        if (!std::isfinite(l) || !std::isfinite(r)) allFinite = false;
+        const double e = l * l + r * r;
+        if (n < static_cast<int>(kFs * 0.3)) eEarly += e;
+        else if (n < static_cast<int>(kFs * 1.5)) eLate += e;
+        else if (n >= static_cast<int>(kFs * 4.0)) eVeryLate += e;
+        l = 0.0; r = 0.0;  // no further input
+    }
+    check(allFinite, "reverb output stays finite (no blow-up)");
+    check(eEarly > 0.0, "reverb produces a wet signal");
+    check(eLate < eEarly, "reverb tail decays over time");
+    check(eVeryLate < eLate * 1e-3, "reverb tail dies away to near silence");
+
+    // Mix 0 must be an exact bypass (dry preserved).
+    soundstage::Reverb dryRev;
+    dryRev.prepare(kFs);
+    dryRev.setMix(0.0);
+    double a = 0.42, b = -0.17;
+    dryRev.process(a, b);
+    checkClose(a, 0.42, 1e-9, "reverb at mix 0 passes left through");
+    checkClose(b, -0.17, 1e-9, "reverb at mix 0 passes right through");
+}
+
 struct Test { const char* name; void (*fn)(); };
 
 }  // namespace
@@ -120,6 +160,7 @@ int main() {
         {"lowpass", testLowpass},
         {"process/stability", testProcessStable},
         {"smoothing", testSmoothing},
+        {"reverb", testReverb},
     };
 
     for (const auto& t : tests) {

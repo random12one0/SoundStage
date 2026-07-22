@@ -18,3 +18,9 @@ else()
     target_compile_options(soundstage_dsp_tests PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME soundstage_dsp_tests COMMAND soundstage_dsp_tests)
+
+# Render tool: run a test signal through the engine and write dry/wet WAVs, so the sound can be
+# checked by ear. Demo/preview only — not part of the shipped engine.
+add_executable(soundstage_render tools/render.cpp)
+target_link_libraries(soundstage_render PRIVATE soundstage_dsp)
+target_include_directories(soundstage_render PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/tools)

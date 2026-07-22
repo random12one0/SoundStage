@@ -27,15 +27,19 @@ ctest --test-dir native/soundstage-dsp/build --output-on-failure
 
 CI runs exactly this on every push (Linux job).
 
-## What's here today (step 1 of the engine)
+## What's here today
 
 - `Biquad` — double-precision RBJ-cookbook biquad (peaking, low/high shelf, low/high-pass) with a
   `magnitude()` helper for tests and the future UI curve. The building block of the EQ.
 - `SmoothedValue` — per-sample linear parameter smoothing; the mechanism behind "can never pop".
-- Unit tests proving filter magnitudes match the cookbook and that smoothing is bounded, monotonic,
-  and lands exactly on target.
+- `Reverb` — our own reverb, an 8-line Feedback Delay Network (Hadamard feedback + per-line damping
+  + input diffusion), with size / decay / damping / pre-delay / width / mix. This is the "Ambience".
+- Unit tests: filter magnitudes match the cookbook; smoothing is bounded/monotonic/exact; the reverb
+  stays finite, decays to silence, and bypasses cleanly at mix 0.
+- `tools/render.cpp` — runs a test signal through the engine and writes dry/wet WAVs, so the sound
+  can be checked **by ear** before the Windows app exists.
 
 ## Coming next (each with tests)
 
-Our reverb (FDN) · compressor/limiter · bass enhancement · stereo width · stereo→5.1/7.1 surround
-upmix → then the virtual-audio driver that hosts it, then the C# app + WebView2 UI.
+Compressor/limiter · bass enhancement · stereo width · stereo→5.1/7.1 surround upmix → then the
+virtual-audio driver that hosts it, then the C# app + WebView2 UI.
