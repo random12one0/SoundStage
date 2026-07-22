@@ -29,21 +29,17 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Test (release gate)
-        run: dotnet test Soundstage.sln -c Release
+      - name: Build (release gate)
+        run: dotnet build Soundstage.sln -c Release
 
-      - name: Publish portable EXE
+      - name: Publish portable EXE (v1.0 shell)
         run: >
-          dotnet publish src/Soundstage.App/Soundstage.App.csproj
+          dotnet publish src/Soundstage.Shell/Soundstage.Shell.csproj
           -c Release -r win-x64 --self-contained
           -p:PublishSingleFile=true
           -p:EnableCompressionInSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
-
-      - name: Build installer
-        shell: pwsh
-        run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\Soundstage.iss'
 
       - name: Create GitHub Release
         shell: pwsh
@@ -52,21 +48,22 @@ jobs:
           VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           $notes = @"
-          ## Soundstage $env:VERSION
+          ## Soundstage $env:VERSION — v1.0 preview (new app, new UI)
 
-          A modern front-end and automation layer for Equalizer APO — system-wide EQ, night mode, loudness, automations, and 8,600+ bundled headphone corrections.
+          The first build of the completely rebuilt Soundstage v1.0: **our own audio engine, our own UI, nothing carried over** from the old Equalizer-APO version.
 
-          ### Getting started
-          1. Install [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) on your output device and reboot (one-time).
-          2. Download **Soundstage-Setup.exe** below and run it — or grab the portable **Soundstage.exe** if you prefer no installer.
-          3. In Soundstage, click **Take control** (your existing config is backed up first).
-          4. Pick a preset. Done.
+          ### What this preview is
+          The real app **UI running natively** — so you can open it on your PC and click through the actual design (dashboard, EQ, speakers, ambience, automations, settings).
 
-          **Dolby Atmos users:** run **Diagnostics → Start 8-second test** once while music plays — if the sound clearly muffles, APO is genuinely in your signal path. Details in [docs/ATMOS-VALIDATION.md](https://github.com/${{ github.repository }}/blob/$env:VERSION/docs/ATMOS-VALIDATION.md).
+          ### What it does NOT do yet
+          **Process audio.** The DSP engine (our own reverb, EQ, compressor, bass, stereo width, surround upmix — all built and tested) and the **virtual audio driver** that routes your system sound through it are wired in over the next builds. This one is look-and-feel, running for real.
+
+          ### Run it
+          Download **Soundstage.exe** below and run it — no install needed. If Windows prompts for the **WebView2 runtime**, it's a free Microsoft component already on most Windows 10/11 machines. Requires 64-bit Windows 10/11.
           "@
           gh release create "$env:VERSION" `
             "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `
-            "installer/Output/Soundstage-Setup.exe#Soundstage-Setup.exe (installer)" `
             --target "${{ github.sha }}" `
             --title "Soundstage $env:VERSION" `
+            --prerelease `
             --notes $notes

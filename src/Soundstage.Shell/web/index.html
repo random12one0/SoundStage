@@ -1,0 +1,555 @@
+<style>
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(120% 90% at 82% -10%,#33404e 0%,transparent 55%),radial-gradient(90% 80% at 0% 110%,#232a34 0%,transparent 50%),#2b313b;min-height:100vh;color:#e6edf2;}
+  .bar{position:sticky;top:0;z-index:50;background:#0f131acc;backdrop-filter:blur(12px);border-bottom:1px solid #232a34;padding:9px clamp(12px,4vw,26px);}
+  .bar .in{max-width:1120px;margin:0 auto;display:flex;gap:12px;align-items:center;}
+  .bm{font-weight:680;font-size:14px;color:#eef2f6;}.bm span{color:#8b95a2;font-weight:500;}
+  .cap{max-width:1120px;margin:8px auto 0;font-size:12px;color:#8b95a2;line-height:1.5;}.cap b{color:#cfd6de;}
+
+  .desk{max-width:1120px;margin:0 auto;padding:clamp(14px,3vw,26px);}
+  .app{--bg:#111823;--surf:#161f2b;--surf2:#1b2632;--line:#26323f;--soft-line:#ffffff0d;--glow:#37e0cf;--glow-ink:#8ff4ea;--amber:#ffbf6b;--ink:#e8eff4;--dim:#93a3b1;--faint:#61717e;--r:14px;
+    border-radius:16px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.5),0 3px 12px rgba(0,0,0,.3);animation:in .5s cubic-bezier(.2,.7,.2,1) both;font-family:"Bahnschrift","Segoe UI Variable",system-ui,sans-serif;}
+  @keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  .ico{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block;}
+  .tb{display:flex;align-items:center;height:42px;padding:0 8px 0 16px;gap:10px;background:linear-gradient(#182230,#131b26);border-bottom:1px solid #0c1118;}
+  .tb .name{font-weight:600;font-size:13px;letter-spacing:.04em;display:flex;align-items:center;gap:9px;color:#d6dee6;}
+  .tb .name .lg{width:17px;height:17px;color:var(--glow);filter:drop-shadow(0 0 5px #37e0cf88);}
+  .tb .wb{margin-left:auto;display:flex;}.tb .wb b{width:42px;height:42px;display:grid;place-items:center;color:#7f8a96;}.tb .wb b svg{width:11px;height:11px;}
+  .shell{display:grid;grid-template-columns:64px 1fr;background:var(--bg);}
+  .rail{background:linear-gradient(#141c27,#111823);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:5px;}
+  .rail a{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;color:#6a7885;cursor:pointer;transition:.16s;position:relative;}
+  .rail a:hover{color:#cdd6de;background:#ffffff08;}
+  .rail a.on{color:var(--glow);background:#37e0cf14;box-shadow:inset 0 0 0 1px #37e0cf3a,0 0 18px #37e0cf22;}
+  .rail a.on::before{content:"";position:absolute;left:-13px;top:50%;transform:translateY(-50%);width:3px;height:18px;border-radius:2px;background:var(--glow);box-shadow:0 0 10px var(--glow);}
+  .rail .sp{flex:1;}
+  .content{position:relative;}
+  .inner{padding:14px;display:flex;flex-direction:column;gap:12px;}
+
+  .panel{background:var(--surf);border:1px solid var(--line);border-radius:var(--r);box-shadow:inset 0 1px 0 var(--soft-line);}
+  .pad{padding:15px 17px;}
+  .ph{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .ph h3{margin:0;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);}
+  .ph h3.big{font-size:16px;letter-spacing:-.01em;text-transform:none;color:var(--ink);font-weight:680;}
+  .ph .sub{font-size:11.5px;color:var(--dim);}
+  .ph .rt{margin-left:auto;display:flex;gap:8px;align-items:center;}
+
+  /* status */
+  .screen{display:flex;align-items:center;gap:16px;padding:12px 16px;background:radial-gradient(120% 180% at 12% 0%,#1a2634,#131b26);border:1px solid var(--line);border-radius:var(--r);flex-wrap:wrap;}
+  .np{display:flex;align-items:center;gap:12px;min-width:0;}
+  .bars{display:flex;align-items:flex-end;gap:2px;height:24px;width:24px;}
+  .bars i{width:3.4px;background:var(--glow);border-radius:2px;transform-origin:bottom;box-shadow:0 0 6px #37e0cf99;animation:b 1.1s ease-in-out infinite;}
+  .bars i:nth-child(1){height:45%}.bars i:nth-child(2){height:85%;animation-delay:.16s}.bars i:nth-child(3){height:60%;animation-delay:.32s}.bars i:nth-child(4){height:100%;animation-delay:.48s}
+  @keyframes b{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+  .np .src{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);opacity:.85;}
+  .np .trk{font-size:16px;font-weight:600;color:var(--ink);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:24vw;}
+  .fmt{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);background:#0e1620;border:1px solid var(--line);border-radius:9px;padding:5px 10px;}
+  .fmt b{color:var(--amber);}
+  .tools{margin-left:auto;display:flex;align-items:center;gap:13px;}
+  .power{font:inherit;font-weight:600;font-size:12px;letter-spacing:.06em;color:var(--glow);background:#0e1c1f;border:1px solid #2b5a57;border-radius:11px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .power .d{width:8px;height:8px;border-radius:50%;background:var(--glow);box-shadow:0 0 8px var(--glow);}
+  .power.off{color:var(--faint);border-color:var(--line);background:#0e1620;}.power.off .d{background:var(--faint);box-shadow:none;}
+  .voldial{display:flex;align-items:center;gap:9px;}
+  .voldial .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);}
+  .vd{width:50px;height:50px;cursor:ns-resize;}
+  .voldial .vn{font-family:ui-monospace,monospace;font-size:13px;color:var(--ink);}
+
+  /* pages */
+  .page{display:none;flex-direction:column;gap:12px;}
+  .page.show{display:flex;animation:fade .28s ease both;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:none;}}
+
+  /* preset dropdown / seg */
+  .pdd{position:relative;}
+  .pddbtn{font:inherit;font-size:12px;font-weight:560;color:var(--ink);background:#0e1620;border:1px solid var(--line);border-radius:9px;padding:6px 11px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+  .pddbtn .pn{color:var(--glow-ink);}.pddbtn .pfx{color:var(--faint);font-weight:500;}.pddbtn svg{width:13px;height:13px;stroke:var(--dim);}
+  .pddmenu{position:absolute;top:calc(100% + 6px);right:0;z-index:20;min-width:180px;background:#131c26;border:1px solid var(--line);border-radius:11px;box-shadow:0 18px 40px rgba(0,0,0,.5);padding:6px;display:none;}
+  .pdd.open .pddmenu{display:block;}
+  .pddmenu a{display:block;font-size:13px;color:var(--dim);padding:7px 10px;border-radius:7px;cursor:pointer;}
+  .pddmenu a:hover{background:#ffffff08;color:var(--ink);}.pddmenu a.on{color:var(--glow);background:#37e0cf12;}
+  .pddmenu a.add{color:var(--glow);border-top:1px solid var(--line);margin-top:4px;}
+  .seg{display:flex;background:#0e1620;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;}
+  .seg button{font:inherit;font-size:11px;font-weight:560;color:var(--dim);background:transparent;border:0;border-radius:7px;padding:5px 10px;cursor:pointer;}
+  .seg button.on{background:#37e0cf1c;color:var(--glow-ink);box-shadow:inset 0 0 0 1px #37e0cf40;}
+  .ghost{font:inherit;font-size:11px;color:var(--dim);background:transparent;border:1px solid var(--line);border-radius:9px;padding:6px 11px;cursor:pointer;}
+  .ghost:hover{color:var(--ink);border-color:var(--glow);}
+  .btn{font:inherit;font-size:12px;font-weight:560;color:var(--glow);background:#0e1c1f;border:1px solid #2b5a57;border-radius:9px;padding:7px 13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+  .btn:hover{box-shadow:0 0 14px #37e0cf33;border-color:var(--glow);}.btn svg{width:13px;height:13px;}
+
+  /* EQ */
+  .row{display:grid;grid-template-columns:1.55fr 1fr;gap:12px;align-items:stretch;}
+  @media(max-width:820px){.row{grid-template-columns:1fr;}}
+  .colL{display:flex;flex-direction:column;gap:12px;min-width:0;}
+  .colL .eqpanel{flex:1;display:flex;flex-direction:column;}
+  .fxpanel{display:flex;flex-direction:column;height:100%;}
+  .geqwrap{background:linear-gradient(#0d141d,#0b1119);border:1px solid var(--line);border-radius:12px;padding:15px 15px 11px;flex:1;display:flex;flex-direction:column;}
+  .geqbars{position:relative;flex:1;min-height:150px;display:flex;gap:7px;}
+  .zeroline{position:absolute;left:0;right:0;top:50%;height:1px;background:#31485a;z-index:1;}
+  .zerolab{position:absolute;right:2px;top:calc(50% - 13px);font-family:ui-monospace,monospace;font-size:9px;color:var(--faint);}
+  .band{flex:1;position:relative;}
+  .btrackline{position:absolute;left:50%;top:0;bottom:0;width:5px;transform:translateX(-50%);background:#0e1822;border-radius:4px;}
+  .bfill{position:absolute;left:50%;width:5px;transform:translateX(-50%);background:linear-gradient(#37e0cf,#1a9d92);border-radius:4px;box-shadow:0 0 8px #37e0cf44;z-index:2;}
+  .bhandle{position:absolute;left:50%;width:14px;height:14px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);box-shadow:0 0 10px #37e0cf88;cursor:grab;transition:transform .12s;z-index:3;}
+  .bhandle:hover{transform:translate(-50%,-50%) scale(1.28);}
+  .hzrow{display:flex;gap:7px;margin-top:9px;}
+  .hzrow span{flex:1;text-align:center;font-family:ui-monospace,monospace;font-size:9px;color:var(--faint);}
+
+  /* radial effects */
+  .fxgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;flex:1;align-content:space-evenly;}
+  .radial{display:flex;flex-direction:column;align-items:center;gap:5px;padding:10px 4px 8px;border-radius:12px;cursor:pointer;transition:.16s;}
+  .radial:hover{background:#ffffff06;}
+  .radial svg{width:76px;height:76px;}
+  .radial .rl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);}
+  .radial .rv{font-family:ui-monospace,monospace;font-size:11px;color:var(--glow-ink);}
+  .radial.off{opacity:.4;}.radial.off .rv{color:var(--faint);}
+
+  /* output line */
+  .out{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;}
+  .out .oi{width:34px;height:34px;border-radius:10px;background:var(--surf2);border:1px solid var(--line);display:grid;place-items:center;color:var(--glow);flex:none;}
+  .out .on-name{font-size:13px;font-weight:600;color:var(--ink);}
+  .out .os{font-size:11px;color:var(--dim);margin-top:1px;}
+  .out .badge{margin-left:auto;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--glow);border:1px solid #37e0cf44;border-radius:8px;padding:5px 11px;}
+  .out .cv{color:var(--faint);margin-left:8px;}
+
+  /* toggles */
+  .sw{width:44px;height:24px;border-radius:12px;background:#0b1119;border:1px solid var(--line);position:relative;cursor:pointer;flex:none;transition:.2s;}
+  .sw .k{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#4d5a67;transition:.2s;}
+  .sw.on{background:linear-gradient(#0c2b29,#0b201f);border-color:#37e0cf88;box-shadow:0 0 10px #37e0cf33;}
+  .sw.on .k{left:22px;background:var(--glow);box-shadow:0 0 8px var(--glow);}
+
+  /* speakers */
+  .calib{display:flex;gap:9px;}
+  .strip{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--line);border-radius:12px;padding:13px 6px;transition:.16s;}
+  .strip .cl{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.06em;color:var(--ink);}
+  .strip .cn{font-size:9px;letter-spacing:.04em;color:var(--faint);text-transform:uppercase;margin-top:-6px;}
+  .fader{position:relative;height:150px;width:100%;}
+  .ftrack{position:absolute;left:50%;top:0;bottom:0;width:5px;transform:translateX(-50%);background:#0e1822;border-radius:4px;}
+  .fzero{position:absolute;left:calc(50% - 13px);width:26px;top:50%;height:1px;background:#31485a;}
+  .ffill{position:absolute;left:50%;width:5px;transform:translateX(-50%);background:linear-gradient(#37e0cf,#1a9d92);border-radius:4px;box-shadow:0 0 8px #37e0cf44;}
+  .fhandle{position:absolute;left:50%;width:16px;height:16px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);box-shadow:0 0 10px #37e0cf88;cursor:grab;transition:transform .15s,box-shadow .15s;}
+  .fhandle:hover{transform:translate(-50%,-50%) scale(1.2);}
+  .strip .db{font-family:ui-monospace,monospace;font-size:11px;color:var(--glow-ink);}
+  .strip .test{width:30px;height:30px;border-radius:9px;background:#0e1620;border:1px solid var(--line);display:grid;place-items:center;color:var(--dim);cursor:pointer;transition:.15s;}
+  .strip .test svg{width:13px;height:13px;}
+  .strip .test:hover{color:var(--ink);border-color:#37e0cf66;}
+  .strip.sub .ffill{background:linear-gradient(#ffbf6b,#b5822f);box-shadow:0 0 8px #ffbf6b44;}
+  .strip.sub .fhandle{border-color:var(--amber);box-shadow:0 0 10px #ffbf6b88;}.strip.sub .db{color:var(--amber);}
+  .strip.playing{border-color:var(--glow);box-shadow:0 0 22px #37e0cf22;}
+  .strip.playing .test{color:var(--glow);border-color:var(--glow);box-shadow:0 0 14px #37e0cf55;}
+  .strip.playing .fhandle{box-shadow:0 0 18px var(--glow);}
+  .umrow{display:flex;align-items:center;gap:14px;padding:15px 17px;}
+  .umrow .umi{width:38px;height:38px;border-radius:11px;background:var(--surf2);border:1px solid var(--line);display:grid;place-items:center;color:var(--glow);flex:none;}
+  .umrow .umt{flex:1;}.umrow .umn{font-size:13.5px;font-weight:600;color:var(--ink);}.umrow .umd{font-size:11.5px;color:var(--dim);margin-top:2px;}
+
+  /* ambience + settings rows */
+  .lrow{display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px solid var(--soft-line);}
+  .lrow:last-child{border-bottom:0;}
+  .lrow .ll{width:130px;flex:none;font-size:13px;font-weight:560;color:var(--ink);}
+  .lrow .ld{font-size:11.5px;color:var(--faint);width:100%;margin-top:-6px;padding-left:0;}
+  .sl{flex:1;position:relative;height:5px;border-radius:4px;background:#0e1620;cursor:pointer;min-width:80px;}
+  .sl i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:linear-gradient(90deg,#1a9d92,#37e0cf);box-shadow:0 0 8px #37e0cf44;}
+  .sl b{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);cursor:grab;}
+  .val{width:52px;text-align:right;font-family:ui-monospace,monospace;font-size:11.5px;color:var(--glow-ink);flex:none;}
+  .setgroup{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:6px 2px 2px;}
+  .setrow{display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px solid var(--soft-line);}
+  .setrow:last-child{border-bottom:0;}
+  .setrow .st{flex:1;}.setrow .stn{font-size:13.5px;font-weight:560;color:var(--ink);}.setrow .std{font-size:11.5px;color:var(--faint);margin-top:2px;}
+  .statusok{font-family:ui-monospace,monospace;font-size:11.5px;color:var(--glow);}
+
+  /* automations cards */
+  .ahd{display:flex;align-items:center;gap:14px;}.ahd .t{flex:1;}
+  .ahd h2{margin:0;font-size:19px;font-weight:680;letter-spacing:-.01em;color:var(--ink);}.ahd .s{font-size:12.5px;color:var(--dim);margin-top:3px;}
+  .newbtn{font:inherit;font-size:13px;font-weight:600;color:#08131a;background:var(--glow);border:0;border-radius:11px;padding:9px 15px;cursor:pointer;display:flex;align-items:center;gap:7px;box-shadow:0 0 16px #37e0cf33;}
+  .newbtn svg{width:15px;height:15px;stroke-width:2.2;}
+  .seclab{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin:4px 2px 0;}
+  .autos{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media(max-width:760px){.autos{grid-template-columns:1fr;}}
+  .acard{display:flex;align-items:center;gap:14px;padding:15px 16px;background:var(--surf);border:1px solid var(--line);border-radius:15px;box-shadow:inset 0 1px 0 var(--soft-line);transition:.16s;}
+  .acard:hover{border-color:#3a4a5a;}
+  .atile{width:44px;height:44px;border-radius:13px;display:grid;place-items:center;flex:none;}.atile svg{width:22px;height:22px;stroke-width:1.8;}
+  .t-violet{background:#9e6bff1f;color:#b492ff;}.t-amber{background:#ffbf6b1f;color:#ffce93;}.t-cyan{background:#37e0cf1f;color:#65e7db;}.t-green{background:#4fd39a1f;color:#7fe3b9;}.t-blue{background:#5b9dff1f;color:#8bbaff;}.t-rose{background:#ff6b8b1f;color:#ff98ac;}
+  .abody{flex:1;min-width:0;}.awhen{font-size:12px;color:var(--dim);}.athen{font-size:14.5px;font-weight:600;color:var(--ink);margin-top:3px;display:flex;align-items:center;gap:7px;}.athen .ar{color:var(--glow);}
+  .acard.off .athen{color:var(--dim);}.acard.off .atile{opacity:.5;}
+  .sugs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media(max-width:760px){.sugs{grid-template-columns:1fr;}}
+  .sug{display:flex;align-items:center;gap:12px;padding:14px 15px;border:1px dashed #33414f;border-radius:15px;cursor:pointer;transition:.16s;background:#131c2688;}
+  .sug:hover{border-color:var(--glow);background:#152029;}
+  .sug .stile{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;background:#1b2632;color:var(--dim);}.sug .stile svg{width:19px;height:19px;}
+  .sug:hover .stile{color:var(--glow);}.sbody{flex:1;min-width:0;}.sug .sw2{font-size:11.5px;color:var(--dim);}.sug .sth{font-size:13.5px;font-weight:600;color:var(--ink);margin-top:2px;}.sug .add{color:var(--glow);flex:none;}.sug .add svg{width:18px;height:18px;stroke-width:2.2;}
+
+  /* ===== builder ===== */
+  .scr{display:none;}.scr.show{display:block;animation:fade .26s ease both;}
+  .bhd{display:flex;align-items:center;gap:12px;margin-bottom:18px;}
+  .bhd .back{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:#0e1620;display:grid;place-items:center;color:var(--dim);cursor:pointer;flex:none;}
+  .bhd .nm{flex:1;}.bhd .nm input{width:100%;max-width:340px;background:transparent;border:0;border-bottom:1.5px solid var(--line);color:var(--ink);font:inherit;font-size:19px;font-weight:680;padding:4px 2px;letter-spacing:-.01em;}
+  .bhd .nm input::placeholder{color:var(--faint);}.bhd .nm input:focus{outline:0;border-color:var(--glow);}
+  .bhd .cancel{font:inherit;font-size:13px;color:var(--dim);background:transparent;border:0;cursor:pointer;padding:9px;}
+  .bhd .done{font:inherit;font-size:13px;font-weight:600;color:#08131a;background:var(--glow);border:0;border-radius:10px;padding:9px 18px;cursor:pointer;box-shadow:0 0 16px #37e0cf33;}
+  .seclab.mt{margin-top:22px;}
+  .emptyrow{width:100%;font:inherit;font-size:13.5px;font-weight:560;color:var(--glow);background:transparent;border:1.5px dashed #33414f;border-radius:14px;padding:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:9px;transition:.15s;}
+  .emptyrow:hover{border-color:var(--glow);background:#152029;}.emptyrow svg{width:16px;height:16px;stroke-width:2.2;}
+  .emptyhint{font-size:12.5px;color:var(--faint);padding:2px 2px 10px;}
+  .stack{display:flex;flex-direction:column;gap:0;}
+  .barrow{display:flex;align-items:center;gap:13px;padding:13px 15px;background:var(--surf);border:1px solid var(--line);border-radius:14px;box-shadow:inset 0 1px 0 var(--soft-line);}
+  .handle{color:var(--faint);cursor:grab;font-size:18px;line-height:.6;letter-spacing:-3px;flex:none;user-select:none;}
+  .btile{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:none;}.btile svg{width:20px;height:20px;stroke-width:1.8;}
+  .bmain{flex:1;min-width:0;display:flex;align-items:center;gap:8px 11px;flex-wrap:wrap;}
+  .btitle{font-size:13.5px;font-weight:600;color:var(--ink);}.bsub{font-size:11px;color:var(--faint);width:100%;margin-top:-2px;}
+  .brm{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--faint);cursor:pointer;border:1px solid transparent;}
+  .brm:hover{color:#ff98ac;border-color:#ff6b8b44;background:#ff6b8b12;}.brm svg{width:14px;height:14px;}
+  .conn{height:14px;width:2px;background:#2b3a48;margin-left:35px;}
+  .andlabel{font-size:10px;font-weight:700;letter-spacing:.14em;color:var(--faint);margin:8px 0 8px 15px;}
+  .cfg-dd{font:inherit;font-size:12.5px;font-weight:560;color:var(--glow-ink);background:#0e1620;border:1px solid #2b3a48;border-radius:9px;padding:7px 11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;}
+  .cfg-dd:hover{border-color:var(--glow);}.cfg-dd svg{width:12px;height:12px;stroke:var(--dim);pointer-events:none;}
+  .cfg-word{font-size:12.5px;color:var(--dim);}
+  .cfg-sl{position:relative;height:5px;border-radius:4px;background:#0e1620;width:110px;flex:none;}
+  .cfg-sl i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:linear-gradient(90deg,#1a9d92,#37e0cf);box-shadow:0 0 8px #37e0cf44;}
+  .cfg-sl b{position:absolute;top:50%;width:13px;height:13px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);cursor:grab;}
+  .cfg-pct{font-family:ui-monospace,monospace;font-size:11px;color:var(--glow-ink);min-width:30px;}
+  .cfg-pills{display:flex;background:#0e1620;border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px;}
+  .cfg-pills button{font:inherit;font-size:11.5px;font-weight:600;color:var(--dim);background:transparent;border:0;border-radius:7px;padding:5px 11px;cursor:pointer;}
+  .cfg-pills button.on{background:#37e0cf1c;color:var(--glow-ink);box-shadow:inset 0 0 0 1px #37e0cf40;}
+  .cfg-in{font:inherit;font-size:12.5px;color:var(--ink);background:#0e1620;border:1px solid #2b3a48;border-radius:9px;padding:7px 11px;min-width:170px;flex:1;}
+  .cfg-in:focus{outline:0;border-color:var(--glow);}
+  .andbtn,.addact{font:inherit;font-size:12.5px;font-weight:560;color:var(--glow);background:transparent;border:1px dashed #33414f;border-radius:12px;padding:11px 15px;cursor:pointer;display:flex;align-items:center;gap:9px;transition:.15s;}
+  .andbtn{margin-top:10px;}.addact{margin-top:12px;width:100%;justify-content:center;}
+  .andbtn:hover,.addact:hover{border-color:var(--glow);background:#152029;}.andbtn svg,.addact svg{width:15px;height:15px;stroke-width:2.2;}
+  .phd{display:flex;align-items:center;gap:12px;margin-bottom:16px;}
+  .phd .back{width:32px;height:32px;border-radius:9px;border:1px solid var(--line);background:#0e1620;display:grid;place-items:center;color:var(--dim);cursor:pointer;flex:none;}
+  .phd h2{margin:0;font-size:17px;font-weight:680;color:var(--ink);}
+  .search{flex:1;max-width:260px;margin-left:auto;font:inherit;font-size:13px;color:var(--ink);background:#0e1620;border:1px solid var(--line);border-radius:10px;padding:9px 13px;}
+  .search:focus{outline:0;border-color:var(--glow);}
+  .pgroup{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);margin:16px 4px 8px;}.pgroup:first-child{margin-top:0;}
+  .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}@media(max-width:720px){.pgrid{grid-template-columns:1fr;}}
+  .pitem{display:flex;align-items:center;gap:12px;padding:13px 14px;background:var(--surf);border:1px solid var(--line);border-radius:13px;cursor:pointer;transition:.14s;}
+  .pitem:hover{border-color:var(--glow);background:#152029;box-shadow:0 0 16px #37e0cf1c;}
+  .pitem .pt{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;flex:none;}.pitem .pt svg{width:19px;height:19px;}
+  .pitem .pn{font-size:13.5px;font-weight:600;color:var(--ink);}.pitem .pd{font-size:11.5px;color:var(--faint);margin-top:1px;}
+  .ddmenu{position:fixed;z-index:200;background:#131c26;border:1px solid #2b3a48;border-radius:11px;box-shadow:0 18px 40px rgba(0,0,0,.55);padding:6px;min-width:150px;max-height:260px;overflow:auto;}
+  .ddm-item{font-size:13px;color:var(--dim);padding:8px 11px;border-radius:7px;cursor:pointer;white-space:nowrap;}
+  .ddm-item:hover{background:#ffffff08;color:var(--ink);}.ddm-item.on{color:var(--glow);background:#37e0cf12;}
+  .detected{font-size:12px;color:var(--dim);margin-bottom:14px;padding:10px 13px;background:#0e1620;border:1px solid var(--line);border-radius:10px;}.detected b{color:var(--glow-ink);}
+  #valList{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}@media(max-width:720px){#valList{grid-template-columns:1fr 1fr;}}
+  .vitem{padding:12px 13px;background:var(--surf);border:1px solid var(--line);border-radius:11px;cursor:pointer;font-size:13px;font-weight:560;color:var(--ink);text-align:center;transition:.14s;}
+  .vitem:hover{border-color:var(--glow);background:#152029;}
+  .customrow{margin-top:16px;}
+  .customadd{font:inherit;font-size:12.5px;font-weight:560;color:var(--glow);background:transparent;border:1px dashed #33414f;border-radius:11px;padding:11px 15px;cursor:pointer;}
+  .customadd:hover{border-color:var(--glow);background:#152029;}
+  .custominput{display:flex;gap:8px;margin-top:10px;}.custominput input{flex:1;max-width:320px;font:inherit;font-size:13px;color:var(--ink);background:#0e1620;border:1px solid #2b3a48;border-radius:10px;padding:9px 13px;}.custominput input:focus{outline:0;border-color:var(--glow);}
+  .custominput button{font:inherit;font-size:13px;font-weight:600;color:#08131a;background:var(--glow);border:0;border-radius:10px;padding:9px 16px;cursor:pointer;}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-6.5 8 6.5"/><path d="M6.5 9.8V19h11V9.8"/></symbol>
+  <symbol id="i-eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16"/><circle cx="6" cy="9" r="2"/><circle cx="12" cy="15" r="2"/><circle cx="18" cy="8" r="2"/></symbol>
+  <symbol id="i-spk" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M17 8.5a5 5 0 0 1 0 7"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 12c2.5-5 5-5 7.5 0s5 5 7.5 0 3-3 5 0"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-app" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="8" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/><rect x="13" y="13" width="8" height="8" rx="2"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 0 1-10 0z M12 16v5"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><path d="M6 3v6a4 4 0 0 0 4 4h8"/><path d="M15 10l3 3-3 3"/></symbol>
+  <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.8 6.8a8 8 0 1 0 10.4 0"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M3 9.5h18M3 14.5h18M8.5 4v16M15.5 4v16"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.2 6.2 0 0 0 10.5 10.5z"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l10-2v13"/><circle cx="6.5" cy="18" r="2.6"/><circle cx="16.5" cy="16" r="2.6"/></symbol>
+  <symbol id="i-head" viewBox="0 0 24 24"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.6"/><rect x="17" y="14" width="4" height="6" rx="1.6"/></symbol>
+  <symbol id="i-game" viewBox="0 0 24 24"><rect x="2.5" y="8" width="19" height="9" rx="4.5"/><path d="M7.5 12.5h-2.4M6.3 11.3v2.4"/><circle cx="16" cy="11.6" r="1.1"/><circle cx="18.4" cy="13.6" r="1.1"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4h3l1.6 4.4-2 1.2a11 11 0 0 0 5 5l1.2-2 4.4 1.6V19a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-min" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-.9 4.5"/><path d="M20 5v6h-6"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></symbol>
+</defs></svg>
+
+<div class="bar">
+  <div class="in"><div class="bm">Soundstage <span>· full clickable prototype — every page, every button</span></div></div>
+  <div class="cap">The whole app wired together. Use the <b>left rail</b> to move between pages. Flip toggles, open the preset dropdowns, drag nothing but click everything — run the speaker tests, build an automation. It won't touch real audio; it's the look &amp; flow, live.</div>
+</div>
+
+<div class="desk">
+  <div class="app">
+    <div class="tb"><span class="name"><svg class="lg ico"><use href="#i-wave"/></svg> Soundstage</span><span class="wb"><b><svg><use href="#i-min"/></svg></b><b><svg><use href="#i-max"/></svg></b><b><svg><use href="#i-x"/></svg></b></span></div>
+    <div class="shell">
+      <nav class="rail">
+        <a data-nav="dashboard" class="on" title="Dashboard"><svg class="ico"><use href="#i-home"/></svg></a>
+        <a data-nav="speakers" title="Speakers"><svg class="ico"><use href="#i-spk"/></svg></a>
+        <a data-nav="ambience" title="Ambience"><svg class="ico"><use href="#i-wave"/></svg></a>
+        <a data-nav="automations" title="Automations"><svg class="ico"><use href="#i-clock"/></svg></a>
+        <span class="sp"></span>
+        <a data-nav="settings" title="Settings"><svg class="ico"><use href="#i-gear"/></svg></a>
+      </nav>
+
+      <div class="content"><div class="inner">
+
+        <!-- STATUS (persistent) -->
+        <div class="screen" id="statusStrip">
+          <div class="np"><div class="bars"><i></i><i></i><i></i><i></i></div><div><div class="src">Now Playing · Spotify</div><div class="trk">Ivy — Frank Ocean</div></div></div>
+          <span class="fmt"><b>2.0 → 7.1</b> · <b>48</b> kHz</span>
+          <div class="tools">
+            <button class="power on" data-power><span class="d"></span> On</button>
+            <div class="voldial"><span class="lab">Vol</span><svg class="vd" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="none" stroke="#1a2531" stroke-width="6" stroke-dasharray="141 189" transform="rotate(135 40 40)" stroke-linecap="round"/><circle cx="40" cy="40" r="30" fill="none" stroke="#37e0cf" stroke-width="6" stroke-dasharray="96 189" transform="rotate(135 40 40)" stroke-linecap="round" style="filter:drop-shadow(0 0 4px #37e0cf)"/><circle cx="40" cy="40" r="20" fill="#141d28" stroke="#2a3846"/><line x1="40" y1="40" x2="58" y2="27" stroke="#8ff4ea" stroke-width="3" stroke-linecap="round"/></svg><span class="vn">68</span></div>
+          </div>
+        </div>
+
+        <!-- ============ DASHBOARD ============ -->
+        <div class="page show" data-page="dashboard">
+          <div class="row">
+            <div class="colL">
+              <section class="panel pad eqpanel">
+                <div class="ph"><h3>Equalizer</h3><div class="rt">
+                  <div class="pdd"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a>Flat</a><a class="on">Cinema</a><a>Music</a><a>Podcast</a></div></div>
+                  <div class="pdd"><button class="pddbtn"><span class="pfx">Yours</span> <span class="pn">Late Night</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a class="on">Late Night</a><a>Gaming</a><a class="add">＋ Save current…</a></div></div>
+                  <div class="seg"><button class="on">10</button><button>31</button></div>
+                </div></div>
+                <div class="geqwrap"><div class="geqbars" data-eq><div class="zeroline"></div><span class="zerolab">0 dB</span></div><div class="hzrow"><span>31</span><span>63</span><span>125</span><span>250</span><span>500</span><span>1k</span><span>2k</span><span>4k</span><span>8k</span><span>16k</span></div></div>
+              </section>
+              <section class="panel out"><div class="oi"><svg class="ico"><use href="#i-spk"/></svg></div><div><div class="on-name">Logitech Z906</div><div class="os">Default output · all system audio</div></div><div class="badge">7.1 surround</div><svg class="ico cv" style="width:17px"><use href="#i-chev"/></svg></section>
+            </div>
+            <section class="panel pad fxpanel">
+              <div class="ph"><h3>Effects</h3></div>
+              <div class="fxgrid">
+                <div class="radial" data-val="62" data-label="Bass"></div>
+                <div class="radial" data-val="40" data-label="Air"></div>
+                <div class="radial off" data-val="30" data-label="Warmth"></div>
+                <div class="radial" data-val="55" data-label="Leveler"></div>
+                <div class="radial" data-val="35" data-label="Ambience"></div>
+                <div class="radial" data-val="45" data-label="Night" data-color="#ffbf6b"></div>
+              </div>
+            </section>
+          </div>
+        </div>
+
+        <!-- ============ SPEAKERS ============ -->
+        <div class="page" data-page="speakers">
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Speaker calibration</h3><span class="sub">Logitech Z906 · 7.1 surround</span><div class="rt"><button class="btn" id="testall"><svg><use href="#i-play"/></svg> Test all</button><button class="ghost">Reset</button></div></div>
+            <div class="calib" id="calib">
+              <div class="strip"><div class="cl">FL</div><div class="cn">Front L</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip"><div class="cl">FR</div><div class="cn">Front R</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip"><div class="cl">C</div><div class="cn">Center</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:50%;height:14.7%"></div><div class="fhandle" style="top:64.7%"></div></div><div class="db">−2.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip sub"><div class="cl">LFE</div><div class="cn">Sub</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:28%;height:22%"></div><div class="fhandle" style="top:28%"></div></div><div class="db">+3.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip"><div class="cl">SL</div><div class="cn">Side L</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:50%;height:7.3%"></div><div class="fhandle" style="top:57.3%"></div></div><div class="db">−1.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip"><div class="cl">SR</div><div class="cn">Side R</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:50%;height:7.3%"></div><div class="fhandle" style="top:57.3%"></div></div><div class="db">−1.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip"><div class="cl">SBL</div><div class="cn">Back L</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+              <div class="strip"><div class="cl">SBR</div><div class="cn">Back R</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+            </div>
+          </section>
+          <section class="panel umrow"><div class="umi"><svg class="ico"><use href="#i-wave"/></svg></div><div class="umt"><div class="umn">Upmix stereo to surround</div><div class="umd">Fill your surround speakers when the source is only stereo (2.0).</div></div><div class="sw" data-sw><div class="k"></div></div></section>
+        </div>
+
+        <!-- ============ AMBIENCE ============ -->
+        <div class="page" data-page="ambience">
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Ambience</h3><span class="sub">our own reverb — depth &amp; space for your speakers</span><div class="rt">
+              <div class="pdd"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a>Subtle</a><a class="on">Cinema Hall</a><a>Concert</a><a>Studio</a><a>Cathedral</a><a class="add">＋ Save current…</a></div></div>
+              <div class="sw on" data-sw><div class="k"></div></div>
+            </div></div>
+            <div class="setgroup">Space</div>
+            <div class="lrow"><span class="ll">Type</span><div class="pdd" style="margin-right:auto"><button class="pddbtn"><span class="pn">Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a>Room</a><a class="on">Hall</a><a>Plate</a><a>Chamber</a><a>Cathedral</a><a>Spring</a></div></div></div>
+            <div class="lrow"><span class="ll">Size</span><div class="sl"><i style="width:60%"></i><b style="left:60%"></b></div><span class="val">60%</span></div>
+            <div class="lrow"><span class="ll">Decay time</span><div class="sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="val">1.8 s</span></div>
+            <div class="lrow"><span class="ll">Pre-delay</span><div class="sl"><i style="width:25%"></i><b style="left:25%"></b></div><span class="val">22 ms</span></div>
+            <div class="setgroup">Tone &amp; character</div>
+            <div class="lrow"><span class="ll">Diffusion</span><div class="sl"><i style="width:75%"></i><b style="left:75%"></b></div><span class="val">75%</span></div>
+            <div class="lrow"><span class="ll">Damping</span><div class="sl"><i style="width:40%"></i><b style="left:40%"></b></div><span class="val">40%</span></div>
+            <div class="lrow"><span class="ll">Early reflections</span><div class="sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="val">50%</span></div>
+            <div class="lrow"><span class="ll">Modulation</span><div class="sl"><i style="width:20%"></i><b style="left:20%"></b></div><span class="val">20%</span></div>
+            <div class="lrow"><span class="ll">Low cut</span><div class="sl"><i style="width:30%"></i><b style="left:30%"></b></div><span class="val">120 Hz</span></div>
+            <div class="lrow"><span class="ll">High cut</span><div class="sl"><i style="width:55%"></i><b style="left:55%"></b></div><span class="val">8 kHz</span></div>
+            <div class="setgroup">Surround &amp; mix</div>
+            <div class="lrow"><span class="ll">Surround spread</span><div class="sl"><i style="width:70%"></i><b style="left:70%"></b></div><span class="val">70%</span></div>
+            <div class="lrow"><span class="ll">Width</span><div class="sl"><i style="width:65%"></i><b style="left:65%"></b></div><span class="val">65%</span></div>
+            <div class="lrow"><span class="ll">Mix</span><div class="sl"><i style="width:35%"></i><b style="left:35%"></b></div><span class="val">35%</span></div>
+          </section>
+          <section class="panel pad" style="padding:13px 17px"><div style="font-size:12px;color:var(--dim)">The sub (LFE) stays dry, so the low end never turns to mud.</div></section>
+        </div>
+
+        <!-- ============ AUTOMATIONS ============ -->
+        <div class="page" data-page="automations">
+          <section class="panel pad"><div class="ahd"><div class="t"><h2>Automations</h2><div class="s">Soundstage switches presets and effects for you — based on what's playing, the time, or your device.</div></div><button class="newbtn" id="newAuto"><svg class="ico"><use href="#i-plus"/></svg> New</button></div></section>
+          <div class="seclab">Your automations</div>
+          <div class="autos">
+            <div class="acard"><div class="atile t-violet"><svg class="ico"><use href="#i-film"/></svg></div><div class="abody"><div class="awhen">When Netflix or a film is playing</div><div class="athen"><span class="ar">→</span> Cinema</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="acard"><div class="atile t-amber"><svg class="ico"><use href="#i-moon"/></svg></div><div class="abody"><div class="awhen">After 10:00 PM</div><div class="athen"><span class="ar">→</span> Night mode on</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="acard"><div class="atile t-cyan"><svg class="ico"><use href="#i-music"/></svg></div><div class="abody"><div class="awhen">When Spotify is playing</div><div class="athen"><span class="ar">→</span> Music</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="acard off"><div class="atile t-green"><svg class="ico"><use href="#i-head"/></svg></div><div class="abody"><div class="awhen">When you plug in headphones</div><div class="athen"><span class="ar">→</span> Headphone profile</div></div><div class="sw" data-sw><div class="k"></div></div></div>
+          </div>
+          <div class="seclab">Quick start — tap to add</div>
+          <div class="sugs">
+            <div class="sug"><div class="stile"><svg class="ico"><use href="#i-game"/></svg></div><div class="sbody"><div class="sw2">When a game launches</div><div class="sth">→ Gaming</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
+            <div class="sug"><div class="stile"><svg class="ico"><use href="#i-phone"/></svg></div><div class="sbody"><div class="sw2">When a call starts</div><div class="sth">→ Voice clarity</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
+            <div class="sug"><div class="stile"><svg class="ico"><use href="#i-cal"/></svg></div><div class="sbody"><div class="sw2">On weekends</div><div class="sth">→ Party</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
+          </div>
+        </div>
+
+        <!-- ============ BUILDER ============ -->
+        <div class="page" data-page="builder">
+          <div class="scr show" id="scr-canvas">
+            <div class="bhd"><div class="back" data-exit><svg class="ico" style="width:17px"><use href="#i-back"/></svg></div><div class="nm"><input placeholder="Automation name" /></div><button class="cancel" data-exit>Cancel</button><button class="done" data-exit>Done</button></div>
+            <div class="seclab">When</div>
+            <button class="emptyrow" data-open="trigger"><svg class="ico"><use href="#i-plus"/></svg> Choose when this runs</button>
+            <div class="stack" id="trigStack"></div>
+            <button class="andbtn" id="addCond" data-open="trigger" style="display:none"><svg class="ico"><use href="#i-plus"/></svg> Add condition</button>
+            <div class="seclab mt">Do</div>
+            <div class="emptyhint" id="emptyDo">Nothing yet — add what should happen.</div>
+            <div class="stack" id="actStack"></div>
+            <button class="addact" data-open="actions"><svg class="ico"><use href="#i-plus"/></svg> Add action</button>
+          </div>
+          <div class="scr" id="scr-trigger">
+            <div class="phd"><div class="back" data-back><svg class="ico" style="width:16px"><use href="#i-back"/></svg></div><h2>When this runs</h2></div>
+            <div class="pgroup">Media</div><div class="pgrid">
+              <div class="pitem" data-trig="app"><span class="pt t-violet"><svg class="ico"><use href="#i-app"/></svg></span><div><div class="pn">When an app plays</div><div class="pd">Netflix, Spotify, a game…</div></div></div>
+              <div class="pitem" data-trig="format"><span class="pt t-cyan"><svg class="ico"><use href="#i-layers"/></svg></span><div><div class="pn">When the source is…</div><div class="pd">Stereo / 5.1 / 7.1 in</div></div></div></div>
+            <div class="pgroup">Time</div><div class="pgrid">
+              <div class="pitem" data-trig="time"><span class="pt t-amber"><svg class="ico"><use href="#i-clock"/></svg></span><div><div class="pn">At a time of day</div><div class="pd">12-hour, repeats daily</div></div></div>
+              <div class="pitem" data-trig="startup"><span class="pt t-green"><svg class="ico"><use href="#i-power"/></svg></span><div><div class="pn">When Soundstage starts</div><div class="pd">On launch</div></div></div></div>
+            <div class="pgroup">Devices</div><div class="pgrid">
+              <div class="pitem" data-trig="device"><span class="pt t-blue"><svg class="ico"><use href="#i-plug"/></svg></span><div><div class="pn">When a device connects</div><div class="pd">Headphones, HDMI, USB DAC</div></div></div></div>
+          </div>
+          <div class="scr" id="scr-actions">
+            <div class="phd"><div class="back" data-back><svg class="ico" style="width:16px"><use href="#i-back"/></svg></div><h2>Add action</h2><input class="search" id="actSearch" placeholder="Search actions…" /></div>
+            <div id="actList">
+              <div class="pgroup">Audio</div><div class="pgrid">
+                <div class="pitem" data-act="preset"><span class="pt t-cyan"><svg class="ico"><use href="#i-layers"/></svg></span><div><div class="pn">Switch preset</div><div class="pd">Cinema, Music, one of yours…</div></div></div>
+                <div class="pitem" data-act="volume"><span class="pt t-blue"><svg class="ico"><use href="#i-spk"/></svg></span><div><div class="pn">Set volume</div><div class="pd">To an exact level</div></div></div></div>
+              <div class="pgroup">Effects</div><div class="pgrid">
+                <div class="pitem" data-act="fxamount"><span class="pt t-green"><svg class="ico"><use href="#i-wave"/></svg></span><div><div class="pn">Set effect amount</div><div class="pd">Bass, Ambience, Air…</div></div></div>
+                <div class="pitem" data-act="fxtoggle"><span class="pt t-green"><svg class="ico"><use href="#i-eq"/></svg></span><div><div class="pn">Turn effect on / off</div><div class="pd">Any single effect</div></div></div>
+                <div class="pitem" data-act="fxalloff"><span class="pt t-rose"><svg class="ico"><use href="#i-x"/></svg></span><div><div class="pn">Turn all effects off</div><div class="pd">Back to clean</div></div></div></div>
+              <div class="pgroup">Speakers</div><div class="pgrid">
+                <div class="pitem" data-act="spklevel"><span class="pt t-amber"><svg class="ico"><use href="#i-spk"/></svg></span><div><div class="pn">Set speaker level</div><div class="pd">Trim one channel</div></div></div>
+                <div class="pitem" data-act="upmix"><span class="pt t-cyan"><svg class="ico"><use href="#i-wave"/></svg></span><div><div class="pn">Toggle upmix</div><div class="pd">Stereo → surround</div></div></div></div>
+              <div class="pgroup">System &amp; control</div><div class="pgrid">
+                <div class="pitem" data-act="notify"><span class="pt t-violet"><svg class="ico"><use href="#i-bell"/></svg></span><div><div class="pn">Show a notification</div><div class="pd">Tell you what happened</div></div></div>
+                <div class="pitem" data-act="wait"><span class="pt t-blue"><svg class="ico"><use href="#i-clock"/></svg></span><div><div class="pn">Wait</div><div class="pd">Pause before the next step</div></div></div>
+                <div class="pitem" data-act="ifcond"><span class="pt t-amber"><svg class="ico"><use href="#i-branch"/></svg></span><div><div class="pn">If…</div><div class="pd">Only run next steps when true</div></div></div></div>
+            </div>
+          </div>
+          <div class="scr" id="scr-value">
+            <div class="phd"><div class="back" data-back><svg class="ico" style="width:16px"><use href="#i-back"/></svg></div><h2 id="valTitle">Choose</h2><input class="search" id="valSearch" placeholder="Search…" /></div>
+            <div class="detected" id="valDetected"></div>
+            <div id="valList"></div>
+            <div class="customrow"><button class="customadd" id="customToggle"><svg class="ico" style="width:14px;display:inline;vertical-align:-2px"><use href="#i-plus"/></svg> Enter a custom one…</button><div class="custominput" id="customInput" style="display:none"><input id="customField" placeholder="Type any app or device name…" /><button id="customSave">Add</button></div></div>
+          </div>
+        </div>
+
+        <!-- ============ SETTINGS ============ -->
+        <div class="page" data-page="settings">
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Settings</h3></div>
+            <div class="setgroup">Startup</div>
+            <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Start minimized to tray</div></div><div class="sw" data-sw><div class="k"></div></div></div>
+            <div class="setgroup">Audio engine</div>
+            <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage applies its processing</div></div><div class="pdd"><button class="pddbtn"><span class="pn">Logitech Z906</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a class="on">Logitech Z906 (7.1)</a><a>HDMI TV</a><a>Headphones</a></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Equalizer APO</div><div class="std">The system component Soundstage drives</div></div><span class="statusok">Installed ✓</span></div>
+            <div class="setgroup">Headphones</div>
+            <div class="setrow"><div class="st"><div class="stn">Auto-switch to headphone profile</div><div class="std">When headphones are plugged in</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">AutoEq profile</div><div class="std">Match your exact headphone model</div></div><button class="btn">Import…</button></div>
+            <div class="setgroup">Updates</div>
+            <div class="setrow"><div class="st"><div class="stn">Version 1.0.0</div><div class="std">You're up to date</div></div><button class="btn"><svg><use href="#i-refresh"/></svg> Check</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Install updates automatically</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="setgroup">Diagnostics</div>
+            <div class="setrow"><div class="st"><div class="stn">Copy my config</div><div class="std">For troubleshooting</div></div><button class="btn"><svg><use href="#i-file"/></svg> Copy</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Run Atmos test</div><div class="std">Check surround is passing through</div></div><button class="btn"><svg><use href="#i-play"/></svg> Run</button></div>
+          </section>
+        </div>
+
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  var chev='<svg><use href="#i-chev"/></svg>';
+
+  /* radial dials (dashboard) */
+  function radial(el){var v=+el.dataset.val,l=el.dataset.label,c=el.dataset.color||'#37e0cf';
+    var C=2*Math.PI*28,track=270/360*C,val=(v/100)*(270/360*C),end=(135+(v/100)*270)*Math.PI/180,hx=(38+28*Math.cos(end)).toFixed(1),hy=(38+28*Math.sin(end)).toFixed(1);
+    el.innerHTML='<svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="28" fill="none" stroke="#12202a" stroke-width="5" stroke-dasharray="'+track.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(135 38 38)" stroke-linecap="round"/><circle cx="38" cy="38" r="28" fill="none" stroke="'+c+'" stroke-width="5" stroke-dasharray="'+val.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(135 38 38)" stroke-linecap="round" style="filter:drop-shadow(0 0 4px '+c+')"/><circle cx="38" cy="38" r="14" fill="#12202a" stroke="'+c+'" stroke-opacity=".8"/><circle cx="'+hx+'" cy="'+hy+'" r="5" fill="#0d141d" stroke="'+c+'" stroke-width="2.5"/></svg><span class="rl">'+l+'</span><span class="rv">'+v+'%</span>';}
+  document.querySelectorAll('.radial').forEach(radial);
+
+  /* build EQ bars into every [data-eq] */
+  var eqvals=[43.3,36.7,46.7,53.3,56.7,50,40,33.3,43.3,46.7];
+  document.querySelectorAll('[data-eq]').forEach(function(host){
+    eqvals.forEach(function(top){
+      var band=document.createElement('div');band.className='band';
+      var fill='';if(top<50)fill='<div class="bfill" style="top:'+top+'%;height:'+(50-top)+'%"></div>';else if(top>50)fill='<div class="bfill" style="top:50%;height:'+(top-50)+'%"></div>';
+      band.innerHTML='<div class="btrackline"></div>'+fill+'<div class="bhandle" style="top:'+top+'%"></div>';
+      host.appendChild(band);
+    });
+  });
+
+  /* page navigation */
+  function setPage(name){
+    document.querySelectorAll('.page').forEach(function(p){p.classList.toggle('show',p.getAttribute('data-page')===name);});
+    var navName=(name==='builder')?'automations':name;
+    document.querySelectorAll('.rail a[data-nav]').forEach(function(a){a.classList.toggle('on',a.getAttribute('data-nav')===navName);});
+    document.getElementById('statusStrip').style.display=(name==='builder')?'none':'flex';
+    if(name==='builder'){showScr('scr-canvas');}
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  document.querySelectorAll('.rail a[data-nav]').forEach(function(a){a.addEventListener('click',function(){setPage(a.getAttribute('data-nav'));});});
+  document.getElementById('newAuto').addEventListener('click',function(){resetBuilder();setPage('builder');});
+
+  /* builder internal screens */
+  function showScr(id){document.querySelectorAll('#scr-canvas,#scr-trigger,#scr-actions,#scr-value').forEach(function(s){s.classList.toggle('show',s.id===id);});closeMenus();}
+  var TRIG={app:{t:'t-violet',ic:'i-app',html:'<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="apps">Netflix '+chev+'</span><span class="cfg-word">is playing</span>'},format:{t:'t-cyan',ic:'i-layers',html:'<span class="btitle">When the source is</span><span class="cfg-dd" data-opts="stereo (2.0),5.1,7.1">5.1 '+chev+'</span>'},time:{t:'t-amber',ic:'i-clock',html:'<span class="btitle">At</span><span class="cfg-dd" data-opts="6:00 AM,8:00 AM,6:00 PM,10:00 PM,11:00 PM,12:00 AM">10:00 PM '+chev+'</span><span class="cfg-word">every day</span>'},startup:{t:'t-green',ic:'i-power',html:'<span class="btitle">When Soundstage starts</span>'},device:{t:'t-blue',ic:'i-plug',html:'<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="devices">Headphones '+chev+'</span><span class="cfg-word">connect</span>'}};
+  var ACT={preset:{t:'t-cyan',ic:'i-layers',html:'<span class="btitle">Switch preset to</span><span class="cfg-dd" data-pick-cat="presets">Cinema '+chev+'</span>'},volume:{t:'t-blue',ic:'i-spk',html:'<span class="btitle">Set volume to</span><div class="cfg-sl"><i style="width:60%"></i><b style="left:60%"></b></div><span class="cfg-pct">60%</span>'},fxamount:{t:'t-green',ic:'i-wave',html:'<span class="btitle">Set</span><span class="cfg-dd" data-opts="Ambience,Bass,Air,Warmth,Leveler,Night">Bass '+chev+'</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="cfg-pct">50%</span>'},fxtoggle:{t:'t-green',ic:'i-eq',html:'<span class="btitle">Turn</span><span class="cfg-dd" data-opts="Night mode,Bass,Air,Warmth,Leveler,Ambience">Night mode '+chev+'</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>'},fxalloff:{t:'t-rose',ic:'i-x',html:'<span class="btitle">Turn all effects off</span>'},spklevel:{t:'t-amber',ic:'i-spk',html:'<span class="btitle">Set</span><span class="cfg-dd" data-opts="Front L,Front R,Center,Sub,Side L,Side R,Back L,Back R">Center '+chev+'</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="cfg-pct">−2 dB</span>'},upmix:{t:'t-cyan',ic:'i-wave',html:'<span class="btitle">Upmix stereo to surround</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>'},notify:{t:'t-violet',ic:'i-bell',html:'<span class="btitle">Show a notification</span><input class="cfg-in" placeholder="e.g. Switched to Cinema" />'},wait:{t:'t-blue',ic:'i-clock',html:'<span class="btitle">Wait</span><span class="cfg-dd" data-opts="1 second,2 seconds,5 seconds,10 seconds">2 seconds '+chev+'</span>'},ifcond:{t:'t-amber',ic:'i-branch',html:'<span class="btitle">If</span><span class="cfg-dd" data-opts="the source is 5.1,it\'s after 10 PM,headphones are connected">the source is 5.1 '+chev+'</span><span class="bsub">Steps below run only when this is true</span>'}};
+  var VALUES={apps:{title:'Which app?',detected:'Playing now: <b>Spotify</b>',items:['Netflix','Spotify','YouTube','Disney+','Prime Video','Apple Music','VLC','Twitch','Chrome','A Steam game','Discord call','Zoom','Any game']},devices:{title:'Which device?',detected:'Connected now: <b>Logitech Z906 · 7.1</b>',items:['Headphones','HDMI TV','USB DAC','Bluetooth speaker','Optical / SPDIF','Line out','Any headphones']},presets:{title:'Which preset?',detected:'',items:['Flat','Cinema','Music','Podcast','Late Night (yours)','Gaming (yours)']}};
+  var activeDD=null,trigStack=document.getElementById('trigStack'),actStack=document.getElementById('actStack');
+  function bar(def,h){var el=document.createElement('div');el.className='barrow';el.innerHTML=(h?'<span class="handle">⋮⋮</span>':'')+'<div class="btile '+def.t+'"><svg class="ico"><use href="#'+def.ic+'"/></svg></div><div class="bmain">'+def.html+'</div><div class="brm"><svg><use href="#i-x"/></svg></div>';return el;}
+  function refreshWhen(){var has=trigStack.children.length>0;document.querySelector('#scr-canvas .emptyrow').style.display=has?'none':'flex';document.getElementById('addCond').style.display=has?'flex':'none';}
+  function refreshDo(){document.getElementById('emptyDo').style.display=actStack.children.length?'none':'block';}
+  function addTrigger(k){if(trigStack.children.length){var l=document.createElement('div');l.className='andlabel';l.textContent='AND';trigStack.appendChild(l);}trigStack.appendChild(bar(TRIG[k],false));refreshWhen();}
+  function addAction(k){if(actStack.children.length){var c=document.createElement('div');c.className='conn';actStack.appendChild(c);}actStack.appendChild(bar(ACT[k],true));refreshDo();}
+  function resetBuilder(){trigStack.innerHTML='';actStack.innerHTML='';refreshWhen();refreshDo();}
+  function openValuePicker(cat,dd){activeDD=dd;var v=VALUES[cat];document.getElementById('valTitle').textContent=v.title;var det=document.getElementById('valDetected');det.innerHTML=v.detected||'';det.style.display=v.detected?'block':'none';document.getElementById('valSearch').value='';var list=document.getElementById('valList');list.innerHTML='';v.items.forEach(function(it){var d=document.createElement('div');d.className='vitem';d.textContent=it;list.appendChild(d);});document.getElementById('customInput').style.display='none';document.getElementById('customField').value='';showScr('scr-value');}
+  function setActive(t){if(activeDD)activeDD.innerHTML=t+' '+chev;showScr('scr-canvas');}
+
+  /* floating dropdown */
+  function closeMenus(){document.querySelectorAll('.ddmenu').forEach(function(m){m.remove();});document.querySelectorAll('.pdd.open').forEach(function(p){p.classList.remove('open');});}
+  function openMenu(dd){closeMenus();var opts=dd.dataset.opts.split(','),cur=dd.textContent.trim();var m=document.createElement('div');m.className='ddmenu';opts.forEach(function(o){var it=document.createElement('div');it.className='ddm-item'+(o===cur?' on':'');it.textContent=o;it.addEventListener('click',function(ev){ev.stopPropagation();dd.innerHTML=o+' '+chev;closeMenus();});m.appendChild(it);});document.body.appendChild(m);var r=dd.getBoundingClientRect();m.style.left=r.left+'px';m.style.top=(r.bottom+5)+'px';m.style.minWidth=r.width+'px';}
+
+  /* speaker tests */
+  var strips=[].slice.call(document.querySelectorAll('#calib .strip'));
+  function playOne(s){strips.forEach(function(x){x.classList.remove('playing');});s.classList.add('playing');clearTimeout(s._t);s._t=setTimeout(function(){s.classList.remove('playing');},900);}
+  var testAll=document.getElementById('testall');if(testAll)testAll.addEventListener('click',function(){strips.forEach(function(s,i){setTimeout(function(){strips.forEach(function(x){x.classList.remove('playing');});s.classList.add('playing');if(i===strips.length-1)setTimeout(function(){s.classList.remove('playing');},700);},i*650);});});
+
+  /* global clicks */
+  document.addEventListener('click',function(e){
+    var op=e.target.closest('[data-open]');if(op){showScr(op.getAttribute('data-open')==='trigger'?'scr-trigger':'scr-actions');return;}
+    var ex=e.target.closest('[data-exit]');if(ex){setPage('automations');return;}
+    var bk=e.target.closest('[data-back]');if(bk){showScr('scr-canvas');return;}
+    var tr=e.target.closest('[data-trig]');if(tr){addTrigger(tr.getAttribute('data-trig'));showScr('scr-canvas');return;}
+    var ac=e.target.closest('[data-act]');if(ac){addAction(ac.getAttribute('data-act'));showScr('scr-canvas');return;}
+    var vi=e.target.closest('.vitem');if(vi){setActive(vi.textContent);return;}
+    var ct=e.target.closest('#customToggle');if(ct){document.getElementById('customInput').style.display='flex';document.getElementById('customField').focus();return;}
+    var cs=e.target.closest('#customSave');if(cs){var cv=document.getElementById('customField').value.trim();if(cv){setActive(cv);}else{showScr('scr-canvas');}return;}
+    var rm=e.target.closest('.brm');if(rm){var row=rm.closest('.barrow');var p=row.previousElementSibling;if(p&&(p.classList.contains('conn')||p.classList.contains('andlabel')))p.remove();else{var n=row.nextElementSibling;if(n&&(n.classList.contains('conn')||n.classList.contains('andlabel')))n.remove();}row.remove();refreshWhen();refreshDo();return;}
+    var t=e.target.closest('.test');if(t){playOne(t.closest('.strip'));return;}
+    var pw=e.target.closest('[data-power]');if(pw){var o=pw.classList.toggle('off');pw.innerHTML='<span class="d"></span> '+(o?'Off':'On');return;}
+    var sw=e.target.closest('[data-sw]');if(sw){var on=sw.classList.toggle('on');var card=sw.closest('.acard');if(card)card.classList.toggle('off',!on);return;}
+    var rad=e.target.closest('.radial');if(rad){rad.classList.toggle('off');return;}
+    var pb=e.target.closest('.cfg-pills button');if(pb){pb.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});pb.classList.add('on');closeMenus();return;}
+    var dd=e.target.closest('.cfg-dd');if(dd){if(dd.dataset.pickCat){openValuePicker(dd.dataset.pickCat,dd);e.stopPropagation();return;}openMenu(dd);e.stopPropagation();return;}
+    var pbtn=e.target.closest('.pddbtn');if(pbtn){var pdd=pbtn.closest('.pdd');var wo=pdd.classList.contains('open');closeMenus();if(!wo)pdd.classList.add('open');e.stopPropagation();return;}
+    var pi=e.target.closest('.pddmenu a');if(pi&&!pi.classList.contains('add')){var pm=pi.closest('.pdd');pm.querySelectorAll('a').forEach(function(x){x.classList.remove('on');});pi.classList.add('on');var pn=pm.querySelector('.pddbtn .pn');if(pn)pn.textContent=pi.textContent;pm.classList.remove('open');return;}
+    var sg=e.target.closest('.seg button');if(sg){sg.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});sg.classList.add('on');return;}
+    var sug=e.target.closest('.sug');if(sug){sug.style.borderStyle='solid';sug.style.borderColor='#37e0cf';return;}
+    closeMenus();
+  });
+  var as=document.getElementById('actSearch');if(as)as.addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('#actList .pitem').forEach(function(it){it.style.display=it.textContent.toLowerCase().indexOf(q)>=0?'':'none';});});
+  var vs=document.getElementById('valSearch');if(vs)vs.addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('#valList .vitem').forEach(function(it){it.style.display=it.textContent.toLowerCase().indexOf(q)>=0?'':'none';});});
+</script>

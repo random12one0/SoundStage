@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Soundstage.Shell</RootNamespace>
+    <AssemblyName>Soundstage</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WebView2 hosts our approved HTML/CSS/JS UI as a native window. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The whole UI is one self-contained HTML file; embed it so it ships inside the single .exe. -->
+    <EmbeddedResource Include="web\index.html">
+      <LogicalName>Soundstage.Shell.web.index.html</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>
