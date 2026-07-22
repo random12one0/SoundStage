@@ -3,7 +3,10 @@
 //
 //   soundstage_render <out_dir>
 //
-// Writes <out_dir>/dry.wav and <out_dir>/reverb.wav.
+// Writes <out_dir>/dry.wav (untouched), <out_dir>/reverb.wav (reverb only), and
+// <out_dir>/soundstage.wav (the full effect chain — what the app actually does).
+#include "soundstage/EngineChain.h"
+#include "soundstage/Equalizer.h"
 #include "soundstage/Reverb.h"
 #include "wav.h"
 
@@ -88,5 +91,47 @@ int main(int argc, char** argv) {
         wet[2*i] = l; wet[2*i+1] = r;
     }
     soundstage::writeWavStereo16((dir + "/reverb.wav").c_str(), wet, kFs);
+
+    // full chain: what the app does with an "enhance everything" preset — warmth + clarity EQ, a
+    // touch of virtual bass, a gentle leveler for density, a little width, and subtle ambience. The
+    // 0.15 s of silence before the first note lets the 20 ms enable-ramps settle, so the phrase is
+    // fully processed and the A/B against dry.wav is honest.
+    using EQ = soundstage::Equalizer;
+    soundstage::EngineChain chain;
+    chain.prepare(kFs);
+    chain.eq().setNumBands(3);
+    chain.eq().setBand(0, EQ::BandType::LowShelf,  90.0,   3.0, 0.707);   // warmth
+    chain.eq().setBand(1, EQ::BandType::Peaking,   3000.0, 2.5, 1.0);     // presence
+    chain.eq().setBand(2, EQ::BandType::HighShelf, 12000.0,3.0, 0.707);   // air
+    chain.bass().setAmount(0.4);
+    chain.bass().setCrossover(90.0);
+    chain.bass().setDrive(2.0);
+    chain.compressor().setThresholdDb(-20.0);
+    chain.compressor().setRatio(2.5);
+    chain.compressor().setKneeDb(6.0);
+    chain.compressor().setMakeupDb(4.0);  // give back level so the A/B is loudness-matched, not quieter
+    chain.compressor().setAttackMs(15.0);
+    chain.compressor().setReleaseMs(150.0);
+    chain.width().setWidth(1.3);
+    chain.reverb().setSize(0.6);
+    chain.reverb().setDecaySeconds(1.6);
+    chain.reverb().setDamping(0.5);
+    chain.reverb().setPreDelayMs(18.0);
+    chain.reverb().setWidth(0.8);
+    chain.reverb().setMix(0.16);
+    chain.enableEq(true);
+    chain.enableBass(true);
+    chain.enableCompressor(true);
+    chain.enableWidth(true);
+    chain.enableReverb(true);
+
+    std::vector<double> full(frames * 2, 0.0);
+    double frame[8] = {0.0};
+    for (int i = 0; i < frames; ++i) {
+        chain.processFrame(dry[2*i], dry[2*i+1], frame, 2);
+        full[2*i] = frame[0];
+        full[2*i+1] = frame[1];
+    }
+    soundstage::writeWavStereo16((dir + "/soundstage.wav").c_str(), full, kFs);
     return 0;
 }
