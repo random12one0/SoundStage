@@ -1,8 +1,12 @@
 // Unit tests for the Soundstage DSP engine core. Dependency-free (no gtest) so it builds anywhere
 // with a C++17 compiler — including this Linux build host, where we verify the math before it ships.
+#include "soundstage/BassEnhancer.h"
 #include "soundstage/Biquad.h"
+#include "soundstage/Compressor.h"
 #include "soundstage/Reverb.h"
 #include "soundstage/SmoothedValue.h"
+#include "soundstage/StereoWidth.h"
+#include "soundstage/Upmix.h"
 
 #include <algorithm>
 #include <cmath>
@@ -29,6 +33,7 @@ void checkClose(double got, double want, double tol, const std::string& what) {
 }
 
 constexpr double kFs = 48000.0;
+constexpr double kPi = 3.14159265358979323846;
 
 double dbToLin(double db) { return std::pow(10.0, db / 20.0); }
 
@@ -149,6 +154,122 @@ void testReverb() {
     checkClose(b, -0.17, 1e-9, "reverb at mix 0 passes right through");
 }
 
+// The compressor leaves quiet material alone and pulls loud material down.
+void testCompressor() {
+    soundstage::Compressor c;
+    c.prepare(kFs);
+    c.setThresholdDb(-20.0);
+    c.setRatio(4.0);
+    c.setKneeDb(0.0);
+    c.setMakeupDb(0.0);
+    c.setAttackMs(5.0);
+    c.setReleaseMs(100.0);
+
+    // Quiet (-30 dBFS) sits below threshold → basically no gain reduction.
+    for (int n = 0; n < static_cast<int>(kFs * 0.3); ++n) {
+        double s = 0.0316 * std::sin(2.0 * kPi * 200.0 * n / kFs);
+        double l = s, r = s;
+        c.process(l, r);
+    }
+    check(c.gainReductionDb() < 0.5, "quiet signal below threshold: ~no gain reduction");
+
+    // Loud (~-3 dBFS) sits well above threshold → clearly compressed and quieter out than in.
+    c.reset();
+    double inRms = 0.0, outRms = 0.0;
+    int cnt = 0;
+    for (int n = 0; n < static_cast<int>(kFs * 0.5); ++n) {
+        double s = 0.7 * std::sin(2.0 * kPi * 200.0 * n / kFs);
+        double l = s, r = s;
+        c.process(l, r);
+        if (n > static_cast<int>(kFs * 0.3)) { inRms += s * s; outRms += l * l; ++cnt; }
+    }
+    check(c.gainReductionDb() > 3.0, "loud signal above threshold: compressed (>3 dB reduction)");
+    check(std::sqrt(outRms / cnt) < std::sqrt(inRms / cnt), "compressed output is quieter than input");
+}
+
+// Width is mono-safe: identity at 1, mono at 0, and centred content never moves.
+void testStereoWidth() {
+    soundstage::StereoWidth w;
+    w.setWidth(1.0);
+    double l = 0.3, r = -0.1;
+    w.process(l, r);
+    checkClose(l, 0.3, 1e-12, "width 1 is identity (L)");
+    checkClose(r, -0.1, 1e-12, "width 1 is identity (R)");
+
+    w.setWidth(0.0);
+    l = 0.3; r = -0.1;
+    w.process(l, r);
+    checkClose(l, 0.1, 1e-12, "width 0 collapses to mid (L)");
+    checkClose(r, 0.1, 1e-12, "width 0 collapses to mid (R)");
+
+    w.setWidth(1.8);  // centred (mono) content must not move
+    l = 0.5; r = 0.5;
+    w.process(l, r);
+    checkClose(l, 0.5, 1e-12, "mono content stays put under widening (L)");
+    checkClose(r, 0.5, 1e-12, "mono content stays put under widening (R)");
+}
+
+// Upmix derives the right channels and fills surrounds only when asked.
+void testUpmix() {
+    soundstage::Upmix u;
+    u.prepare(kFs, soundstage::Upmix::Surround7_1);
+    u.setAmount(0.7);
+    u.setCenterGain(1.0);
+    u.setLfeGain(1.0);
+    check(u.channels() == 8, "7.1 has 8 channels");
+
+    double out[8] = {0};
+    for (int n = 0; n < static_cast<int>(kFs * 0.2); ++n) u.process(0.5, 0.5, out);  // settle DC
+    checkClose(out[0], 0.5, 1e-9, "FL passes front L");
+    checkClose(out[1], 0.5, 1e-9, "FR passes front R");
+    checkClose(out[2], 0.5, 1e-9, "centre carries the mono content");
+    check(out[3] > 0.4, "LFE receives the low-passed sum");
+    check(out[4] > 0.0 && out[6] > 0.0, "surround and back speakers are filled");
+
+    u.setAmount(0.0);
+    u.process(0.5, 0.5, out);
+    checkClose(out[4], 0.0, 1e-9, "amount 0 leaves surrounds silent");
+
+    soundstage::Upmix u51;
+    u51.prepare(kFs, soundstage::Upmix::Surround5_1);
+    check(u51.channels() == 6, "5.1 has 6 channels");
+}
+
+// Bass enhancer bypasses at amount 0 and, when driven, synthesises harmonics above the fundamental.
+void testBass() {
+    soundstage::BassEnhancer b;
+    b.prepare(kFs);
+    b.setAmount(0.0);
+    double l = 0.4, r = -0.2;
+    b.process(l, r);
+    checkClose(l, 0.4, 1e-12, "amount 0 is a bypass (L)");
+    checkClose(r, -0.2, 1e-12, "amount 0 is a bypass (R)");
+
+    // Drive a 50 Hz tone; measure energy above 130 Hz (harmonics) in dry vs processed.
+    soundstage::BassEnhancer be;
+    be.prepare(kFs);
+    be.setAmount(0.8);
+    be.setCrossover(110.0);
+    be.setDrive(3.0);
+    // Two cascaded high-passes at 130 Hz so the 50 Hz fundamental is properly rejected and we're
+    // measuring the synthesised harmonics, not fundamental leakage.
+    soundstage::Biquad hpDry1, hpDry2, hpWet1, hpWet2;
+    for (auto* h : {&hpDry1, &hpDry2, &hpWet1, &hpWet2}) h->setHighpass(kFs, 130.0, 0.707);
+    double dryHp = 0.0, wetHp = 0.0;
+    for (int n = 0; n < static_cast<int>(kFs * 0.5); ++n) {
+        const double s = 0.5 * std::sin(2.0 * kPi * 50.0 * n / kFs);
+        double wl = s, wr = s;
+        be.process(wl, wr);
+        if (n > static_cast<int>(kFs * 0.1)) {
+            const double d = hpDry2.process(hpDry1.process(s));
+            const double w = hpWet2.process(hpWet1.process(wl));
+            dryHp += d * d;
+            wetHp += w * w;
+        }
+    }
+    check(wetHp > dryHp * 4.0, "bass enhancer adds harmonic energy above the fundamental");
+}
+
 struct Test { const char* name; void (*fn)(); };
 
 }  // namespace
@@ -161,6 +282,10 @@ int main() {
         {"process/stability", testProcessStable},
         {"smoothing", testSmoothing},
         {"reverb", testReverb},
+        {"compressor", testCompressor},
+        {"stereo-width", testStereoWidth},
+        {"upmix", testUpmix},
+        {"bass-enhancer", testBass},
     };
 
     for (const auto& t : tests) {

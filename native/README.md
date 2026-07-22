@@ -34,12 +34,19 @@ CI runs exactly this on every push (Linux job).
 - `SmoothedValue` — per-sample linear parameter smoothing; the mechanism behind "can never pop".
 - `Reverb` — our own reverb, an 8-line Feedback Delay Network (Hadamard feedback + per-line damping
   + input diffusion), with size / decay / damping / pre-delay / width / mix. This is the "Ambience".
-- Unit tests: filter magnitudes match the cookbook; smoothing is bounded/monotonic/exact; the reverb
-  stays finite, decays to silence, and bypasses cleanly at mix 0.
+- `Compressor` — feed-forward log-domain compressor/limiter (attack/release, soft knee, makeup); the
+  "Leveler" and the guts of Night mode.
+- `BassEnhancer` — psychoacoustic "virtual bass" via missing-fundamental harmonic synthesis.
+- `StereoWidth` — mid/side width that leaves centred (mono) content untouched.
+- `Upmix` — our own stereo → 5.1 / 7.1 (derived centre + LFE, filled surrounds/backs).
+- Unit tests (10 groups): cookbook filter magnitudes; smoothing bounded/monotonic/exact; reverb
+  decays to silence & bypasses clean; compressor pulls loud down / leaves quiet alone; width is
+  mono-safe; upmix derives the right channels; bass adds harmonics above the fundamental.
 - `tools/render.cpp` — runs a test signal through the engine and writes dry/wet WAVs, so the sound
   can be checked **by ear** before the Windows app exists.
 
-## Coming next (each with tests)
+## Coming next
 
-Compressor/limiter · bass enhancement · stereo width · stereo→5.1/7.1 surround upmix → then the
-virtual-audio driver that hosts it, then the C# app + WebView2 UI.
+The **virtual-audio driver** (Windows/WDK, based on FxSound's open-source one) that pipes all system
+audio through this engine, then the **C# app + WebView2 UI** wired to it. That's the fresh v1.0 app —
+a clean rebuild, nothing carried over from the old APO-based version.
