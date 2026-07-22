@@ -11,6 +11,8 @@
   <ItemGroup>
     <!-- WebView2 hosts our approved HTML/CSS/JS UI as a native window. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />
+    <!-- NAudio drives WASAPI capture/render — the audio path into and out of our engine. -->
+    <PackageReference Include="NAudio" Version="2.2.1" />
   </ItemGroup>
 
   <ItemGroup>

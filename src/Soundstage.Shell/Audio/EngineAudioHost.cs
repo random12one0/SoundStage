@@ -1,0 +1,230 @@
+using System.Runtime.InteropServices;
+
+using NAudio.CoreAudioApi;
+using NAudio.Wave;
+
+using Soundstage.Shell.Engine;
+
+namespace Soundstage.Shell.Audio;
+
+/// <summary>
+/// The processing core of the Soundstage output device: it captures the audio playing on one device,
+/// runs every buffer through the engine, and renders the result to another (your real speakers).
+///
+/// Until the Soundstage virtual device exists, point capture at any device and render to a *different*
+/// one (the two must differ, or the output would feed back into the capture). Once the driver ships,
+/// capture = the "Soundstage" device your apps play into, render = your speakers — seamless and
+/// system-wide.
+///
+/// v1 processes in stereo end-to-end; surround upmix to a multichannel render device comes next.
+/// This runs only on Windows (WASAPI); it is built here but tested on the user's machine.
+/// </summary>
+public sealed class EngineAudioHost : IDisposable
+{
+    private readonly SoundstageEngine _engine;
+    private readonly object _sync = new();
+
+    private WasapiLoopbackCapture? _capture;
+    private WasapiOut? _output;
+    private BufferedWaveProvider? _buffer;
+
+    // Reused across callbacks so the audio thread doesn't allocate every buffer.
+    private float[] _inScratch = Array.Empty<float>();
+    private float[] _outScratch = Array.Empty<float>();
+    private byte[] _outBytes = Array.Empty<byte>();
+
+    private bool _running;
+    private bool _disposed;
+
+    public EngineAudioHost(SoundstageEngine engine)
+    {
+        _engine = engine ?? throw new ArgumentNullException(nameof(engine));
+    }
+
+    public bool IsRunning
+    {
+        get { lock (_sync) { return _running; } }
+    }
+
+    /// <summary>The default render device — a convenient render target for testing.</summary>
+    public static MMDevice DefaultRenderDevice()
+    {
+        using var mm = new MMDeviceEnumerator();
+        return mm.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+    }
+
+    /// <summary>All active render (playback) devices, for the UI to choose capture/render endpoints.</summary>
+    public static IReadOnlyList<MMDevice> RenderDevices()
+    {
+        using var mm = new MMDeviceEnumerator();
+        var list = new List<MMDevice>();
+        foreach (var d in mm.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+        {
+            list.Add(d);
+        }
+
+        return list;
+    }
+
+    /// <summary>
+    /// Start processing: capture what plays on <paramref name="captureDevice"/>, run it through the
+    /// engine, and render to <paramref name="renderDevice"/>. The two must be different devices.
+    /// </summary>
+    public void Start(MMDevice captureDevice, MMDevice renderDevice)
+    {
+        ArgumentNullException.ThrowIfNull(captureDevice);
+        ArgumentNullException.ThrowIfNull(renderDevice);
+        if (string.Equals(captureDevice.ID, renderDevice.ID, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Capture and render must be different devices, or the output would feed straight back " +
+                "into the capture. Once the Soundstage virtual device is installed, capture from it and " +
+                "render to your speakers.");
+        }
+
+        lock (_sync)
+        {
+            if (_running)
+            {
+                return;
+            }
+
+            _capture = new WasapiLoopbackCapture(captureDevice);
+            int rate = _capture.WaveFormat.SampleRate;
+            _engine.Prepare(rate);
+
+            // Process and render stereo float at the capture rate; Windows maps stereo onto the render
+            // device's own channel layout in shared mode.
+            var outFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
+            _buffer = new BufferedWaveProvider(outFormat)
+            {
+                BufferDuration = TimeSpan.FromMilliseconds(200),
+                DiscardOnBufferOverflow = true,
+            };
+
+            _output = new WasapiOut(renderDevice, AudioClientShareMode.Shared, useEventSync: true, latency: 40);
+            _output.Init(_buffer);
+
+            _capture.DataAvailable += OnData;
+            _capture.RecordingStopped += OnRecordingStopped;
+
+            _capture.StartRecording();
+            _output.Play();
+            _running = true;
+        }
+    }
+
+    public void Stop()
+    {
+        lock (_sync)
+        {
+            if (!_running)
+            {
+                return;
+            }
+
+            _running = false;
+            try { _capture?.StopRecording(); } catch { /* tearing down */ }
+            try { _output?.Stop(); } catch { /* tearing down */ }
+        }
+    }
+
+    private void OnData(object? sender, WaveInEventArgs e)
+    {
+        WasapiLoopbackCapture? cap = _capture;
+        BufferedWaveProvider? buffer = _buffer;
+        if (cap is null || buffer is null || e.BytesRecorded <= 0)
+        {
+            return;
+        }
+
+        // The loopback mix format is 32-bit float; bail cleanly on anything unexpected.
+        if (cap.WaveFormat.Encoding != WaveFormatEncoding.IeeeFloat || cap.WaveFormat.BitsPerSample != 32)
+        {
+            return;
+        }
+
+        int channels = cap.WaveFormat.Channels;
+        if (channels < 1)
+        {
+            return;
+        }
+
+        int frames = e.BytesRecorded / (4 * channels);
+        if (frames <= 0)
+        {
+            return;
+        }
+
+        EnsureScratch(frames);
+
+        // De-interleave the captured frame to stereo (first two channels; mono is duplicated).
+        ReadOnlySpan<float> src = MemoryMarshal.Cast<byte, float>(e.Buffer.AsSpan(0, frames * channels * 4));
+        for (int n = 0; n < frames; n++)
+        {
+            float l = src[n * channels];
+            float r = channels >= 2 ? src[n * channels + 1] : l;
+            _inScratch[n * 2] = l;
+            _inScratch[n * 2 + 1] = r;
+        }
+
+        _engine.Process(_inScratch, 2, _outScratch, 2, frames);
+
+        // Interleaved stereo floats back to bytes, into the render buffer.
+        int outSamples = frames * 2;
+        Span<float> dst = MemoryMarshal.Cast<byte, float>(_outBytes.AsSpan(0, outSamples * 4));
+        _outScratch.AsSpan(0, outSamples).CopyTo(dst);
+        buffer.AddSamples(_outBytes, 0, outSamples * 4);
+    }
+
+    private void OnRecordingStopped(object? sender, StoppedEventArgs e)
+    {
+        lock (_sync)
+        {
+            _running = false;
+        }
+    }
+
+    private void EnsureScratch(int frames)
+    {
+        int stereo = frames * 2;
+        if (_inScratch.Length < stereo)
+        {
+            _inScratch = new float[stereo];
+        }
+
+        if (_outScratch.Length < stereo)
+        {
+            _outScratch = new float[stereo];
+        }
+
+        int bytes = stereo * 4;
+        if (_outBytes.Length < bytes)
+        {
+            _outBytes = new byte[bytes];
+        }
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        Stop();
+
+        if (_capture is not null)
+        {
+            _capture.DataAvailable -= OnData;
+            _capture.RecordingStopped -= OnRecordingStopped;
+            try { _capture.Dispose(); } catch { /* ignore */ }
+            _capture = null;
+        }
+
+        try { _output?.Dispose(); } catch { /* ignore */ }
+        _output = null;
+        _buffer = null;
+    }
+}
