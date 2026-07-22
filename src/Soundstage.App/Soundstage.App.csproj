@@ -21,4 +21,13 @@
     <ProjectReference Include="..\Soundstage.Windows\Soundstage.Windows.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Bundled Airwindows (MIT) VST2 rack, embedded in the app. The portable release ships a single
+         .exe, so we can't drop loose DLLs beside it; instead the app self-extracts these to the
+         stable per-user plugin folder on demand, giving Equalizer APO a real path it can load. -->
+    <EmbeddedResource Include="plugins/*.dll">
+      <LogicalName>Soundstage.Plugins.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
 </Project>

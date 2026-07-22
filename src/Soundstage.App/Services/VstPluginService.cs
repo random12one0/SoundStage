@@ -8,10 +8,11 @@ using Soundstage.Core.Effects;
 namespace Soundstage.App.Services;
 
 /// <summary>
-/// Locates and installs the bundled VST rack DLLs. Effects resolve to a DLL either shipped next to
-/// the app (installer-bundled) or downloaded into the per-user data folder; the compiler skips any
-/// effect whose DLL isn't present, so a missing rack never breaks audio. All rack plugins are
-/// Airwindows (MIT), so we're free to fetch and ship them.
+/// Locates and installs the VST rack DLLs. The rack ships embedded in the app and self-extracts to
+/// the per-user plugin folder on first use, so the enhancers work out of the box with no download;
+/// the online bundle and folder-import paths remain as fallbacks. The compiler skips any effect whose
+/// DLL can't be resolved, so a missing plugin never breaks audio. All rack plugins are Airwindows
+/// (MIT), so we're free to embed and ship them.
 /// </summary>
 public sealed class VstPluginService
 {
@@ -20,7 +21,11 @@ public sealed class VstPluginService
 
     public const string DownloadPageUrl = "https://www.airwindows.com/vsts/";
 
+    /// <summary>Manifest-resource prefix for the embedded rack DLLs (see the .csproj LogicalName).</summary>
+    private const string EmbeddedResourcePrefix = "Soundstage.Plugins.";
+
     private readonly string _bundledDir = Path.Combine(AppContext.BaseDirectory, "plugins");
+    private readonly object _extractLock = new();
 
     /// <summary>Where downloaded plugins land (the app data folder, always writable).</summary>
     public string UserPluginDirectory { get; } = Path.Combine(DefaultAppPaths.DataDirectory, "plugins");
@@ -28,14 +33,100 @@ public sealed class VstPluginService
     /// <summary>Absolute path to a plugin DLL if it's installed (bundled or downloaded), else null.</summary>
     public string? Resolve(string dllFileName)
     {
+        // 1) A loose "plugins" folder next to the app (dev builds / manual drop-in).
         var bundled = Path.Combine(_bundledDir, dllFileName);
         if (File.Exists(bundled))
         {
             return bundled;
         }
 
+        // 2) The stable per-user plugin folder (self-extracted, downloaded, or imported).
         var user = Path.Combine(UserPluginDirectory, dllFileName);
-        return File.Exists(user) ? user : null;
+        if (File.Exists(user))
+        {
+            return user;
+        }
+
+        // 3) Self-extract the copy shipped inside the app to the user folder. This is what makes the
+        //    rack work out of the box for the single-file portable build, with a path APO can load.
+        var extracted = TryExtractEmbedded(dllFileName);
+        if (extracted is not null)
+        {
+            return extracted;
+        }
+
+        // 4) Lenient scan: a file whose canonical key matches (Airwindows "64" suffix, odd casing,
+        //    spaces, "(1)" copies) — for packs the user dropped in themselves.
+        return FindLenient(_bundledDir, dllFileName) ?? FindLenient(UserPluginDirectory, dllFileName);
+    }
+
+    /// <summary>
+    /// Writes the app-embedded copy of <paramref name="dllFileName"/> into the per-user plugin folder
+    /// (once, refreshing only when the shipped bytes differ) and returns its path, or null if the app
+    /// doesn't embed it. Never throws — falls back to any copy already on disk.
+    /// </summary>
+    private string? TryExtractEmbedded(string dllFileName)
+    {
+        var name = Path.GetFileName(dllFileName);
+        var target = Path.Combine(UserPluginDirectory, name);
+        var asm = typeof(VstPluginService).Assembly;
+
+        lock (_extractLock)
+        {
+            try
+            {
+                using var res = asm.GetManifestResourceStream(EmbeddedResourcePrefix + name);
+                if (res is null)
+                {
+                    return File.Exists(target) ? target : null;
+                }
+
+                if (File.Exists(target) && new FileInfo(target).Length == res.Length)
+                {
+                    return target;
+                }
+
+                Directory.CreateDirectory(UserPluginDirectory);
+                var tmp = Path.Combine(UserPluginDirectory, name + ".tmp");
+                using (var file = File.Create(tmp))
+                {
+                    res.CopyTo(file);
+                }
+
+                File.Move(tmp, target, overwrite: true);
+                return target;
+            }
+            catch
+            {
+                // A locked/unwritable target (e.g. APO has it open) — an existing copy still works.
+                return File.Exists(target) ? target : null;
+            }
+        }
+    }
+
+    private static string? FindLenient(string dir, string dllFileName)
+    {
+        if (!Directory.Exists(dir))
+        {
+            return null;
+        }
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(dir, "*.dll"))
+            {
+                if (VstNaming.Matches(dllFileName, Path.GetFileName(file)))
+                {
+                    return file;
+                }
+            }
+        }
+        catch
+        {
+            // Unreadable folder — treat as not found.
+        }
+
+        return null;
     }
 
     public int InstalledCount => VstCatalog.All.Count(e => Resolve(e.DllFileName) is not null);
@@ -72,15 +163,24 @@ public sealed class VstPluginService
             }
 
             status?.Report("Installing effects…");
-            var wanted = VstCatalog.All.Select(e => e.DllFileName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // Match the pack's entries to the catalog by canonical key, then save each under our
+            // catalog filename so the exact-path resolver finds it afterwards.
+            var wanted = BuildWantedByKey();
+            var saved = new HashSet<string>(StringComparer.Ordinal);
             using (var zip = ZipFile.OpenRead(tmpZip))
             {
                 foreach (var entry in zip.Entries)
                 {
                     var name = Path.GetFileName(entry.FullName);
-                    if (!string.IsNullOrEmpty(name) && wanted.Contains(name))
+                    if (string.IsNullOrEmpty(name) || !name.EndsWith(".dll", StringComparison.OrdinalIgnoreCase))
                     {
-                        entry.ExtractToFile(Path.Combine(UserPluginDirectory, name), overwrite: true);
+                        continue;
+                    }
+
+                    var key = VstNaming.NormalizeKey(name);
+                    if (wanted.TryGetValue(key, out var canonical) && saved.Add(key))
+                    {
+                        entry.ExtractToFile(Path.Combine(UserPluginDirectory, canonical), overwrite: true);
                     }
                 }
             }
@@ -107,10 +207,8 @@ public sealed class VstPluginService
         }
 
         Directory.CreateDirectory(UserPluginDirectory);
-        var wanted = VstCatalog.All.Select(e => e.DllFileName)
-            .ToDictionary(n => n, n => n, StringComparer.OrdinalIgnoreCase);
+        var wanted = BuildWantedByKey();
 
-        var copied = 0;
         IEnumerable<string> files;
         try
         {
@@ -121,9 +219,12 @@ public sealed class VstPluginService
             return 0;
         }
 
+        var copied = 0;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var file in files)
         {
-            if (wanted.TryGetValue(Path.GetFileName(file), out var canonical))
+            var key = VstNaming.NormalizeKey(Path.GetFileName(file));
+            if (wanted.TryGetValue(key, out var canonical) && seen.Add(key))
             {
                 try
                 {
@@ -138,6 +239,18 @@ public sealed class VstPluginService
         }
 
         return copied;
+    }
+
+    /// <summary>Catalog DLLs indexed by their canonical key, mapping to the filename we save under.</summary>
+    private static Dictionary<string, string> BuildWantedByKey()
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var effect in VstCatalog.All)
+        {
+            map[VstNaming.NormalizeKey(effect.DllFileName)] = effect.DllFileName;
+        }
+
+        return map;
     }
 
     public void OpenPluginFolder()

@@ -17,7 +17,7 @@ public static class VstCatalog
         new VstRackEffect(
             "bass", "Virtual Bass",
             "Adds deep bass and sub weight small speakers can't make on their own.",
-            "BassKit.dll", VstRackEffect.RouteFrontStereo,
+            "BassKit64.dll", VstRackEffect.RouteFrontStereo,
             DefaultParams: [0.5, 0.5, 0.5, 0.5],
             IntensityMaps: [new VstIntensityMap(2, 0.5, 0.9), new VstIntensityMap(3, 0.5, 0.85)],
             LicenseNote: Airwindows),
@@ -27,7 +27,7 @@ public static class VstCatalog
         new VstRackEffect(
             "warmth", "Warmth",
             "A gentle analog-style richness that makes everything sound fuller.",
-            "PurestDrive.dll", VstRackEffect.RouteFrontStereo,
+            "PurestDrive64.dll", VstRackEffect.RouteFrontStereo,
             DefaultParams: [0.0],
             IntensityMaps: [new VstIntensityMap(0, 0.0, 1.0)],
             LicenseNote: Airwindows),
@@ -36,7 +36,7 @@ public static class VstCatalog
         new VstRackEffect(
             "air", "Air",
             "Adds high-end sparkle and detail — a real exciter, not just a treble boost.",
-            "Air2.dll", VstRackEffect.RouteFrontStereo,
+            "Air264.dll", VstRackEffect.RouteFrontStereo,
             DefaultParams: [0.5, 0.5, 0.5, 0.0, 1.0],
             IntensityMaps: [new VstIntensityMap(2, 0.5, 0.82), new VstIntensityMap(1, 0.5, 0.68)],
             LicenseNote: Airwindows),
@@ -46,7 +46,7 @@ public static class VstCatalog
         new VstRackEffect(
             "leveler", "Leveler",
             "Evens out loud and quiet so everything sits at a comfortable, consistent level.",
-            "Pressure4.dll", VstRackEffect.RouteFrontStereo,
+            "Pressure464.dll", VstRackEffect.RouteFrontStereo,
             DefaultParams: [0.0, 0.2, 0.5, 1.0],
             IntensityMaps: [new VstIntensityMap(0, 0.0, 0.8)],
             LicenseNote: Airwindows),
@@ -56,7 +56,7 @@ public static class VstCatalog
         new VstRackEffect(
             "loud", "Loudness",
             "Pushes overall level up with a safety ceiling so it never clips or strains your speakers.",
-            "ADClip7.dll", VstRackEffect.RouteFrontStereo,
+            "ADClip764.dll", VstRackEffect.RouteFrontStereo,
             DefaultParams: [0.0, 0.5, 0.5, 0.0],
             IntensityMaps: [new VstIntensityMap(0, 0.0, 0.5)],
             LicenseNote: Airwindows),

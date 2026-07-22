@@ -100,8 +100,8 @@ public partial class VstRackViewModel : ObservableObject
         var total = _services.Vst.TotalCount;
         NeedsInstall = installed < total;
         InstallStatus = installed == total
-            ? $"All {total} effects installed."
-            : $"{installed} of {total} effects installed.";
+            ? $"All {total} effects are built in and ready."
+            : $"{installed} of {total} effects ready.";
         _syncing = false;
     }
 
@@ -166,7 +166,7 @@ public partial class VstRackViewModel : ObservableObject
         Rebuild();
         InstallStatus = count > 0
             ? $"Imported {count} effect{(count == 1 ? "" : "s")} — {InstallStatus}"
-            : "No matching effect DLLs in that folder. Look for BassKit.dll, PurestDrive.dll, Air2.dll, Pressure4.dll and ADClip7.dll.";
+            : "No matching effect DLLs in that folder. Look for BassKit64.dll, PurestDrive64.dll, Air264.dll, Pressure464.dll and ADClip764.dll (the “64” builds).";
         _services.Controller?.Apply(ApplyAttribution.Manual());
     }
 

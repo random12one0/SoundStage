@@ -185,7 +185,7 @@
                         <StackPanel Margin="0,0,120,0">
                             <TextBlock FontSize="15" FontWeight="SemiBold" Text="Enhancers" />
                             <TextBlock Margin="0,2,0,0" FontSize="12" Opacity="0.65" TextWrapping="Wrap"
-                                       Text="Real DSP beyond EQ — virtual bass, warmth, a true exciter and compressor, and a loudness ceiling. These are bundled plug-ins; install once and they're ready." />
+                                       Text="Real DSP beyond EQ — virtual bass, warmth, a true exciter and compressor, and a loudness ceiling. Built in and ready; just flip one on." />
                         </StackPanel>
                         <TextBlock HorizontalAlignment="Right" VerticalAlignment="Top" FontSize="11" Opacity="0.6" Text="{Binding InstallStatus}" />
                     </Grid>

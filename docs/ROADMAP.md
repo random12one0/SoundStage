@@ -26,7 +26,19 @@ headphone illusion the way Boom does.
 - [x] **v0.8.0** — width mid/side scratch-channel matrix fix; bolder ambience IR; dashboard `%`
       readouts; softer selected pills.
 
-## ✅ v0.10.0 — real fixes + surround calibration + a VST effect rack (this release)
+## ✅ v0.10.4 — enhancers bundled and work out of the box (this release)
+
+- [x] **The 5 enhancer plug-ins ship inside the app.** BassKit, PurestDrive, Air2, Pressure4 and
+      ADClip7 (all Airwindows, MIT) are embedded in the .exe and **self-extract** to the per-user
+      plugins folder the first time they're needed — so the enhancers just work, with no download.
+      Because the portable release is a single .exe, embedding is the only way to give Equalizer APO
+      a real, stable DLL path it can load.
+- [x] **Lenient plug-in naming.** Airwindows ships its 64-bit builds as `BassKit64.dll`; our catalog
+      and older packs used `BassKit.dll`. A new canonical-key matcher (`VstNaming`) ignores the `64`
+      suffix, casing, spaces and `(1)` copy markers, so resolve / import / auto-install all match
+      regardless of the exact filename — this is what the folder-import "found nothing" was.
+
+## ✅ v0.10.0 — real fixes + surround calibration + a VST effect rack
 
 - [x] **Stereo width — the actual root-cause fix.** Equalizer APO evaluates a single `Copy:` line
       in parallel, so the scratch/virtual channels we used were unnecessary and were themselves the
