@@ -22,3 +22,6 @@ tools/AutoEqPacker/work/
 # OS
 Thumbs.db
 .DS_Store
+
+# Native DSP engine build output
+native/**/build/

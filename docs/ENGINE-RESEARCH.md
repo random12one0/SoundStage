@@ -100,3 +100,52 @@ APO caveats actually block *your* setup.
 - Signalsmith "Let's Write a Reverb": https://signalsmith-audio.co.uk/writing/2021/lets-write-a-reverb/
 - RSAlgorithmicVerb (JUCE reverb families): https://github.com/reillypascal/RSAlgorithmicVerb
 - Ross Bencina — real-time audio rules: http://www.rossbencina.com/code/real-time-audio-programming-101-time-waits-for-nothing
+
+---
+
+## DECISION — v1.0 engine (locked)
+
+After a second research pass on the *implementation* stack, the earlier "Option B — our own C++
+DSP as a plugin inside stock Equalizer APO" is **not buildable the clean way**, and we changed the
+plan:
+
+- **Our own VST2 is legally impossible.** Steinberg withdrew the VST2 SDK licence (Oct 2018) and its
+  headers can't be redistributed. Stock APO only hosts VST2 — so we can't put *our* plugin in stock
+  APO. (Bundling *pre-built* MIT VST2s like Airwindows is still fine; building a new one is not.)
+- **VST3 works but needs a third-party APO fork** that is explicitly "for simple, lightweight
+  plug-ins," adds latency, and crashes with some plugins — too fragile to be a foundation.
+- The product owner's priority is unambiguous: **it must just work and not depend on flaky external
+  pieces.** The APO route (which the prototype rode on) is exactly that flaky dependency, and it has
+  been failing on the target 7.1 + Atmos rig.
+
+**Chosen architecture (the FxSound / Boom / Voicemeeter model):**
+
+1. **Our own virtual audio device (driver)** that the user selects as default output. It captures all
+   system audio, hands it to our engine, and renders to the real device. No APO, no fork.
+   Based on FxSound's **open-source** driver (derived from Microsoft's WDK virtual-audio sample).
+2. **Our own DSP engine** (portable C++, this `native/soundstage-dsp` module) — EQ, our reverb,
+   compressor/limiter, bass enhancement, stereo width, and the stereo→5.1/7.1 upmix. Double
+   precision, per-sample parameter smoothing (can-never-pop).
+3. **The app**: a C# shell hosting the approved UI in **WebView2** (reuses the exact HTML/CSS/JS
+   design), bridged to the engine.
+
+**The one real gate:** shipping the driver so it installs cleanly requires **attestation signing via
+Microsoft Partner Center, which needs a paid EV code-signing certificate (~$250–400/yr)**. That is
+the owner's to obtain, at ship time. For development the driver can run under Windows test-signing
+mode. Everything else can be built and (for the DSP) unit-tested without it.
+
+**Build order (small, verified steps):**
+1. **DSP engine core** in portable C++, unit-tested on Linux CI. ← *in progress (this commit: biquad
+   EQ + pop-free parameter smoothing).*
+2. Grow the engine: our reverb (FDN), compressor/limiter, bass, width, surround upmix — each with
+   tests.
+3. The virtual-audio driver (Windows/WDK, based on the FxSound driver) routing audio through the
+   engine.
+4. C# app + WebView2 UI wired to the engine.
+
+## Sources — implementation pass
+- VST2 SDK withdrawn / non-redistributable: https://www.kvraudio.com/forum/viewtopic.php?t=508845
+- Equalizer APO VST3 fork (fragile, "lightweight plug-ins only"): https://sourceforge.net/p/equalizerapo/discussion/general/thread/9526d91f79/
+- CamillaDSP (open IIR/FIR engine, needs a virtual device on Windows): https://github.com/HEnquist/camilladsp
+- Driver attestation signing needs an EV cert: https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/code-signing-attestation
+- WebView2 in WPF (host our UI): https://learn.microsoft.com/en-us/microsoft-edge/webview2/get-started/wpf
