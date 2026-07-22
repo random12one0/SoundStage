@@ -22,4 +22,37 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- Build the native engine (soundstage_engine) with CMake and ship it beside the app so the
+       P/Invoke in SoundstageEngine resolves at runtime: soundstage_engine.dll on Windows (MSVC in
+       CI), lib*.so/.dylib elsewhere. Verified on the Linux build host. -->
+  <PropertyGroup>
+    <NativeEngineDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\..\native\soundstage-dsp'))</NativeEngineDir>
+    <NativeEngineBuildDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)obj\native-engine'))</NativeEngineBuildDir>
+  </PropertyGroup>
+
+  <Target Name="BuildNativeEngine">
+    <Exec Command="cmake -S &quot;$(NativeEngineDir)&quot; -B &quot;$(NativeEngineBuildDir)&quot; -DCMAKE_BUILD_TYPE=Release" />
+    <Exec Command="cmake --build &quot;$(NativeEngineBuildDir)&quot; --config Release --target soundstage_engine" />
+    <ItemGroup>
+      <NativeEngineArtifact Include="$(NativeEngineBuildDir)**\soundstage_engine.dll" />
+      <NativeEngineArtifact Include="$(NativeEngineBuildDir)**\libsoundstage_engine.so" />
+      <NativeEngineArtifact Include="$(NativeEngineBuildDir)**\libsoundstage_engine.dylib" />
+    </ItemGroup>
+  </Target>
+
+  <!-- Copy the engine next to the app for a plain build / dotnet run. -->
+  <Target Name="_CopyNativeEngineToOutput" AfterTargets="Build" DependsOnTargets="BuildNativeEngine">
+    <Copy SourceFiles="@(NativeEngineArtifact)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <!-- Include the engine in publish output (single-file self-extract picks up native libs). -->
+  <Target Name="_AddNativeEngineToPublish" BeforeTargets="ComputeResolvedFilesToPublishList" DependsOnTargets="BuildNativeEngine">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="@(NativeEngineArtifact)">
+        <RelativePath>%(Filename)%(Extension)</RelativePath>
+        <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      </ResolvedFileToPublish>
+    </ItemGroup>
+  </Target>
+
 </Project>
