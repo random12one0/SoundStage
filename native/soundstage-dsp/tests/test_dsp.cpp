@@ -3,6 +3,8 @@
 #include "soundstage/BassEnhancer.h"
 #include "soundstage/Biquad.h"
 #include "soundstage/Compressor.h"
+#include "soundstage/EngineChain.h"
+#include "soundstage/Equalizer.h"
 #include "soundstage/Reverb.h"
 #include "soundstage/SmoothedValue.h"
 #include "soundstage/StereoWidth.h"
@@ -270,6 +272,145 @@ void testBass() {
     check(wetHp > dryHp * 4.0, "bass enhancer adds harmonic energy above the fundamental");
 }
 
+// The multi-band EQ is a faithful biquad cascade: no bands = identity, and stacked bands multiply.
+void testEqualizer() {
+    soundstage::Equalizer eq;
+    eq.prepare(kFs);
+
+    eq.setNumBands(0);
+    double l = 0.33, r = -0.21;
+    eq.process(l, r);
+    checkClose(l, 0.33, 1e-12, "EQ with no bands is identity (L)");
+    checkClose(r, -0.21, 1e-12, "EQ with no bands is identity (R)");
+
+    eq.setNumBands(1);
+    eq.setBand(0, soundstage::Equalizer::BandType::Peaking, 1000.0, 6.0, 1.0);
+    checkClose(eq.magnitude(1000.0), dbToLin(6.0), 1e-6, "EQ single band: +6 dB at f0");
+
+    eq.setNumBands(2);
+    eq.setBand(1, soundstage::Equalizer::BandType::Peaking, 1000.0, 6.0, 1.0);
+    checkClose(eq.magnitude(1000.0), dbToLin(12.0), 1e-5, "two identical bands stack to +12 dB at f0");
+
+    eq.setBandFlat(1);
+    checkClose(eq.magnitude(1000.0), dbToLin(6.0), 1e-5, "flattening a band drops it back to +6 dB");
+}
+
+// The full chain: transparent by default, a clean master bypass, correct gain + channel expansion,
+// pop-free effect toggles, and rock-solid stability with everything engaged.
+void testEngineChain() {
+    // 1) Transparent out of the box: master on, every effect off -> output == input, exactly.
+    {
+        soundstage::EngineChain e;
+        e.prepare(kFs);
+        double o[8] = {0};
+        e.processFrame(0.4, -0.2, o, 2);
+        checkClose(o[0], 0.4, 1e-12, "default chain passes L straight through");
+        checkClose(o[1], -0.2, 1e-12, "default chain passes R straight through");
+    }
+
+    // 2) The master switch is a clean bypass, not a mute: with an effect engaged, off -> input.
+    {
+        soundstage::EngineChain e;
+        e.prepare(kFs);
+        e.eq().setNumBands(1);
+        e.eq().setBand(0, soundstage::Equalizer::BandType::LowShelf, 200.0, 12.0, 0.707);
+        e.enableEq(true);
+        e.setEnabled(false);
+        double o[2] = {0};
+        for (int n = 0; n < 2000; ++n) e.processFrame(0.1, 0.1, o, 2);  // settle both ramps
+        checkClose(o[0], 0.1, 1e-6, "master off is a clean bypass (input preserved), not a mute");
+    }
+
+    // 3) Output gain: +6 dB scales the signal (~x1.995) once the ramp settles.
+    {
+        soundstage::EngineChain e;
+        e.prepare(kFs);
+        e.setOutputGainDb(6.0);
+        double o[2] = {0};
+        for (int n = 0; n < 2000; ++n) e.processFrame(0.1, -0.1, o, 2);
+        checkClose(o[0], 0.1 * dbToLin(6.0), 1e-4, "output gain +6 dB scales L");
+        checkClose(o[1], -0.1 * dbToLin(6.0), 1e-4, "output gain +6 dB scales R");
+    }
+
+    // 4) Channel expansion. Upmix on: fronts carry the signal and surrounds fill. Off: rest silent.
+    {
+        soundstage::EngineChain e;
+        e.prepare(kFs);
+        e.enableUpmix(true);
+        double o[8] = {0};
+        for (int n = 0; n < 200; ++n) e.processFrame(0.5, 0.5, o, 8);  // settle LFE low-pass + amount
+        checkClose(o[0], 0.5, 1e-6, "7.1 FL carries front L");
+        checkClose(o[1], 0.5, 1e-6, "7.1 FR carries front R");
+        checkClose(o[2], 0.5, 1e-6, "7.1 centre carries the mono content");
+        check(o[4] > 0.0 && o[6] > 0.0, "7.1 surround + back speakers filled");
+
+        e.enableUpmix(false);
+        double q[8] = {9, 9, 9, 9, 9, 9, 9, 9};
+        e.processFrame(0.5, -0.3, q, 8);
+        checkClose(q[0], 0.5, 1e-6, "upmix off: FL still carries the signal");
+        checkClose(q[1], -0.3, 1e-6, "upmix off: FR still carries the signal");
+        checkClose(q[2], 0.0, 1e-12, "upmix off: centre silent");
+        checkClose(q[7], 0.0, 1e-12, "upmix off: back R silent");
+    }
+
+    // 5) Enabling an effect ramps smoothly. Feed DC so the only source of change is the enable ramp:
+    //    no single-sample jump, and it lands on the full effect.
+    {
+        soundstage::EngineChain e;
+        e.prepare(kFs);
+        e.eq().setNumBands(1);
+        e.eq().setBand(0, soundstage::Equalizer::BandType::LowShelf, 200.0, 12.0, 0.707);
+        double o[2] = {0};
+        for (int n = 0; n < 400; ++n) e.processFrame(0.1, 0.1, o, 2);  // steady, EQ still off
+        e.enableEq(true);
+        double prev = o[0], maxStep = 0.0;
+        for (int n = 0; n < 2000; ++n) {
+            e.processFrame(0.1, 0.1, o, 2);
+            maxStep = std::max(maxStep, std::fabs(o[0] - prev));
+            prev = o[0];
+        }
+        check(maxStep < 0.005, "enabling an effect ramps smoothly (no pop)");
+        checkClose(o[0], 0.1 * dbToLin(12.0), 1e-3, "EQ fully engaged after the ramp (+12 dB at DC)");
+    }
+
+    // 6) Everything on, noisy input: stays finite and inside [-1, 1] (the safety clamp holds).
+    {
+        soundstage::EngineChain e;
+        e.prepare(kFs);
+        e.eq().setNumBands(2);
+        e.eq().setBand(0, soundstage::Equalizer::BandType::LowShelf, 120.0, 6.0, 0.707);
+        e.eq().setBand(1, soundstage::Equalizer::BandType::HighShelf, 8000.0, 4.0, 0.707);
+        e.bass().setAmount(0.7);
+        e.compressor().setThresholdDb(-24.0);
+        e.compressor().setRatio(4.0);
+        e.compressor().setMakeupDb(6.0);
+        e.width().setWidth(1.6);
+        e.reverb().setMix(0.35);
+        e.enableEq(true);
+        e.enableBass(true);
+        e.enableCompressor(true);
+        e.enableWidth(true);
+        e.enableReverb(true);
+        e.enableUpmix(true);
+        e.setOutputGainDb(3.0);
+
+        bool allFinite = true, inRange = true;
+        unsigned int seed = 12345u;
+        double o[8] = {0};
+        for (int n = 0; n < static_cast<int>(kFs); ++n) {
+            seed = seed * 1103515245u + 12345u;  // deterministic LCG noise
+            const double x = ((seed >> 9) / static_cast<double>(1u << 23) - 0.5) * 1.2;  // ~[-0.6, 0.6]
+            e.processFrame(x, -x * 0.8, o, 8);
+            for (int c = 0; c < 8; ++c) {
+                if (!std::isfinite(o[c])) allFinite = false;
+                if (o[c] < -1.0000001 || o[c] > 1.0000001) inRange = false;
+            }
+        }
+        check(allFinite, "full chain stays finite under noise");
+        check(inRange, "full chain output stays within [-1, 1]");
+    }
+}
+
 struct Test { const char* name; void (*fn)(); };
 
 }  // namespace
@@ -286,6 +427,8 @@ int main() {
         {"stereo-width", testStereoWidth},
         {"upmix", testUpmix},
         {"bass-enhancer", testBass},
+        {"equalizer", testEqualizer},
+        {"engine-chain", testEngineChain},
     };
 
     for (const auto& t : tests) {
