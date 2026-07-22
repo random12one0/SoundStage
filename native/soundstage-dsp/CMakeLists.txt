@@ -9,6 +9,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(soundstage_dsp INTERFACE)
 target_include_directories(soundstage_dsp INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
+# The shipped engine: EngineChain behind a flat C ABI, built as a shared library the app P/Invokes
+# (soundstage_engine.dll on Windows, libsoundstage_engine.so/.dylib elsewhere).
+add_library(soundstage_engine SHARED src/engine_c.cpp)
+target_link_libraries(soundstage_engine PUBLIC soundstage_dsp)
+target_compile_features(soundstage_engine PUBLIC cxx_std_17)
+set_target_properties(soundstage_engine PROPERTIES C_VISIBILITY_PRESET hidden
+                                                   CXX_VISIBILITY_PRESET hidden)
+
 enable_testing()
 add_executable(soundstage_dsp_tests tests/test_dsp.cpp)
 target_link_libraries(soundstage_dsp_tests PRIVATE soundstage_dsp)
@@ -18,6 +26,16 @@ else()
     target_compile_options(soundstage_dsp_tests PRIVATE -Wall -Wextra)
 endif()
 add_test(NAME soundstage_dsp_tests COMMAND soundstage_dsp_tests)
+
+# Drives the shipped shared library through its C ABI, the way the app will.
+add_executable(soundstage_capi_tests tests/test_capi.cpp)
+target_link_libraries(soundstage_capi_tests PRIVATE soundstage_engine)
+if(MSVC)
+    target_compile_options(soundstage_capi_tests PRIVATE /W4)
+else()
+    target_compile_options(soundstage_capi_tests PRIVATE -Wall -Wextra)
+endif()
+add_test(NAME soundstage_capi_tests COMMAND soundstage_capi_tests)
 
 # Render tool: run a test signal through the engine and write dry/wet WAVs, so the sound can be
 # checked by ear. Demo/preview only — not part of the shipped engine.
