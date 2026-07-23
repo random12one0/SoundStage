@@ -1,21 +1,20 @@
 {
   "state": "done",
-  "headline": "The APO is built — one admin step left for you",
-  "note": "Soundstage no longer needs VB-CABLE. The plugin builds, the app publishes settings to it live, and both sides agree on the data byte for byte (33/33 checks). The one thing I couldn't do is install it: attaching a plugin to a speaker needs Administrator. Run install-apo.ps1 as admin when you're back. It backs up everything it touches and -Uninstall puts it all back.",
-  "updated": "APO complete, pushed as 914216e",
+  "headline": "The plugin works — no more VB-CABLE",
+  "note": "Soundstage now runs inside Windows' own audio engine. It's installed on your Realtek output and proven by measurement: asked for -20 dB, measured -20.00 dB at the plugin's own output. Three separate Windows requirements had to be found before it would load at all, and audiodg crashed a few times on the way. Your AV receiver is attached too, but it went into standby before I could confirm 8-channel — play something through it and it should just work.",
+  "updated": "APO working and pushed, plus plugin mode in the UI and per-speaker meters",
   "items": [
-    { "text": "Status page for your phone", "done": true, "active": false },
-    { "text": "Limiter switch in the UI", "done": true, "active": false },
-    { "text": "Gain reduction on the Leveler dial", "done": true, "active": false },
-    { "text": "Measured latency readout", "done": true, "active": false },
-    { "text": "Panic restore", "done": true, "active": false },
-    { "text": "Shift-drag fine adjustment", "done": true, "active": false },
-    { "text": "Real bass management (Small/Large + crossover)", "done": true, "active": false },
     { "text": "Soundstage APO - our own audio plugin", "done": true, "active": false },
-    { "text": "App publishes settings to the plugin, live", "done": true, "active": false },
-    { "text": "Layouts verified across C# and C++ (33/33)", "done": true, "active": false },
-    { "text": "Installer script with full backup and undo", "done": true, "active": false },
-    { "text": "Pushed to GitHub", "done": true, "active": false },
-    { "text": "YOU: run install-apo.ps1 as admin to switch it on", "done": false, "active": true }
+    { "text": "Found the hidden second registration Windows requires", "done": true, "active": false },
+    { "text": "COM aggregation - the engine demands it", "done": true, "active": false },
+    { "text": "IAudioSystemEffects3 - refusing it crashed all audio", "done": true, "active": false },
+    { "text": "Loads inside audiodg and locks the stream", "done": true, "active": false },
+    { "text": "Measured: 0 / -20 / -6 dB asked, 0.00 / -20.00 / -6.00 got", "done": true, "active": false },
+    { "text": "Bypass verified clean (+0.00 dB)", "done": true, "active": false },
+    { "text": "Plugin mode in Settings, with install and undo", "done": true, "active": false },
+    { "text": "Level meter on every speaker fader", "done": true, "active": false },
+    { "text": "Visual direction mockups - sent as an artifact", "done": true, "active": false },
+    { "text": "Everything pushed to GitHub", "done": true, "active": false },
+    { "text": "Left for you: play something on the AV receiver to confirm 8ch", "done": false, "active": true }
   ]
 }
