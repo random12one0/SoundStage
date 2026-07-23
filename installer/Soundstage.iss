@@ -51,6 +51,12 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "..\publish\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 
+; The audio plugin and its installer. Shipped as plain files beside the exe rather than bundled into
+; it, because install-apo.ps1 looks for the DLL in its own directory, and because turning plugin mode
+; on is a separate elevated step the user takes later from Settings - not part of this install.
+Source: "..\native\soundstage-apo\SoundstageApo.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\native\soundstage-apo\install-apo.ps1"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
