@@ -37,6 +37,18 @@ EV cert for clean distribution) — task #29, deferred.
 - UI feels native: custom title bar with working window buttons, fixed frame (only content scrolls),
   glow, old-app settings removed.
 
+## Just added in the cloud — VERIFY ON WINDOWS FIRST (written blind, not run)
+The final cloud commits added these but could not be tested (no Windows to run on). **Run the app and
+check each one first:**
+- **Window dragging** via CSS `-webkit-app-region: drag` on `.tb` (buttons are `no-drag`). Replaces the
+  old flaky DragMove-from-JS (which the user confirmed did NOT work). If the window still won't drag by
+  the title bar in this WPF+WebView2 setup, fall back to a `WindowChrome` caption or host-side drag.
+- **Drag-to-adjust dials**: `.radial` pointer events in `web/index.html` — drag up/down adjusts + emits
+  to the engine, a plain click toggles on/off. Confirm dragging actually turns them and the value/arc
+  updates.
+- **Honest now-playing text** (was a hard-coded "Ivy — Frank Ocean"). Real now-playing detection
+  (GlobalSystemMediaTransportControlsSessionManager) is still to do.
+
 ## What's next
 1. **Drag-to-adjust** the dials + EQ bands + wire presets (currently toggle-only) — task #33.
 2. Retune the effect→param curves by ear (user judges sound).

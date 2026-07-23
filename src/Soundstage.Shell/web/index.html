@@ -12,10 +12,10 @@
     overflow:hidden;height:100%;display:flex;flex-direction:column;user-select:none;font-family:"Bahnschrift","Segoe UI Variable",system-ui,sans-serif;}
   @keyframes in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .ico{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;display:block;}
-  .tb{display:flex;align-items:center;height:42px;padding:0 8px 0 16px;gap:10px;background:linear-gradient(#182230,#131b26);border-bottom:1px solid #0c1118;}
+  .tb{display:flex;align-items:center;height:42px;padding:0 8px 0 16px;gap:10px;background:linear-gradient(#182230,#131b26);border-bottom:1px solid #0c1118;-webkit-app-region:drag;app-region:drag;}
   .tb .name{font-weight:600;font-size:13px;letter-spacing:.04em;display:flex;align-items:center;gap:9px;color:#d6dee6;}
   .tb .name .lg{width:17px;height:17px;color:var(--glow);filter:drop-shadow(0 0 5px #37e0cf88);}
-  .tb .wb{margin-left:auto;display:flex;height:42px;}
+  .tb .wb{margin-left:auto;display:flex;height:42px;-webkit-app-region:no-drag;app-region:no-drag;}
   .tb .wb b{width:46px;height:42px;display:grid;place-items:center;color:#c2ccd2;cursor:default;transition:background .12s,color .12s;}
   .tb .wb b svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
   .tb .wb b:hover{background:#ffffff18;}
@@ -298,7 +298,7 @@
 
         <!-- STATUS (persistent) -->
         <div class="screen" id="statusStrip">
-          <div class="np"><div class="bars"><i></i><i></i><i></i><i></i></div><div><div class="src">Now Playing · Spotify</div><div class="trk">Ivy — Frank Ocean</div></div></div>
+          <div class="np"><div class="bars"><i></i><i></i><i></i><i></i></div><div><div class="src">Soundstage</div><div class="trk">Ready — press power to start</div></div></div>
           <span class="fmt"><b>2.0 → 7.1</b> · <b>48</b> kHz</span>
           <div class="tools">
             <button class="power off" data-power><span class="d"></span> Off</button>
@@ -541,7 +541,7 @@
     var t=e.target.closest('.test');if(t){playOne(t.closest('.strip'));return;}
     var pw=e.target.closest('[data-power]');if(pw){var o=pw.classList.toggle('off');pw.innerHTML='<span class="d"></span> '+(o?'Off':'On');return;}
     var sw=e.target.closest('[data-sw]');if(sw){var on=sw.classList.toggle('on');var card=sw.closest('.acard');if(card)card.classList.toggle('off',!on);return;}
-    var rad=e.target.closest('.radial');if(rad){rad.classList.toggle('off');return;}
+    var rad=e.target.closest('.radial');if(rad){return;}  /* dial on/off + drag handled by pointer events */
     var pb=e.target.closest('.cfg-pills button');if(pb){pb.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});pb.classList.add('on');closeMenus();return;}
     var dd=e.target.closest('.cfg-dd');if(dd){if(dd.dataset.pickCat){openValuePicker(dd.dataset.pickCat,dd);e.stopPropagation();return;}openMenu(dd);e.stopPropagation();return;}
     var pbtn=e.target.closest('.pddbtn');if(pbtn){var pdd=pbtn.closest('.pdd');var wo=pdd.classList.contains('open');closeMenus();if(!wo)pdd.classList.add('open');e.stopPropagation();return;}
@@ -559,12 +559,34 @@
     var FX={'Bass':'bass','Air':'air','Warmth':'warmth','Leveler':'leveler','Ambience':'ambience','Night':'night'};
     function emitDial(el){var id=FX[el.dataset.label];if(!id)return;ssg({t:'effect',id:id,on:!el.classList.contains('off'),v:(+el.dataset.val||0)/100});}
 
-    /* Runs after the existing click handler (which toggles .off / the power text); emits the result. */
+    /* Power button: runs after the existing handler (which flips the text) and emits the result. */
     document.addEventListener('click',function(e){
       var pw=e.target.closest('[data-power]');
       if(pw){ssg({t:'power',on:!pw.classList.contains('off')});return;}
-      var rad=e.target.closest('.radial');
-      if(rad){emitDial(rad);return;}
+    });
+
+    /* Dials: drag up/down to adjust the amount, click to toggle on/off — both drive the engine live. */
+    document.querySelectorAll('.radial').forEach(function(el){
+      var startY=0,startVal=0,dragging=false,pid;
+      el.addEventListener('pointerdown',function(e){
+        startY=e.clientY;startVal=+el.dataset.val||0;dragging=false;pid=e.pointerId;
+        try{el.setPointerCapture(pid);}catch(_){}
+        e.preventDefault();
+      });
+      el.addEventListener('pointermove',function(e){
+        if(pid===undefined||e.pointerId!==pid)return;
+        var dy=startY-e.clientY;
+        if(Math.abs(dy)>3)dragging=true;
+        if(dragging){
+          var v=Math.max(0,Math.min(100,Math.round(startVal+dy*0.5)));
+          if(v!==(+el.dataset.val||0)){el.dataset.val=v;el.classList.remove('off');radial(el);emitDial(el);}
+        }
+      });
+      el.addEventListener('pointerup',function(e){
+        if(pid!==undefined){try{el.releasePointerCapture(pid);}catch(_){}}
+        if(!dragging){el.classList.toggle('off');emitDial(el);}  /* a plain click toggles on/off */
+        dragging=false;pid=undefined;
+      });
     });
 
     /* toast for status coming back from the app */

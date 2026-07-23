@@ -105,13 +105,6 @@ window.addEventListener('DOMContentLoaded', function () {
     wb[1].addEventListener('click', function () { post('max'); });
     wb[2].addEventListener('click', function () { post('close'); });
   }
-  var tb = document.querySelector('.tb');
-  if (tb) {
-    tb.style.userSelect = 'none';
-    tb.addEventListener('mousedown', function (e) {
-      if (e.target.closest('.wb')) { return; }
-      post('drag');
-    });
-  }
+  // Dragging the window is handled natively by CSS -webkit-app-region: drag on the title bar.
 });";
 }
