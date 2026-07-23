@@ -11,7 +11,7 @@
 ; for admin to install an audio utility is the kind of thing that makes people close the window.
 
 #define AppName "Soundstage"
-#define AppVersion "1.0.0"
+#define AppVersion "1.1.0"
 #define AppExe "Soundstage.exe"
 #define AppPublisher "Soundstage"
 #define AppUrl "https://github.com/random12one0/SoundStage"
