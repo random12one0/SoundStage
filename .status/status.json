@@ -1,19 +1,19 @@
 {
   "state": "done",
-  "headline": "Found the real bug — the plugin never ran on your 5.1 receiver",
-  "note": "The whole time, the plugin was skipping your surround receiver because it told Windows it only handled 2 channels. That's why nothing you touched did anything on the receiver. Fixed and measured: it now locks at 6 channels and your controls reach it — Bass +2.70 dB at 60 Hz, volume 0/-10/-30 exact, upmix now spreads stereo across the surrounds (+8.53 dB delta inside the plugin). Also fixed: two copies of the app running at once (a real cause of 'controls do nothing'), and the app no longer mentions the cable you deleted.",
-  "updated": "surround + single-instance + upmix fixes, all pushed",
+  "headline": "Hardened it — tried hard to break it, then fixed what broke",
+  "note": "Spent this session trying to make it fail the way it would in the wild: corrupted settings, glitchy input samples, garbage in every knob, odd channel counts, in-place buffers, weird sample rates. Found five ways to make the audio engine spit out NaN — which inside Windows' audio service is a loud click at best. All fixed with layered scrubbing: nothing non-finite can now reach your speakers. A corrupted settings file no longer crashes system audio, no longer mutes, and recovers the instant good settings return. The app also survives a totally garbled settings file on launch. Normal sound is untouched — bypass measures exactly 0.00 dB.",
+  "updated": "hardening pass - 20 adversarial tests, all pass",
   "items": [
-    { "text": "Plugin now runs on the 5.1 receiver (was stereo-only)", "done": true, "active": false },
-    { "text": "Root cause: it reported 2 channels before locking, so Windows skipped it", "done": true, "active": false },
-    { "text": "App controls reach the receiver - Bass +2.70 dB measured", "done": true, "active": false },
-    { "text": "Volume path exact: 0/-10/-30 dB", "done": true, "active": false },
-    { "text": "Upmix spreads stereo to surrounds (+8.53 dB inside the plugin)", "done": true, "active": false },
-    { "text": "Single-instance guard - two copies were overwriting each other", "done": true, "active": false },
-    { "text": "No more mention of the cable you removed", "done": true, "active": false },
-    { "text": "Built a loopback analyzer and session lister for real measurement", "done": true, "active": false },
-    { "text": "Learned: loopback taps before the plugin - use its own stats log", "done": true, "active": false },
-    { "text": "App reset to neutral, one instance, plugin attached", "done": true, "active": false },
-    { "text": "For you to confirm by ear: does 5.1 fill all speakers now", "done": false, "active": true }
+    { "text": "Fuzzed the DSP: 13 categories, found 5 NaN paths", "done": true, "active": false },
+    { "text": "Output scrub - no NaN/Inf ever reaches audiodg", "done": true, "active": false },
+    { "text": "Input scrub - a bad sample can't poison a filter forever", "done": true, "active": false },
+    { "text": "Every setting clamped finite + in-range before it hits a filter", "done": true, "active": false },
+    { "text": "Corrupt settings file: no crash, no mute, full recovery", "done": true, "active": false },
+    { "text": "App survives empty/garbage/truncated state.json on launch", "done": true, "active": false },
+    { "text": "Odd channels, in-place, 44/96/192kHz, rapid toggling all clean", "done": true, "active": false },
+    { "text": "Surround/stereo decision now sticky - no popping on quiet film scenes", "done": true, "active": false },
+    { "text": "Regression: normal audio + effects still exact (bypass 0.00, gain -6.00)", "done": true, "active": false },
+    { "text": "Hardened DLL shipped in app + installer, running now", "done": true, "active": false },
+    { "text": "For you: the 30-ideas list - we'll pick from it once base is proven by ear", "done": false, "active": true }
   ]
 }
