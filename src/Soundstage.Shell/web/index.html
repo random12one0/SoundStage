@@ -256,10 +256,19 @@
   .knob-hit{cursor:grab;}
   .dragging .knob-hit{cursor:grabbing;}
   .knob-hub{cursor:pointer;}
-  .vd{width:50px;height:50px;touch-action:none;}
-  .vd svg{width:50px;height:50px;}
+  /* The volume dial is the control you reach for most, so it gets the most room. */
+  .vd{width:68px;height:68px;touch-action:none;}
+  .vd svg{width:68px;height:68px;}
+  .voldial .vn{font-size:14px;min-width:24px;text-align:right;}
   .fader,.sl,.geqbars,.band{touch-action:none;}
   .bhandle.dragging,.fhandle.dragging,.sl b.dragging{cursor:grabbing;}
+  /* Invisible padding around every handle. The dot stays small because that reads better; the
+     thing you have to hit is much bigger than the thing you can see. */
+  .bhandle::after,.fhandle::after,.sl b::after{content:"";position:absolute;inset:-11px;border-radius:50%;}
+  /* Widen the slider's grab zone without changing its layout — a 5 px-tall track is a cruel target.
+     The pseudo-element sits behind the handle, so dragging the handle still wins. */
+  .sl::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px;}
+  .fader::before{content:"";position:absolute;left:-6px;right:-6px;top:0;bottom:0;}
   .band{cursor:pointer;}
   .bdb{position:absolute;left:50%;transform:translateX(-50%);top:1px;font-family:ui-monospace,monospace;
        font-size:9px;color:var(--glow-ink);opacity:0;transition:opacity .12s;pointer-events:none;z-index:4;white-space:nowrap;}
@@ -285,6 +294,48 @@
                border:1px solid #2b3a48;border-radius:10px;padding:10px 12px;}
   #modal input:focus{outline:0;border-color:var(--glow);}
   #modal .row{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;}
+
+  /* update banner — present when it matters, gone when it doesn't */
+  .updbar{display:none;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--r);
+          background:linear-gradient(90deg,#12312e,#132030);border:1px solid #2f6f68;
+          box-shadow:0 0 26px #37e0cf22;}
+  .updbar.show{display:flex;animation:fade .3s ease both;}
+  .updbar .ub-dot{width:8px;height:8px;border-radius:50%;background:var(--glow);
+                  box-shadow:0 0 10px var(--glow);flex:none;animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .updbar .ub-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+  .updbar .ub-t b{font-size:13.5px;font-weight:600;color:var(--ink);}
+  .updbar .ub-t span{font-size:11.5px;color:var(--dim);}
+  .updbar .ub-p{display:none;width:120px;height:5px;border-radius:4px;background:#0d1a1f;overflow:hidden;flex:none;}
+  .updbar .ub-p.show{display:block;}
+  .updbar .ub-p i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1a9d92,#37e0cf);transition:width .2s;}
+  .ub-x{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;color:var(--faint);
+        background:transparent;border:0;cursor:pointer;flex:none;}
+  .ub-x:hover{color:var(--ink);background:#ffffff10;}
+
+  /* guided setup */
+  #setup{position:fixed;inset:0;z-index:9997;background:#060a0fcc;backdrop-filter:blur(4px);
+         display:none;align-items:center;justify-content:center;}
+  #setup.show{display:flex;animation:fade .2s ease both;}
+  #setup .sbox{width:min(520px,90vw);background:var(--surf);border:1px solid var(--line);border-radius:18px;
+               box-shadow:0 30px 90px rgba(0,0,0,.65),inset 0 1px 0 var(--soft-line);padding:22px 24px 20px;}
+  #setup .sh{display:flex;align-items:center;margin-bottom:10px;}
+  #setup .sstep{font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--glow);flex:1;}
+  #setup h3{margin:0 0 8px;font-size:19px;font-weight:680;letter-spacing:-.01em;color:var(--ink);}
+  #setup p{margin:0 0 16px;font-size:13px;line-height:1.55;color:var(--dim);}
+  #setup p b{color:var(--ink);font-weight:600;}
+  #setup .sdiag{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;
+                background:#0d141d;border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:14px;}
+  #setup .sdiag .node{font-size:11.5px;color:var(--ink);background:#16202c;border:1px solid #2a3846;
+                      border-radius:9px;padding:7px 11px;}
+  #setup .sdiag .node.on{border-color:var(--glow);color:var(--glow-ink);box-shadow:0 0 14px #37e0cf28;}
+  #setup .sdiag .arr{color:var(--faint);font-size:13px;}
+  #setup .scheck{font-size:12.5px;border-radius:11px;padding:11px 13px;margin-bottom:16px;display:none;}
+  #setup .scheck.show{display:block;}
+  #setup .scheck.ok{background:#0f2622;border:1px solid #2f6f68;color:#9fe8dd;}
+  #setup .scheck.warn{background:#2a2016;border:1px solid #6b5324;color:#f0cf9a;}
+  #setup .srow{display:flex;align-items:center;gap:9px;}
+  #setup .srow .sp{flex:1;}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
@@ -334,6 +385,16 @@
       </nav>
 
       <div class="content"><div class="inner">
+
+        <!-- UPDATE BANNER — only ever shown when there really is a newer release -->
+        <div class="updbar" id="updBar">
+          <span class="ub-dot"></span>
+          <div class="ub-t"><b id="ubTitle">A new version is available</b><span id="ubSub"></span></div>
+          <div class="ub-p" id="ubProgress"><i></i></div>
+          <button class="ghost" id="ubNotes">Release notes</button>
+          <button class="btn" id="ubGet">Download</button>
+          <button class="ub-x" id="ubClose"><svg class="ico" style="width:14px"><use href="#i-x"/></svg></button>
+        </div>
 
         <!-- STATUS (persistent) -->
         <div class="screen" id="statusStrip">
@@ -483,12 +544,25 @@
             <div class="ph"><h3 class="big">Settings</h3></div>
             <div class="setgroup">Startup</div>
             <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw" data-sw="runAtLogin"><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Keep running in the tray when closed</div><div class="std">Closing the window leaves your sound processed. Quit from the tray icon to stop.</div></div><div class="sw" data-sw="closeToTray"><div class="k"></div></div></div>
+
             <div class="setgroup">Audio</div>
             <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage plays your processed sound</div></div><div class="pdd" id="devDD"><button class="pddbtn"><span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Outlet device</div><div class="std">The virtual device your apps play into, which we capture</div></div><div class="pdd" id="outletDD"><button class="pddbtn"><span class="pn">Automatic</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
+            <div class="setrow" id="layoutRow"><div class="st"><div class="stn">Speaker layout</div><div class="std" id="layoutNote">—</div></div><button class="ghost" id="speakerSetup">Configure in Windows</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Take the device exclusively</div><div class="std">Drives every speaker your hardware has, even if Windows is set to stereo. Nothing else can play through it while on.</div></div><div class="sw" data-sw="exclusive"><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Buffer</div><div class="std" id="latencyNote">40 ms — lower is tighter, higher survives a busy machine</div></div><div class="sl" data-set="latency" style="max-width:180px"></div></div>
             <div class="setrow"><div class="st"><div class="stn">Engine</div><div class="std" id="engineStatus">Checking…</div></div><button class="ghost" id="refreshDevices">Rescan devices</button></div>
+
+            <div class="setgroup">Updates</div>
+            <div class="setrow"><div class="st"><div class="stn" id="verLine">Version 1.0.0</div><div class="std" id="updateStatus">Not checked yet</div></div><button class="btn" id="checkUpdate"><svg><use href="#i-refresh"/></svg> Check now</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Check automatically</div><div class="std">Looks once a day, and tells you — never installs on its own</div></div><div class="sw" data-sw="autoUpdate"><div class="k"></div></div></div>
+
             <div class="setgroup">Diagnostics</div>
-            <div class="setrow"><div class="st"><div class="stn">Version 1.0.0</div><div class="std">Settings are saved automatically</div></div><button class="btn" id="copyDiag"><svg><use href="#i-file"/></svg> Copy</button></div>
-            <div class="setrow"><div class="st"><div class="stn">Reset everything</div><div class="std">Put every control back to its default</div></div><button class="ghost" id="resetAll">Reset</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Copy diagnostics</div><div class="std">Everything useful for a bug report, on your clipboard</div></div><button class="btn" id="copyDiag"><svg><use href="#i-file"/></svg> Copy</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Settings file</div><div class="std" id="statePathNote">—</div></div><button class="ghost" id="openFolder">Open folder</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Run setup again</div><div class="std">The guided walkthrough for routing your sound</div></div><button class="ghost" id="runSetup">Open setup</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Reset everything</div><div class="std">Put every control back to its default. Your saved presets are kept.</div></div><button class="ghost" id="resetAll">Reset</button></div>
           </section>
         </div>
 
@@ -496,6 +570,21 @@
     </div>
   </div>
 </div>
+
+<!-- GUIDED SETUP — the routing story, one step at a time. Shown on first run and from Settings. -->
+<div id="setup"><div class="sbox">
+  <div class="sh"><span class="sstep" id="setupStep">Step 1 of 4</span><button class="ub-x" id="setupClose"><svg class="ico" style="width:14px"><use href="#i-x"/></svg></button></div>
+  <h3 id="setupTitle">Let's route your sound</h3>
+  <p id="setupBody">Soundstage sits between your apps and your speakers.</p>
+  <div class="sdiag" id="setupDiag"></div>
+  <div class="scheck" id="setupCheck"></div>
+  <div class="srow">
+    <button class="ghost" id="setupBack">Back</button>
+    <span class="sp"></span>
+    <button class="ghost" id="setupSkip">Skip</button>
+    <button class="btn" id="setupNext">Next</button>
+  </div>
+</div></div>
 
 <div id="modal"><div class="box">
   <h4 id="modalTitle">Name this preset</h4>
@@ -579,15 +668,23 @@
             size: 0.6, decay: 1.8, predelay: 22, diffusion: 0.75,
             damping: 0.4, lowcut: 120, highcut: 8000, width: 0.65, mix: 0.35 },
       spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false },
-      settings: { runAtLogin: false, deviceId: null },
+      settings: {
+        runAtLogin: false, closeToTray: true, exclusive: false, autoUpdate: true,
+        deviceId: null, outletId: null, latency: 40, setupDone: false, lastCheck: 0
+      },
       presets: {}   /* the user's own saved presets, by name */
     };
   }
+
+  /* Buffer size is the one setting with a real range rather than an on/off. */
+  var LATENCY = { min: 10, max: 200 };
 
   var S = defaults();
   var devices = [];
   var engineOk = false;
   var ready = false;      /* true once the host's saved state has been applied */
+  var appVersion = '1.0.0';
+  var statePath = '';
 
   /* ---------- 2. bridge --------------------------------------------------------------- */
 
@@ -762,7 +859,8 @@
 
     /* The grab target — deliberately larger than the dot it sits on, so the handle is easy to
        catch. This is the only part of the dial that starts a turn. */
-    var hit = svgEl('circle', { 'class': 'knob-hit', cx: c, cy: c, r: 13, fill: 'transparent' });
+    // Generous on purpose: you should be able to grab the handle without lining up on it exactly.
+    var hit = svgEl('circle', { 'class': 'knob-hit', cx: c, cy: c, r: Math.max(16, size * 0.26), fill: 'transparent' });
     svg.appendChild(hit);
 
     el.insertBefore(svg, el.firstChild);
@@ -1069,8 +1167,15 @@
   }
 
   function renderSpeakers() {
+    /* Dim the channels this device doesn't have, rather than offering faders for speakers that
+       aren't there. */
+    var ch = activeChannels(currentDevice());
     document.querySelectorAll('#calib .strip').forEach(function (strip) {
-      var i = +strip.dataset.ch, db = S.spk.trims[i] || 0;
+      var idx = +strip.dataset.ch;
+      var have = idx < ch;
+      strip.style.opacity = have ? '' : '.32';
+      strip.title = have ? '' : 'Your output device doesn’t have this speaker';
+      var i = idx, db = S.spk.trims[i] || 0;
       var top = (0.5 - db / (2 * TRIM_RANGE)) * 100;
       var fill = strip.querySelector('.ffill');
       if (Math.abs(db) < 0.05) {
@@ -1111,6 +1216,14 @@
     if (key === 'upmix')      { S.spk.upmix = on; pushUpmix(); }
     else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
+    else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
+    else if (key === 'autoUpdate') { S.settings.autoUpdate = on; }
+    else if (key === 'exclusive') {
+      S.settings.exclusive = on;
+      send({ t: 'exclusive', on: on });
+      renderDevices();
+      if (on) { toast('Exclusive mode: nothing else can play through this device while Soundstage runs.'); }
+    }
     else {
       /* Automations: the card's enable is still presentation only — nothing fires yet. */
       sw.classList.toggle('on', on);
@@ -1270,38 +1383,272 @@
     fillDD('myPresetDD', items, S.eq.mine || '—');
   }
 
-  function renderDevices() {
+  function currentDevice() {
     var sel = devices.filter(function (d) { return d.id === S.settings.deviceId; })[0];
     if (!sel) { sel = devices.filter(function (d) { return d.isDefault && !d.isCable; })[0]; }
     if (!sel) { sel = devices.filter(function (d) { return !d.isCable; })[0]; }
+    return sel;
+  }
+
+  /* How many channels we'll actually drive: exclusive mode uses the hardware's own layout, shared
+     mode is stuck with whatever Windows' speaker config says. */
+  function activeChannels(d) {
+    if (!d) { return 2; }
+    return S.settings.exclusive ? Math.max(d.physicalChannels || 2, d.channels) : d.channels;
+  }
+
+  function renderDevices() {
+    var sel = currentDevice();
 
     fillDD('devDD', devices.filter(function (d) { return !d.isCable; })
                            .map(function (d) { return { label: d.name, value: d.id }; }),
            sel ? sel.name : '—');
 
+    var outlets = [{ label: 'Automatic', value: '' }].concat(
+      devices.map(function (d) { return { label: d.name, value: d.id }; }));
+    var chosenOutlet = devices.filter(function (d) { return d.id === S.settings.outletId; })[0];
+    fillDD('outletDD', outlets, chosenOutlet ? chosenOutlet.name : 'Automatic');
+
+    var ch = activeChannels(sel);
     var name = document.getElementById('outName');
     var badge = document.getElementById('outBadge');
     var sub = document.getElementById('outSub');
+
     if (sel) {
       name.textContent = sel.name;
-      badge.textContent = layoutName(sel.channels);
+      badge.textContent = layoutName(ch);
       sub.textContent = (sel.isDefault ? 'Default output' : 'Selected output') + ' · all system audio';
       var cs = document.getElementById('calibSub');
-      if (cs) { cs.textContent = sel.name + ' · ' + layoutName(sel.channels); }
+      if (cs) { cs.textContent = sel.name + ' · ' + layoutName(ch); }
       var fmt = document.getElementById('fmtChip');
-      if (fmt) { fmt.innerHTML = '<b>2.0 → ' + layoutShort(sel.channels) + '</b> · <b>48</b> kHz'; }
+      if (fmt) { fmt.innerHTML = '<b>2.0 → ' + layoutShort(ch) + '</b> · <b>48</b> kHz'; }
+
+      /* Say plainly when the hardware can do more than Windows is currently asking of it — that
+         mismatch is invisible everywhere else and it's why a 5.1 receiver plays as stereo. */
+      var note = document.getElementById('layoutNote');
+      if (note) {
+        if (sel.physicalChannels > sel.channels) {
+          note.innerHTML = sel.name + ' supports <b style="color:var(--glow-ink)">' + sel.physicalLayout +
+            '</b>, but Windows is set to ' + sel.layout + '.' +
+            (S.settings.exclusive
+              ? ' Exclusive mode is on, so we drive all of them anyway.'
+              : ' Configure it in Windows, or turn on exclusive mode below.');
+        } else {
+          note.textContent = sel.name + ' · ' + sel.layout +
+            (S.settings.exclusive ? ' · taken exclusively' : ' · following Windows');
+        }
+      }
     } else {
       name.textContent = 'No output device found';
       badge.textContent = '—';
     }
+
+    renderSpeakers();
   }
 
   function layoutName(ch) {
     if (ch >= 8) { return '7.1 surround'; }
     if (ch >= 6) { return '5.1 surround'; }
+    if (ch >= 4) { return 'quadraphonic'; }
     return 'stereo';
   }
-  function layoutShort(ch) { return ch >= 8 ? '7.1' : ch >= 6 ? '5.1' : '2.0'; }
+  function layoutShort(ch) { return ch >= 8 ? '7.1' : ch >= 6 ? '5.1' : ch >= 4 ? '4.0' : '2.0'; }
+
+  /* ---------- settings rendering -------------------------------------------------------- */
+
+  function renderSettings() {
+    ['runAtLogin', 'closeToTray', 'exclusive', 'autoUpdate'].forEach(function (k) {
+      syncToggle(k, S.settings[k]);
+    });
+
+    var sl = document.querySelector('.sl[data-set="latency"]');
+    if (sl) {
+      if (!sl.querySelector('b')) { sl.innerHTML = '<i></i><b></b>'; }
+      var t = clamp((S.settings.latency - LATENCY.min) / (LATENCY.max - LATENCY.min), 0, 1) * 100;
+      sl.querySelector('i').style.width = t + '%';
+      sl.querySelector('b').style.left = t + '%';
+    }
+    var ln = document.getElementById('latencyNote');
+    if (ln) {
+      ln.textContent = Math.round(S.settings.latency) +
+        ' ms — lower is tighter, higher survives a busy machine';
+    }
+
+    var sp = document.getElementById('statePathNote');
+    if (sp) { sp.textContent = statePath || '—'; }
+    var vl = document.getElementById('verLine');
+    if (vl) { vl.textContent = 'Version ' + appVersion; }
+  }
+
+  function bindLatencySlider() {
+    var sl = document.querySelector('.sl[data-set="latency"]');
+    if (!sl) { return; }
+    sl.innerHTML = '<i></i><b></b>';
+    var handle = sl.querySelector('b');
+
+    function setFromX(clientX) {
+      var box = sl.getBoundingClientRect();
+      if (!box.width) { return; }
+      var t = clamp((clientX - box.left) / box.width, 0, 1);
+      S.settings.latency = Math.round(LATENCY.min + (t * (LATENCY.max - LATENCY.min)));
+      renderSettings();
+      save();
+    }
+
+    draggable(handle, null, function (e) { setFromX(e.clientX); },
+              function () { send({ t: 'latency', ms: S.settings.latency }); });
+    draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
+                  function (e) { setFromX(e.clientX); },
+                  function () { send({ t: 'latency', ms: S.settings.latency }); });
+  }
+
+  /* ---------- updates ------------------------------------------------------------------ */
+
+  var update = { available: false, latest: '', notes: '', url: '', asset: '' };
+
+  function showUpdate(msg) {
+    update = msg;
+    var bar = document.getElementById('updBar');
+    var status = document.getElementById('updateStatus');
+
+    if (msg.available) {
+      document.getElementById('ubTitle').textContent = 'Soundstage ' + msg.latest + ' is available';
+      document.getElementById('ubSub').textContent = 'You have ' + msg.current + '.';
+      document.getElementById('ubGet').style.display = msg.asset ? '' : 'none';
+      bar.classList.add('show');
+      if (status) { status.textContent = msg.latest + ' is available — you have ' + msg.current + '.'; }
+    } else {
+      bar.classList.remove('show');
+      if (status) {
+        status.textContent = msg.silent
+          ? 'Up to date (' + msg.current + ')'
+          : 'You’re on the latest version (' + msg.current + ').';
+      }
+      if (!msg.silent) { toast('Soundstage is up to date.'); }
+    }
+
+    S.settings.lastCheck = nowMs();
+    save();
+  }
+
+  /* new Date() only for the once-a-day check — nothing here depends on the wall clock otherwise. */
+  function nowMs() { return new Date().getTime(); }
+
+  function maybeAutoCheck() {
+    if (!S.settings.autoUpdate) { return; }
+    var day = 24 * 60 * 60 * 1000;
+    if (nowMs() - (S.settings.lastCheck || 0) < day) { return; }
+    send({ t: 'update-check' });
+  }
+
+  /* ---------- guided setup ------------------------------------------------------------- */
+
+  /* Four steps that explain the routing and check it as you go. This is the part that turns
+     "install a virtual cable and hope" into something a person can follow. */
+  var setupIndex = 0;
+  var SETUP = [
+    {
+      title: 'Let’s route your sound',
+      body: 'Soundstage sits between your apps and your speakers. Your apps play into a virtual ' +
+            '<b>outlet</b>, we process that audio, and we send it on to your real speakers.',
+      diagram: ['Your apps', 'Outlet', 'Soundstage', 'Your speakers'],
+      lit: [0, 1, 2, 3],
+      check: null
+    },
+    {
+      title: 'Install the outlet',
+      body: 'Soundstage needs a virtual device to capture from. <b>VB-CABLE</b> is free and takes a ' +
+            'minute — install it, then come back here.',
+      diagram: ['Your apps', 'CABLE Input', 'Soundstage', 'Your speakers'],
+      lit: [1],
+      check: function () {
+        var cable = devices.filter(function (d) { return d.isCable; })[0];
+        return cable
+          ? { ok: true, text: 'Found it: ' + cable.name }
+          : { ok: false, text: 'No virtual outlet found yet. Install VB-CABLE, then press Check again.' };
+      },
+      action: { label: 'Get VB-CABLE', url: 'https://vb-audio.com/Cable/' }
+    },
+    {
+      title: 'Send Windows through it',
+      body: 'Set the outlet as your Windows <b>default output</b>. Everything your PC plays then ' +
+            'arrives here instead of going straight to your speakers.',
+      diagram: ['Windows', 'CABLE Input', 'Soundstage', 'Your speakers'],
+      lit: [0, 1],
+      check: function () {
+        var def = devices.filter(function (d) { return d.isDefault; })[0];
+        if (!def) { return { ok: false, text: 'Couldn’t read your default output.' }; }
+        return def.isCable
+          ? { ok: true, text: 'Your default output is ' + def.name + '. That’s right.' }
+          : { ok: false, text: 'Your default output is still ' + def.name +
+                              '. Set it to the CABLE device in Windows sound settings.' };
+      },
+      action: { label: 'Open sound settings', msg: 'speakersetup' }
+    },
+    {
+      title: 'Choose where it comes out',
+      body: 'Finally, pick the speakers Soundstage should play to. Then press the power button and ' +
+            'you’re done — everything on your PC runs through the engine.',
+      diagram: ['Windows', 'CABLE Input', 'Soundstage', 'Your speakers'],
+      lit: [3],
+      check: function () {
+        var sel = currentDevice();
+        if (!sel) { return { ok: false, text: 'No output device selected yet.' }; }
+        var extra = sel.physicalChannels > sel.channels
+          ? ' Your hardware has ' + sel.physicalLayout + ' but Windows is set to ' + sel.layout +
+            ' — turn on exclusive mode in Settings to use them all.'
+          : '';
+        return { ok: true, text: 'Playing to ' + sel.name + ' (' + sel.layout + ').' + extra };
+      }
+    }
+  ];
+
+  function openSetup(index) {
+    setupIndex = index || 0;
+    document.getElementById('setup').classList.add('show');
+    renderSetup();
+  }
+
+  function closeSetup() {
+    document.getElementById('setup').classList.remove('show');
+    S.settings.setupDone = true;
+    save();
+  }
+
+  function renderSetup() {
+    var s = SETUP[setupIndex];
+    document.getElementById('setupStep').textContent = 'Step ' + (setupIndex + 1) + ' of ' + SETUP.length;
+    document.getElementById('setupTitle').textContent = s.title;
+    document.getElementById('setupBody').innerHTML = s.body;
+
+    var diag = document.getElementById('setupDiag');
+    diag.innerHTML = s.diagram.map(function (n, i) {
+      var node = '<span class="node' + (s.lit.indexOf(i) >= 0 ? ' on' : '') + '">' + n + '</span>';
+      return i < s.diagram.length - 1 ? node + '<span class="arr">→</span>' : node;
+    }).join('');
+
+    var box = document.getElementById('setupCheck');
+    if (s.check) {
+      var r = s.check();
+      box.className = 'scheck show ' + (r.ok ? 'ok' : 'warn');
+      box.textContent = r.text;
+    } else {
+      box.className = 'scheck';
+      box.textContent = '';
+    }
+
+    document.getElementById('setupBack').style.visibility = setupIndex === 0 ? 'hidden' : 'visible';
+    document.getElementById('setupNext').textContent = setupIndex === SETUP.length - 1 ? 'Done' : 'Next';
+
+    var skip = document.getElementById('setupSkip');
+    if (s.action) {
+      skip.textContent = s.action.label;
+      skip.dataset.action = '1';
+    } else {
+      skip.textContent = 'Skip';
+      skip.dataset.action = '';
+    }
+  }
 
   /* ---------- level meter -------------------------------------------------------------- */
 
@@ -1362,7 +1709,7 @@
     renderReverb();
     renderSpeakers();
     renderDevices();
-    syncToggle('runAtLogin', S.settings.runAtLogin);
+    renderSettings();
     document.querySelectorAll('#eqMode button').forEach(function (b) {
       b.classList.toggle('on', +b.dataset.mode === S.eq.mode);
     });
@@ -1527,7 +1874,41 @@
     if (e.target.closest('#calibReset')) {
       S.spk.trims = [0, 0, 0, 0, 0, 0, 0, 0]; renderSpeakers(); pushTrims(); save(); return;
     }
-    if (e.target.closest('#refreshDevices')) { send({ t: 'devices' }); return; }
+    if (e.target.closest('#refreshDevices')) { send({ t: 'devices' }); toast('Rescanning audio devices…'); return; }
+    if (e.target.closest('#speakerSetup')) { send({ t: 'speakersetup' }); return; }
+    if (e.target.closest('#openFolder')) { send({ t: 'openfolder' }); return; }
+    if (e.target.closest('#runSetup')) { openSetup(0); return; }
+    if (e.target.closest('#checkUpdate')) {
+      document.getElementById('updateStatus').textContent = 'Checking…';
+      send({ t: 'update-check' });
+      return;
+    }
+
+    /* update banner */
+    if (e.target.closest('#ubClose')) { document.getElementById('updBar').classList.remove('show'); return; }
+    if (e.target.closest('#ubNotes')) { send({ t: 'open-url', url: update.url }); return; }
+    if (e.target.closest('#ubGet')) {
+      document.getElementById('ubProgress').classList.add('show');
+      document.getElementById('ubGet').textContent = 'Downloading…';
+      send({ t: 'update-download', url: update.asset });
+      return;
+    }
+
+    /* guided setup */
+    if (e.target.closest('#setupClose')) { closeSetup(); return; }
+    if (e.target.closest('#setupBack')) { if (setupIndex > 0) { setupIndex--; renderSetup(); } return; }
+    if (e.target.closest('#setupNext')) {
+      if (setupIndex < SETUP.length - 1) { setupIndex++; send({ t: 'devices' }); renderSetup(); }
+      else { closeSetup(); toast('Setup finished — press the power button to start.'); }
+      return;
+    }
+    if (e.target.closest('#setupSkip')) {
+      var step = SETUP[setupIndex];
+      if (step.action && step.action.url) { send({ t: 'open-url', url: step.action.url }); }
+      else if (step.action && step.action.msg) { send({ t: step.action.msg }); }
+      else { closeSetup(); }
+      return;
+    }
     if (e.target.closest('#resetAll')) {
       var keep = S.presets;
       S = defaults(); S.presets = keep;
@@ -1536,8 +1917,14 @@
       return;
     }
     if (e.target.closest('#copyDiag')) {
-      var diag = 'Soundstage 1.0.0\nengine: ' + (engineOk ? 'loaded' : 'NOT LOADED') +
-                 '\ndevices: ' + devices.map(function (d) { return d.name + ' (' + d.channels + 'ch)'; }).join(', ') +
+      var diag = 'Soundstage ' + appVersion +
+                 '\nengine: ' + (engineOk ? 'loaded' : 'NOT LOADED') +
+                 '\nexclusive: ' + S.settings.exclusive + '  buffer: ' + S.settings.latency + ' ms' +
+                 '\ndevices:\n' + devices.map(function (d) {
+                   return '  ' + d.name + ' — windows ' + d.channels + 'ch, hardware ' +
+                          d.physicalChannels + 'ch' + (d.isDefault ? ' [default]' : '') +
+                          (d.isCable ? ' [outlet]' : '');
+                 }).join('\n') +
                  '\nstate: ' + JSON.stringify(S);
       try { navigator.clipboard.writeText(diag); toast('Diagnostics copied to the clipboard.'); }
       catch (_) { toast('Could not reach the clipboard.'); }
@@ -1578,6 +1965,11 @@
       else if (owner.id === 'rvPresetDD') { applyRvPreset(pi.textContent); }
       else if (owner.id === 'rvTypeDD')   { applyRvType(pi.textContent); }
       else if (owner.id === 'devDD')      { S.settings.deviceId = v; send({ t: 'device', id: v }); renderDevices(); save(); }
+      else if (owner.id === 'outletDD')   {
+        S.settings.outletId = v || null;
+        send({ t: 'outlet', id: v || null });
+        renderDevices(); save();
+      }
       else if (owner.id === 'myPresetDD') {
         if (v === '__save') {
           askName('Name this preset',
@@ -1665,12 +2057,23 @@
           S.settings.runAtLogin = !!msg.runAtLogin;
           engineOk = !!msg.engine;
           dragMode = msg.dragMode || 'native';
+          appVersion = msg.version || '1.0.0';
+          statePath = msg.statePath || '';
           var es = document.getElementById('engineStatus');
           if (es) { es.textContent = engineOk ? 'Native engine loaded' : 'Native engine NOT loaded — controls will not affect sound'; }
           ready = true;
           renderEverything();
           pushAll();
+          send({ t: 'tray', closeToTray: S.settings.closeToTray });
+          send({ t: 'exclusive', on: S.settings.exclusive });
+          send({ t: 'latency', ms: S.settings.latency });
+          if (S.settings.outletId) { send({ t: 'outlet', id: S.settings.outletId }); }
           if (!engineOk) { toast('The audio engine did not load, so the controls will not change your sound.'); }
+
+          /* First run walks you through the routing; after that we just check for updates. */
+          setTimeout(function () {
+            if (!S.settings.setupDone) { openSetup(0); } else { maybeAutoCheck(); }
+          }, 700);
           return;
         }
         if (msg.t === 'devices') {
@@ -1679,6 +2082,25 @@
           return;
         }
         if (msg.t === 'level') { showLevel(msg); return; }
+        if (msg.t === 'update') { showUpdate(msg); return; }
+        if (msg.t === 'update-progress') {
+          var p = document.querySelector('#ubProgress i');
+          if (p) { p.style.width = (msg.percent || 0) + '%'; }
+          return;
+        }
+        if (msg.t === 'update-done') {
+          document.getElementById('ubProgress').classList.remove('show');
+          document.getElementById('ubGet').textContent = 'Download';
+          toast(msg.ok
+            ? 'Downloaded — the installer is in your Downloads folder.'
+            : 'The download didn’t finish. You can grab it from the release page instead.');
+          return;
+        }
+        if (msg.t === 'tray-power') { setPower(!!msg.on); return; }
+        if (msg.t === 'running') {
+          toast('Soundstage is processing your sound — ' + msg.output + ' · ' + msg.format + '.');
+          return;
+        }
         return;
       }
       if (m === 'no-cable') {
@@ -1701,6 +2123,7 @@
 
   initDials();
   bindSliders();
+  bindLatencySlider();
   buildSpeakers();
   renderEverything();
   refreshWhen();

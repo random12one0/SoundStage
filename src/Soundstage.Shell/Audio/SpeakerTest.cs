@@ -21,7 +21,7 @@ public sealed class SpeakerTest : IDisposable
     private static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(6);
 
     private readonly object _sync = new();
-    private readonly Timer _idle;
+    private readonly System.Threading.Timer _idle;
 
     private WasapiOut? _out;
     private BurstSource? _source;
@@ -31,7 +31,7 @@ public sealed class SpeakerTest : IDisposable
 
     public SpeakerTest()
     {
-        _idle = new Timer(_ => CloseIfIdle(), null, Timeout.Infinite, Timeout.Infinite);
+        _idle = new System.Threading.Timer(_ => CloseIfIdle(), null, Timeout.Infinite, Timeout.Infinite);
     }
 
     /// <summary>

@@ -20,11 +20,53 @@ public partial class MainWindow : Window
 {
     private readonly Engine.EngineController _controller;
 
+    private TrayIcon? _tray;
+
     public MainWindow()
     {
         InitializeComponent();
         _controller = new Engine.EngineController(NotifyUi);
         Loaded += OnLoaded;
+        SetUpTray();
+    }
+
+    private void SetUpTray()
+    {
+        try
+        {
+            _tray = new TrayIcon();
+            _tray.ShowRequested += RestoreFromTray;
+            _tray.PowerToggled += on => NotifyUi("{\"t\":\"tray-power\",\"on\":" + (on ? "true" : "false") + "}");
+            _tray.ExitRequested += () =>
+            {
+                _reallyExiting = true;
+                Close();
+            };
+        }
+        catch
+        {
+            // No notification area (rare, but possible on stripped-down systems) — run without it.
+            _tray = null;
+        }
+    }
+
+    private void HideToTray()
+    {
+        Hide();
+        _tray?.Notify("Soundstage is still running",
+                      "Your sound keeps being processed. Double-click the tray icon to bring it back.");
+    }
+
+    private void RestoreFromTray()
+    {
+        Dispatcher.Invoke(() =>
+        {
+            Show();
+            WindowState = WindowState.Normal;
+            Activate();
+            Topmost = true;
+            Topmost = false;
+        });
     }
 
     // Lets the engine controller send a status back to the page (e.g. "no-cable"). Called on the UI
@@ -85,10 +127,15 @@ public partial class MainWindow : Window
         try { message = e.TryGetWebMessageAsString(); }
         catch { return; }
 
-        // Control messages from the UI are JSON; window commands are bare strings.
+        // Control messages from the UI are JSON; window commands are bare strings. A few JSON types
+        // belong to the window rather than the engine (updates, the tray), so peek before forwarding.
         if (message.StartsWith('{'))
         {
-            _controller.HandleMessage(message);
+            if (!TryHandleWindowMessage(message))
+            {
+                _controller.HandleMessage(message);
+            }
+
             return;
         }
 
@@ -101,7 +148,7 @@ public partial class MainWindow : Window
                 WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
                 break;
             case "close":
-                Close();
+                if (_closeToTray) { HideToTray(); } else { _reallyExiting = true; Close(); }
                 break;
             case "drag":
                 StartHostDrag();
@@ -157,10 +204,107 @@ public partial class MainWindow : Window
             runAtLogin = Engine.Startup.IsRunAtLogin(),
             engine = _controller.EngineAvailable,
             dragMode = _nonClientRegionsEnabled ? "native" : "host",
+            version = Engine.Updater.CurrentVersion,
+            statePath = Engine.AppState.FilePath,
         };
 
         NotifyUi(JsonSerializer.Serialize(payload));
         _controller.SendDeviceList();
+    }
+
+    // ---- messages the window owns rather than the engine ----------------------------------------
+
+    private bool _closeToTray = true;
+    private bool _reallyExiting;
+
+    /// <summary>Returns true if this message was for the window and has been handled.</summary>
+    private bool TryHandleWindowMessage(string json)
+    {
+        string type;
+        JsonDocument doc;
+        try { doc = JsonDocument.Parse(json); }
+        catch { return false; }
+
+        using (doc)
+        {
+            if (!doc.RootElement.TryGetProperty("t", out JsonElement t) || t.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            type = t.GetString() ?? "";
+
+            switch (type)
+            {
+                case "update-check":
+                    _ = CheckForUpdateAsync(silent: false);
+                    return true;
+
+                case "update-download":
+                    {
+                        string url = doc.RootElement.TryGetProperty("url", out JsonElement u) ? u.GetString() ?? "" : "";
+                        _ = DownloadUpdateAsync(url);
+                        return true;
+                    }
+
+                case "open-url":
+                    {
+                        string url = doc.RootElement.TryGetProperty("url", out JsonElement u) ? u.GetString() ?? "" : "";
+                        Engine.Updater.OpenPage(url);
+                        return true;
+                    }
+
+                case "tray":
+                    _closeToTray = doc.RootElement.TryGetProperty("closeToTray", out JsonElement c) &&
+                                   c.ValueKind != JsonValueKind.False;
+                    return true;
+
+                case "hide":
+                    HideToTray();
+                    return true;
+
+                case "powerstate":
+                    _tray?.SetPower(doc.RootElement.TryGetProperty("on", out JsonElement p) &&
+                                    p.ValueKind == JsonValueKind.True);
+                    return false;   // the engine wants to see this one too
+            }
+        }
+
+        return false;
+    }
+
+    private async Task CheckForUpdateAsync(bool silent)
+    {
+        Engine.Updater.Result r = await Engine.Updater.CheckAsync();
+        NotifyUi(JsonSerializer.Serialize(new
+        {
+            t = "update",
+            available = r.Available,
+            current = r.Current,
+            latest = r.Latest,
+            notes = r.Notes,
+            url = r.Url,
+            asset = r.AssetUrl,
+            silent,
+        }));
+
+        if (r.Available && silent)
+        {
+            _tray?.Notify("Soundstage " + r.Latest + " is available", "Open Soundstage to install it.");
+        }
+    }
+
+    private async Task DownloadUpdateAsync(string url)
+    {
+        var progress = new Progress<int>(p => NotifyUi(
+            JsonSerializer.Serialize(new { t = "update-progress", percent = p })));
+
+        string? file = await Engine.Updater.DownloadAsync(url, progress);
+        NotifyUi(JsonSerializer.Serialize(new { t = "update-done", ok = file is not null, path = file ?? "" }));
+        if (file is not null)
+        {
+            Engine.Updater.Reveal(file);
+        }
     }
 
     /// <summary>
@@ -202,9 +346,24 @@ public partial class MainWindow : Window
     private System.Windows.Threading.DispatcherTimer? _meterTimer;
     private bool _meterWasLive;
 
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        // The X on our own title bar routes through OnWebMessage; this catches Alt+F4 and the like,
+        // where closing the window would otherwise silently stop processing the user's audio.
+        if (!_reallyExiting && _closeToTray && _tray is not null)
+        {
+            e.Cancel = true;
+            HideToTray();
+            return;
+        }
+
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         _meterTimer?.Stop();
+        _tray?.Dispose();
         _controller.Dispose();
         base.OnClosed(e);
     }

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text.Json;
 
 using NAudio.CoreAudioApi;
@@ -65,8 +66,22 @@ public sealed class EngineController : IDisposable
     private double _volumeDb;
     private double _nightDb;
 
-    // The device the user picked for output (null = follow the Windows default).
+    // The device the user picked for output (null = follow the Windows default), and the one they
+    // nominated as the outlet we capture from (null = find a CABLE by name).
     private string? _renderDeviceId;
+    private string? _outletDeviceId;
+
+    /// <summary>Re-open the audio path so a device or buffer change takes effect immediately.</summary>
+    private void Restart()
+    {
+        if (_host?.IsRunning != true)
+        {
+            return;
+        }
+
+        StopProcessing();
+        StartProcessing();
+    }
 
     public EngineController(Action<string>? notify = null)
     {
@@ -122,10 +137,25 @@ public sealed class EngineController : IDisposable
                     return;
                 case "device":
                     _renderDeviceId = root.TryGetProperty("id", out JsonElement devEl) ? devEl.GetString() : null;
-                    if (_host?.IsRunning == true)
+                    Restart();
+                    return;
+                case "outlet":
+                    _outletDeviceId = root.TryGetProperty("id", out JsonElement outEl) ? outEl.GetString() : null;
+                    Restart();
+                    return;
+                case "latency":
+                    if (_host is not null)
                     {
-                        StopProcessing();
-                        StartProcessing();
+                        _host.LatencyMs = (int)Math.Clamp(Num(root, "ms", 40), 10, 200);
+                        Restart();
+                    }
+
+                    return;
+                case "exclusive":
+                    if (_host is not null)
+                    {
+                        _host.Exclusive = Bool(root, "on");
+                        Restart();
                     }
 
                     return;
@@ -134,6 +164,12 @@ public sealed class EngineController : IDisposable
                     return;
                 case "speakertest":
                     PlaySpeakerTest((int)Num(root, "ch", -1), Num(root, "db", 0.0));
+                    return;
+                case "speakersetup":
+                    AudioDevices.OpenWindowsSpeakerSetup();
+                    return;
+                case "openfolder":
+                    OpenStateFolder();
                     return;
             }
 
@@ -361,7 +397,13 @@ public sealed class EngineController : IDisposable
                 foreach (MMDevice d in mm.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
                 {
                     bool isCable = IsCable(d.FriendlyName);
-                    if (isCable && cable is null)
+
+                    // An explicitly nominated outlet wins over guessing by name.
+                    if (_outletDeviceId is not null)
+                    {
+                        if (string.Equals(d.ID, _outletDeviceId, StringComparison.Ordinal)) { cable = d; }
+                    }
+                    else if (isCable && cable is null)
                     {
                         cable = d;
                     }
@@ -402,7 +444,14 @@ public sealed class EngineController : IDisposable
                 }
 
                 _host.Start(cable, speakers);
-                _notify?.Invoke("running");
+                _notify?.Invoke(JsonSerializer.Serialize(new
+                {
+                    t = "running",
+                    outlet = cable.FriendlyName,
+                    output = speakers.FriendlyName,
+                    format = _host.FormatDescription,
+                    channels = _host.OutputChannels,
+                }));
             }
         }
         catch
@@ -411,9 +460,26 @@ public sealed class EngineController : IDisposable
         }
     }
 
-    private static bool IsCable(string name)
-        => name.Contains("CABLE", StringComparison.OrdinalIgnoreCase)
-        || name.Contains("Soundstage", StringComparison.OrdinalIgnoreCase);
+    private static bool IsCable(string name) => AudioDevices.IsCable(name);
+
+    /// <summary>Show the user where their settings actually live.</summary>
+    private static void OpenStateFolder()
+    {
+        try
+        {
+            string dir = Path.GetDirectoryName(AppState.FilePath)!;
+            Directory.CreateDirectory(dir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = dir,
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // Explorer unavailable — nothing worth surfacing.
+        }
+    }
 
     public void StopProcessing() => _host?.Stop();
 
@@ -474,27 +540,17 @@ public sealed class EngineController : IDisposable
     {
         try
         {
-            var items = new List<object>();
-            string defaultId = "";
-            using (var mm = new MMDeviceEnumerator())
+            var items = AudioDevices.Render().Select(d => new
             {
-                try { defaultId = mm.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia).ID; }
-                catch { /* no default device */ }
-
-                foreach (MMDevice d in mm.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
-                {
-                    int channels = 2;
-                    try { channels = d.AudioClient.MixFormat.Channels; } catch { /* keep the default */ }
-                    items.Add(new
-                    {
-                        id = d.ID,
-                        name = d.FriendlyName,
-                        channels,
-                        isDefault = string.Equals(d.ID, defaultId, StringComparison.Ordinal),
-                        isCable = IsCable(d.FriendlyName),
-                    });
-                }
-            }
+                id = d.Id,
+                name = d.Name,
+                channels = d.Channels,
+                physicalChannels = d.PhysicalChannels,
+                layout = d.Layout,
+                physicalLayout = d.PhysicalLayout,
+                isDefault = d.IsDefault,
+                isCable = d.IsCable,
+            }).ToList();
 
             _notify?.Invoke(JsonSerializer.Serialize(new { t = "devices", items, selected = _renderDeviceId }));
         }

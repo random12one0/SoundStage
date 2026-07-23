@@ -4,8 +4,12 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <!-- Only for NotifyIcon: Windows still has no first-class WPF tray API. -->
+    <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Soundstage.Shell</RootNamespace>
     <AssemblyName>Soundstage</AssemblyName>
+    <Version>1.0.0</Version>
+    <ApplicationIcon></ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

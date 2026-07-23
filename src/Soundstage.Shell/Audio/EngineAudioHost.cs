@@ -36,6 +36,101 @@ public sealed class EngineAudioHost : IDisposable
     // The render device's channel count (2, 6 or 8) — what the engine is asked to write per frame.
     private int _outChannels = 2;
 
+    /// <summary>
+    /// Render buffer in ms. Lower is tighter lip-sync, higher survives a busy machine without
+    /// crackling. Takes effect the next time the audio path starts.
+    /// </summary>
+    public int LatencyMs { get; set; } = 40;
+
+    /// <summary>Channels currently being rendered, for the UI.</summary>
+    public int OutputChannels => _outChannels;
+
+    /// <summary>
+    /// Take the output device exclusively. This is how we drive all of a receiver's speakers even
+    /// when Windows' "Configure Speakers" has reverted to stereo — but nothing else can play through
+    /// that device while we hold it. Takes effect on the next start.
+    /// </summary>
+    public bool Exclusive { get; set; }
+
+    private WaveFormat? _outFormat;
+
+    /// <summary>A short description of what we actually opened, for the UI to show.</summary>
+    public string FormatDescription => _outFormat is null
+        ? "—"
+        : $"{_outFormat.Channels}ch · {_outFormat.SampleRate / 1000.0:0.#} kHz · " +
+          (_outFormat.Encoding == WaveFormatEncoding.IeeeFloat ? "32-bit float" : $"{_outFormat.BitsPerSample}-bit");
+
+    /// <summary>
+    /// Find a format the device will actually accept, widest layout first. Shared mode only ever has
+    /// one answer (the mix format), so this really matters for exclusive, where drivers are picky —
+    /// NVIDIA's HDMI endpoint, for instance, takes 16-bit only.
+    /// </summary>
+    private WaveFormat NegotiateFormat(MMDevice device, int rate, AudioClientShareMode share)
+    {
+        if (share == AudioClientShareMode.Shared)
+        {
+            // Windows resamples/remaps for us; match its mix format's channel count.
+            int channels = 2;
+            try
+            {
+                int mix = device.AudioClient.MixFormat.Channels;
+                if (mix is 6 or 8) { channels = mix; }
+            }
+            catch
+            {
+                // Device wouldn't say — stereo is always safe.
+            }
+
+            return WaveFormat.CreateIeeeFloatWaveFormat(rate, channels);
+        }
+
+        // Exclusive: ask for the speakers the hardware claims, then fall back gracefully.
+        int physical = 2;
+        try
+        {
+            var info = AudioDevices.Render().FirstOrDefault(d => d.Id == device.ID);
+            if (info is not null) { physical = Math.Max(info.PhysicalChannels, info.Channels); }
+        }
+        catch
+        {
+            // Fall through to stereo.
+        }
+
+        int[] layouts = physical >= 8 ? new[] { 8, 6, 2 } : physical >= 6 ? new[] { 6, 2 } : new[] { 2 };
+        int[] rates = rate == 48000 ? new[] { 48000, 44100 } : new[] { rate, 48000, 44100 };
+
+        foreach (int ch in layouts)
+        {
+            foreach (int r in rates)
+            {
+                foreach (WaveFormat candidate in Candidates(r, ch))
+                {
+                    try
+                    {
+                        if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate))
+                        {
+                            return candidate;
+                        }
+                    }
+                    catch
+                    {
+                        // Some drivers throw rather than returning false; treat as unsupported.
+                    }
+                }
+            }
+        }
+
+        return WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
+    }
+
+    private static IEnumerable<WaveFormat> Candidates(int rate, int channels)
+    {
+        yield return WaveFormat.CreateIeeeFloatWaveFormat(rate, channels);
+        yield return new WaveFormatExtensible(rate, 32, channels);
+        yield return new WaveFormatExtensible(rate, 24, channels);
+        yield return new WaveFormatExtensible(rate, 16, channels);
+    }
+
     // Peak levels for the UI meter, written on the audio thread and read on the UI thread. Plain
     // fields: a torn read of a float meter is harmless, and a lock on the audio path is not.
     private volatile float _inPeak;
@@ -107,31 +202,22 @@ public sealed class EngineAudioHost : IDisposable
             int rate = _capture.WaveFormat.SampleRate;
             _engine.Prepare(rate);
 
-            // Render in the device's own channel layout so the upmix and the per-speaker trims reach
-            // real speakers. The engine writes 2, 6 or 8 channels; anything else falls back to stereo
-            // and lets Windows do the mapping.
-            _outChannels = 2;
-            try
-            {
-                int deviceChannels = renderDevice.AudioClient.MixFormat.Channels;
-                if (deviceChannels == 6 || deviceChannels == 8)
-                {
-                    _outChannels = deviceChannels;
-                }
-            }
-            catch
-            {
-                // Device wouldn't tell us — stereo is always safe.
-            }
+            // Pick the output format. Shared mode has to take whatever Windows' speaker config says,
+            // which is why a 5.1 receiver left on the stereo default plays as stereo for every app on
+            // the system. Exclusive mode negotiates directly with the driver, so we can drive all the
+            // speakers the hardware actually has no matter what that setting happens to be.
+            AudioClientShareMode share = Exclusive ? AudioClientShareMode.Exclusive : AudioClientShareMode.Shared;
+            WaveFormat outFormat = NegotiateFormat(renderDevice, rate, share);
+            _outChannels = outFormat.Channels;
+            _outFormat = outFormat;
 
-            var outFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, _outChannels);
             _buffer = new BufferedWaveProvider(outFormat)
             {
                 BufferDuration = TimeSpan.FromMilliseconds(200),
                 DiscardOnBufferOverflow = true,
             };
 
-            _output = new WasapiOut(renderDevice, AudioClientShareMode.Shared, useEventSync: true, latency: 40);
+            _output = new WasapiOut(renderDevice, share, useEventSync: true, latency: LatencyMs);
             _output.Init(_buffer);
 
             _capture.DataAvailable += OnData;
@@ -203,7 +289,6 @@ public sealed class EngineAudioHost : IDisposable
         int outCh = _outChannels;
         _engine.Process(_inScratch, 2, _outScratch, outCh, frames);
 
-        // Interleaved floats back to bytes, into the render buffer.
         int outSamples = frames * outCh;
         float outPeak = 0f;
         for (int i = 0; i < outSamples; i++)
@@ -217,9 +302,10 @@ public sealed class EngineAudioHost : IDisposable
         _inPeak = Math.Max(inPeak, _inPeak * 0.75f);
         _outPeak = Math.Max(outPeak, _outPeak * 0.75f);
 
-        Span<float> dst = MemoryMarshal.Cast<byte, float>(_outBytes.AsSpan(0, outSamples * 4));
-        _outScratch.AsSpan(0, outSamples).CopyTo(dst);
-        buffer.AddSamples(_outBytes, 0, outSamples * 4);
+        // Pack into whatever the device agreed to. Exclusive mode often means integer PCM — NVIDIA's
+        // HDMI endpoint takes 16-bit only — so the engine's floats get converted here.
+        int written = PackOutput(outSamples);
+        buffer.AddSamples(_outBytes, 0, written);
     }
 
     private void OnRecordingStopped(object? sender, StoppedEventArgs e)
@@ -228,6 +314,57 @@ public sealed class EngineAudioHost : IDisposable
         {
             _running = false;
         }
+    }
+
+    /// <summary>Write the engine's floats into <see cref="_outBytes"/> in the negotiated format.
+    /// Returns how many bytes were written.</summary>
+    private int PackOutput(int outSamples)
+    {
+        int bits = _outFormat?.BitsPerSample ?? 32;
+        bool isFloat = (_outFormat?.Encoding ?? WaveFormatEncoding.IeeeFloat) == WaveFormatEncoding.IeeeFloat;
+
+        if (isFloat && bits == 32)
+        {
+            Span<float> dst = MemoryMarshal.Cast<byte, float>(_outBytes.AsSpan(0, outSamples * 4));
+            _outScratch.AsSpan(0, outSamples).CopyTo(dst);
+            return outSamples * 4;
+        }
+
+        if (bits == 16)
+        {
+            Span<short> dst = MemoryMarshal.Cast<byte, short>(_outBytes.AsSpan(0, outSamples * 2));
+            for (int i = 0; i < outSamples; i++)
+            {
+                dst[i] = (short)(Math.Clamp(_outScratch[i], -1f, 1f) * 32767f);
+            }
+
+            return outSamples * 2;
+        }
+
+        if (bits == 24)
+        {
+            for (int i = 0; i < outSamples; i++)
+            {
+                int v = (int)(Math.Clamp(_outScratch[i], -1f, 1f) * 8388607f);
+                int o = i * 3;
+                _outBytes[o] = (byte)v;
+                _outBytes[o + 1] = (byte)(v >> 8);
+                _outBytes[o + 2] = (byte)(v >> 16);
+            }
+
+            return outSamples * 3;
+        }
+
+        // 32-bit integer PCM.
+        Span<int> ints = MemoryMarshal.Cast<byte, int>(_outBytes.AsSpan(0, outSamples * 4));
+        for (int i = 0; i < outSamples; i++)
+        {
+            // 2147483520 is the largest value representable as a float below int.MaxValue, so the
+            // cast can't overflow at full scale.
+            ints[i] = (int)(Math.Clamp(_outScratch[i], -1f, 1f) * 2147483520f);
+        }
+
+        return outSamples * 4;
     }
 
     private void EnsureScratch(int frames)
@@ -244,7 +381,7 @@ public sealed class EngineAudioHost : IDisposable
             _outScratch = new float[outSamples];
         }
 
-        int bytes = outSamples * 4;
+        int bytes = outSamples * 4;   // widest packing we ever use
         if (_outBytes.Length < bytes)
         {
             _outBytes = new byte[bytes];
