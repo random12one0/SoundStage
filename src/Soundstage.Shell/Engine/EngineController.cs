@@ -583,6 +583,11 @@ public sealed class EngineController : IDisposable
     /// <summary>Current input/output peaks (0..1) for the UI meter.</summary>
     public (float In, float Out) Levels => _host is null ? (0f, 0f) : (_host.InputPeak, _host.OutputPeak);
 
+    /// <summary>The layouts actually in use right now — what the content is, and what we're sending
+    /// to the speakers. Not the device's channel count, which says nothing about either.</summary>
+    public (int In, int Out) ActiveLayouts
+        => _host is null ? (2, 2) : (_host.ActiveInputChannels, _host.ActiveOutputChannels);
+
     /// <summary>Send the real playback devices to the UI, so the output row and the settings picker
     /// show what's actually on this machine instead of a hard-coded name.</summary>
     public void SendDeviceList()

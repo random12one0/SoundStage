@@ -1554,11 +1554,9 @@
       sub.textContent = (sel.isDefault ? 'Default output' : 'Selected output') + ' · all system audio';
       var cs = document.getElementById('calibSub');
       if (cs) { cs.textContent = sel.name + ' · ' + layoutName(ch); }
-      var fmt = document.getElementById('fmtChip');
-      if (fmt) {
-        var inShort = layoutShort(liveIn || outletChannels || 2);
-        fmt.innerHTML = '<b>' + inShort + ' → ' + layoutShort(ch) + '</b> · <b>48</b> kHz';
-      }
+      /* While audio is flowing the badge belongs to the level meter, which knows what is actually
+         playing. Only paint it here when nothing is running. */
+      if (!S.power) { setFormatBadge(0, 0); }
 
       /* The outlet is the ceiling. If it's stereo, a 5.1 film is already flattened before it
          reaches us — worth saying out loud, because nothing in this app can undo it.
@@ -1965,6 +1963,24 @@
   /* The four bars in the status strip are the real output level while audio is flowing. When
      nothing is running they go back to their idle animation, so the strip never implies sound is
      moving when it isn't. */
+  /* Zero on either side means "nothing playing" — say so rather than inventing a layout. */
+  function setFormatBadge(inCh, outCh) {
+    var fmt = document.getElementById('fmtChip');
+    if (!fmt) { return; }
+
+    if (!inCh && !outCh) {
+      var idle = layoutShort(activeChannels(currentDevice()));
+      fmt.innerHTML = '<b>— → ' + idle + '</b> · <b>48</b> kHz';
+      fmt.title = 'Nothing is playing yet. Your speakers are set up for ' + idle + '.';
+      return;
+    }
+
+    liveIn = inCh || liveIn;
+    fmt.innerHTML = '<b>' + layoutShort(inCh) + ' → ' + layoutShort(outCh) + '</b> · <b>48</b> kHz';
+    fmt.title = 'What is playing: ' + layoutName(inCh) +
+                '. What Soundstage is sending to your speakers: ' + layoutName(outCh) + '.';
+  }
+
   var lastLevel = 0;
   function showLevel(msg) {
     var bars = document.getElementById('npBars');
@@ -1976,8 +1992,14 @@
       document.getElementById('npText').textContent = S.power
         ? 'Waiting for sound…'
         : 'Ready — press power to start';
+      setFormatBadge(0, 0);
       return;
     }
+
+    /* The badge reports what is really happening: the layout of the audio arriving, and the layout
+       we're actually driving. Not the device's channel count — a 5.1 outlet carrying Spotify is
+       still stereo, and saying "5.1" there would be a lie. */
+    setFormatBadge(msg.inCh || 0, msg.outCh || 0);
     bars.classList.add('live');
     /* dBFS-ish curve: a linear peak looks dead until it is almost clipping. */
     var out = +msg.out || 0;

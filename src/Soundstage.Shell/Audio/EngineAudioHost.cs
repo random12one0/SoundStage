@@ -45,11 +45,37 @@ public sealed class EngineAudioHost : IDisposable
     /// <summary>Channels currently being rendered, for the UI.</summary>
     public int OutputChannels => _outChannels;
 
-    /// <summary>Channels actually arriving from the outlet — 2 means the source reached us as
-    /// stereo, whatever it started as.</summary>
+    /// <summary>Channels the outlet hands us — the container size, not what's in it.</summary>
     public int InputChannels => _inChannels;
 
     private int _inChannels = 2;
+
+    // ---- what is ACTUALLY playing --------------------------------------------------------------
+    // The outlet's channel count says nothing about the content: with the cable configured as 5.1,
+    // Spotify's stereo still arrives as six channels, four of them silent. So we watch each channel
+    // for real signal and report the layout that is genuinely in use. A hold time keeps a quiet
+    // passage in a film from momentarily collapsing the reading to stereo.
+    private const float ActiveFloor = 0.0004f;   // ≈ -68 dBFS, below anything audible
+    private const long HoldMs = 4000;
+
+    private readonly long[] _inLastActive = new long[8];
+    private readonly long[] _outLastActive = new long[8];
+
+    /// <summary>The layout actually arriving (2, 6 or 8) — stereo content reads as 2 even on a 5.1 outlet.</summary>
+    public int ActiveInputChannels => ActiveLayout(_inLastActive, _inChannels);
+
+    /// <summary>The layout actually leaving for the speakers, after everything we do to it.</summary>
+    public int ActiveOutputChannels => ActiveLayout(_outLastActive, _outChannels);
+
+    private static int ActiveLayout(long[] lastActive, int available)
+    {
+        long now = Environment.TickCount64;
+        bool Live(int c) => c < available && (now - lastActive[c]) < HoldMs;
+
+        if (Live(6) || Live(7)) { return 8; }
+        if (Live(2) || Live(3) || Live(4) || Live(5)) { return 6; }
+        return 2;
+    }
 
     /// <summary>
     /// Take the output device exclusively. This is how we drive all of a receiver's speakers even
@@ -306,24 +332,43 @@ public sealed class EngineAudioHost : IDisposable
 
         ReadOnlySpan<float> src = MemoryMarshal.Cast<byte, float>(e.Buffer.AsSpan(0, frames * channels * 4));
         int outCh = _outChannels;
+        int capCh = Math.Min(channels, 8);
 
-        // If the outlet is genuinely carrying more than two channels, the source is a real 5.1/7.1
-        // stream and folding it to stereo would throw away the centre and surrounds that the whole
-        // point of this app is to deliver. Keep them.
-        bool multi = channels > 2;
-        int inCh = multi ? Math.Min(channels, 8) : 2;
-
+        // Measure every channel first. Which path we take has to depend on what is actually PLAYING,
+        // not on how many channels the outlet happens to be configured for: with the cable set to
+        // 5.1, Spotify still arrives as six channels with four of them silent, and treating that as
+        // a surround source would mean the upmix never ran for ordinary music.
         float inPeak = 0f;
+        Span<float> chPeak = stackalloc float[8];
         for (int n = 0; n < frames; n++)
         {
-            if (multi)
+            for (int c = 0; c < capCh; c++)
+            {
+                float a = Math.Abs(src[(n * channels) + c]);
+                if (a > inPeak) { inPeak = a; }
+                if (a > chPeak[c]) { chPeak[c] = a; }
+            }
+        }
+
+        long stamp = Environment.TickCount64;
+        for (int c = 0; c < capCh; c++)
+        {
+            if (chPeak[c] > ActiveFloor) { _inLastActive[c] = stamp; }
+        }
+
+        // Real surround content? Keep every channel. Otherwise it's stereo wearing a 5.1 costume —
+        // fold it down and let the upmix decide what the surrounds should get.
+        bool contentIsMulti = ActiveLayout(_inLastActive, capCh) > 2;
+        int inCh = contentIsMulti ? capCh : 2;
+        _inChannels = inCh;
+
+        for (int n = 0; n < frames; n++)
+        {
+            if (contentIsMulti)
             {
                 for (int c = 0; c < inCh; c++)
                 {
-                    float v = src[(n * channels) + c];
-                    _inScratch[(n * inCh) + c] = v;
-                    float a = Math.Abs(v);
-                    if (a > inPeak) { inPeak = a; }
+                    _inScratch[(n * inCh) + c] = src[(n * channels) + c];
                 }
             }
             else
@@ -332,13 +377,10 @@ public sealed class EngineAudioHost : IDisposable
                 float r = channels >= 2 ? src[(n * channels) + 1] : l;
                 _inScratch[n * 2] = l;
                 _inScratch[(n * 2) + 1] = r;
-                float m = Math.Max(Math.Abs(l), Math.Abs(r));
-                if (m > inPeak) { inPeak = m; }
             }
         }
 
-        _inChannels = inCh;
-        if (multi)
+        if (contentIsMulti)
         {
             _engine.ProcessMulti(_inScratch, inCh, _outScratch, outCh, frames);
         }
@@ -349,10 +391,18 @@ public sealed class EngineAudioHost : IDisposable
 
         int outSamples = frames * outCh;
         float outPeak = 0f;
+        Span<float> outChPeak = stackalloc float[8];
         for (int i = 0; i < outSamples; i++)
         {
             float m = Math.Abs(_outScratch[i]);
             if (m > outPeak) { outPeak = m; }
+            int c = i % outCh;
+            if (c < 8 && m > outChPeak[c]) { outChPeak[c] = m; }
+        }
+
+        for (int c = 0; c < outCh && c < 8; c++)
+        {
+            if (outChPeak[c] > ActiveFloor) { _outLastActive[c] = stamp; }
         }
 
         // Decay the meter rather than snapping to each block's peak, so it reads like a meter

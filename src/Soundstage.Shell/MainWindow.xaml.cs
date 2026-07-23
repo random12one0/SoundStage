@@ -337,8 +337,10 @@ public partial class MainWindow : Window
 
             _meterWasLive = true;
             (float inPeak, float outPeak) = _controller.Levels;
+            (int inCh, int outCh) = _controller.ActiveLayouts;
             NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                $"{{\"t\":\"level\",\"in\":{inPeak:0.####},\"out\":{outPeak:0.####},\"live\":true}}"));
+                $"{{\"t\":\"level\",\"in\":{inPeak:0.####},\"out\":{outPeak:0.####}," +
+                $"\"inCh\":{inCh},\"outCh\":{outCh},\"live\":true}}"));
         };
         _meterTimer.Start();
     }
