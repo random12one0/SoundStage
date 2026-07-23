@@ -306,6 +306,50 @@ int main() {
         ssg_destroy(t);
     }
 
+    // Bass management has to do BOTH halves: take the low end off a "Small" speaker and give it to
+    // the sub. Only doing the second half leaves the bass playing twice, which is the boomy doubled
+    // low end this is meant to cure.
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+        ssg_enable_upmix(t, 0);
+
+        const int len = 24000;
+        auto measure = [&](double freq, bool manage, double* frontPeak, double* subPeak) {
+            ssg_reset(t);
+            ssg_bass_management(t, manage ? 1 : 0, 80.0, 0xFF, 1.0);
+            std::vector<float> in(len * 2), out(len * 6, 0.0f);
+            for (int n = 0; n < len; ++n) {
+                const float s = (float)(0.4 * std::sin(2.0 * 3.14159265358979 * freq * n / 48000.0));
+                in[n * 2] = s; in[n * 2 + 1] = s;
+            }
+            ssg_process(t, in.data(), 2, out.data(), 6, len);
+            double f = 0.0, sub = 0.0;
+            for (int n = len / 2; n < len; ++n) {                 // settled half only
+                f = std::fmax(f, std::fabs((double)out[n * 6]));       // front left
+                sub = std::fmax(sub, std::fabs((double)out[n * 6 + 3]));  // LFE
+            }
+            *frontPeak = f; *subPeak = sub;
+        };
+
+        double frontOff = 0, subOff = 0, frontOn = 0, subOn = 0;
+
+        // A 40 Hz tone — well below the 80 Hz crossover, so it should move to the sub entirely.
+        measure(40.0, false, &frontOff, &subOff);
+        measure(40.0, true, &frontOn, &subOn);
+        check(frontOn < frontOff * 0.25, "bass management REMOVES low bass from a small speaker");
+        check(subOn > subOff + 0.05, "bass management SENDS that bass to the subwoofer");
+
+        // A 1 kHz tone — far above the crossover, so the front keeps it and the sub gets nothing.
+        double frontMidOff = 0, subMidOff = 0, frontMidOn = 0, subMidOn = 0;
+        measure(1000.0, false, &frontMidOff, &subMidOff);
+        measure(1000.0, true, &frontMidOn, &subMidOn);
+        check(frontMidOn > frontMidOff * 0.9, "midrange stays on the speaker it belongs to");
+        check(subMidOn < 0.02, "nothing above the crossover leaks into the subwoofer");
+
+        ssg_destroy(t);
+    }
+
     // prepare() must not throw away settings. It runs when the audio path opens and on every device
     // or sample-rate change, so if it reset the enables it would silently switch off whatever the
     // user had turned on — the EQ section used to die the instant audio started.

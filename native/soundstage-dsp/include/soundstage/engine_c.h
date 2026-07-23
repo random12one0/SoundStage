@@ -89,8 +89,15 @@ SSG_API void        ssg_reverb_set_tone(ssg_engine* e, double diffusion,
  * delay lines, which stops a sustained note ringing metallically). */
 SSG_API void        ssg_reverb_set_character(ssg_engine* e, double early, double modulation);
 SSG_API void        ssg_upmix_set(ssg_engine* e, double amount, double center_gain, double lfe_gain);
-/* Feed the subwoofer from the stereo low end even with the upmix off (bass management). */
+/* Feed the subwoofer from the stereo low end even with the upmix off. */
 SSG_API void        ssg_enable_sub_feed(ssg_engine* e, int on);
+
+/* Bass management — a receiver's "Speaker Size: Small". Removes everything below `crossover_hz` from
+ * each speaker whose bit is set in `small_mask` (bit 0 = FL ... bit 7 = SR; the LFE bit is ignored)
+ * and redirects it to the subwoofer. Copying bass to the sub without taking it off the speaker is
+ * what makes a small satellite sound boomy, so this does both halves. */
+SSG_API void        ssg_bass_management(ssg_engine* e, int on, double crossover_hz,
+                                        int small_mask, double sub_gain);
 
 /* Night mode — its own dynamics stage, separate from the Leveler, so you can run both. The point is
  * to stop sudden loud moments carrying through the house; the bass cut that goes with it is an EQ

@@ -100,6 +100,17 @@ void ssg_reverb_set_tone(ssg_engine* e, double diffusion, double low_cut_hz, dou
 
 void ssg_enable_sub_feed(ssg_engine* e, int on) { if (e) e->chain.enableSubFeed(on != 0); }
 
+void ssg_bass_management(ssg_engine* e, int on, double crossover_hz, int small_mask, double sub_gain) {
+    if (!e) return;
+    auto& bm = e->chain.bassManager();
+    bm.setEnabled(on != 0);
+    bm.setCrossover(crossover_hz);
+    bm.setSubGain(sub_gain);
+    for (int c = 0; c < soundstage::BassManager::kChannels; ++c) {
+        bm.setSmall(c, (small_mask & (1 << c)) != 0);
+    }
+}
+
 void ssg_enable_night(ssg_engine* e, int on) { if (e) e->chain.enableNight(on != 0); }
 
 void ssg_night_set(ssg_engine* e, double threshold_db, double ratio,

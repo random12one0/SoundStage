@@ -141,6 +141,14 @@
   .strip .test{width:30px;height:30px;border-radius:9px;background:#0e1620;border:1px solid var(--line);display:grid;place-items:center;color:var(--dim);cursor:pointer;transition:.15s;}
   .strip .test svg{width:13px;height:13px;}
   .strip .test:hover{color:var(--ink);border-color:#37e0cf66;}
+  /* Speaker size, the way a receiver labels it. Small = it can't do the deep stuff, send that to
+     the sub; Large = it's full-range, leave it alone. */
+  .strip .size{font:inherit;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+               padding:3px 8px;border-radius:7px;cursor:pointer;border:1px solid var(--line);
+               background:#0e1620;color:var(--faint);transition:.14s;}
+  .strip .size.small{color:var(--glow);border-color:#37e0cf55;background:#0e1c1f;}
+  .strip .size:hover{border-color:var(--glow);}
+  .strip.nosub .size{opacity:.35;pointer-events:none;}
   .strip.sub .ffill{background:linear-gradient(#ffbf6b,#b5822f);box-shadow:0 0 8px #ffbf6b44;}
   .strip.sub .fhandle{border-color:var(--amber);box-shadow:0 0 10px #ffbf6b88;}.strip.sub .db{color:var(--amber);}
   .strip.playing{border-color:var(--glow);box-shadow:0 0 22px #37e0cf22;}
@@ -274,9 +282,10 @@
   .band{cursor:pointer;}
   /* The EQ response curve, behind the handles. */
   .eqcurve{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible;}
-  .eqline{fill:none;stroke:var(--glow);stroke-width:1.1;vector-effect:non-scaling-stroke;
-          stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #37e0cf66);}
-  .eqfill{fill:#37e0cf1f;stroke:none;}
+  /* Just the line. A filled area under it read as a solid block rather than a curve. */
+  .eqline{fill:none;stroke:var(--glow);stroke-width:1.4;vector-effect:non-scaling-stroke;
+          stroke-linecap:round;stroke-linejoin:round;opacity:.75;
+          filter:drop-shadow(0 0 4px #37e0cf55);}
   .bdb{position:absolute;left:50%;transform:translateX(-50%);top:1px;font-family:ui-monospace,monospace;
        font-size:9px;color:var(--glow-ink);opacity:0;transition:opacity .12s;pointer-events:none;z-index:4;white-space:nowrap;}
   .band:hover .bdb,.band.dragging .bdb{opacity:1;}
@@ -473,7 +482,6 @@
                 <div class="ph"><h3>Equalizer</h3><div class="rt">
                   <div class="pdd" id="eqPresetDD"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Flat</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
                   <div class="pdd" id="myPresetDD"><button class="pddbtn"><span class="pfx">Yours</span> <span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
-                  <div class="seg" id="eqMode"><button class="on" data-mode="10">10</button><button data-mode="31">31</button></div>
                   <button class="ghost" id="eqReset">Flatten</button>
                 </div></div>
                 <div class="geqwrap"><div class="geqbars" data-eq><div class="zeroline"></div><span class="zerolab">0 dB</span></div><div class="hzrow" id="hzRow"></div></div>
@@ -520,9 +528,20 @@
               <div class="st"><div class="stn">Upmix stereo to surround<span id="upmixHelp"></span></div><div class="std">Fill your surround speakers when the source is only stereo (2.0)</div></div>
               <div class="sw" data-sw="upmix"><div class="k"></div></div>
             </div>
-            <div class="setrow">
+            <div class="setrow" style="border-bottom:1px solid var(--soft-line)">
               <div class="st"><div class="stn">Send bass to the subwoofer<span id="subHelp"></span></div><div class="std">Use your sub even for plain stereo, with upmix off</div></div>
               <div class="sw" data-sw="subfeed"><div class="k"></div></div>
+            </div>
+            <div class="setrow" style="border-bottom:1px solid var(--soft-line)">
+              <div class="st"><div class="stn">Bass management<span id="bmHelp"></span></div><div class="std">Take the low end off speakers marked Small and send it to the sub instead. Mark each speaker above.</div></div>
+              <div class="sw" data-sw="bassmgmt"><div class="k"></div></div>
+            </div>
+            <div class="setrow">
+              <div class="st"><div class="stn">Crossover<span id="xoHelp"></span></div><div class="std" id="xoNote">80 Hz — below this goes to the subwoofer</div></div>
+              <div class="seg" id="xoSeg">
+                <button data-xo="60">60</button><button data-xo="80" class="on">80</button>
+                <button data-xo="100">100</button><button data-xo="120">120</button><button data-xo="150">150</button>
+              </div>
             </div>
           </section>
         </div>
@@ -720,11 +739,12 @@
 
   /* ---------- 1. state ---------------------------------------------------------------- */
 
-  /* The graphic EQ's band centres. The host owns the real filter frequencies; these are only
-     for the labels and for sampling preset curves. */
+  /* The graphic EQ's band centres — the standard ten-band octave layout, which is what every
+     consumer EQ uses and what published preset curves are written against. A 31-band version was
+     tried and dropped: a third-octave EQ is a measurement tool, and without a measurement to work
+     from it's thirty-one ways to make things worse.
+     The host owns the real filter frequencies; these are for the labels and for sampling presets. */
   var FREQ10 = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-  var FREQ31 = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630,
-                800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000];
   var EQ_RANGE = 12;   /* the fader travel, in dB either side of flat */
 
   /* Windows interleaves by channel-mask bit order, so index 4/5 are the BACK speakers and 6/7 are
@@ -767,7 +787,6 @@
     power:   'A/B switch. On, you hear Soundstage. Bypassed, you hear the original untouched — the sound keeps playing either way. Flip it to judge whether an effect is actually helping.',
     volume:  'Soundstage\'s own output level, on top of the Windows volume.',
     eq:      'Shapes the tone across the frequency range. Drag a handle up to boost that band, down to cut it. Double-click a band to reset it.',
-    eqmode:  '10 bands is quick and broad. 31 bands is one-third-octave — finer control, for fixing a specific problem frequency.',
     preset:  'Ready-made tone curves. Picking one replaces your EQ; "Yours" saves everything — EQ, dials and ambience — under a name.',
     output:  'Where Soundstage sends the finished sound. This is the one to change when you switch to headphones.',
     outlet:  'The virtual device your apps play into, which Soundstage captures. Normally the CABLE device.',
@@ -805,8 +824,7 @@
     return {
       power: false,
       volume: 68,
-      eq: { mode: 10, gains10: FREQ10.map(function () { return 0; }),
-                      gains31: FREQ31.map(function () { return 0; }), preset: 'Flat', mine: null },
+      eq: { gains: FREQ10.map(function () { return 0; }), preset: 'Flat', mine: null },
       fx: {
         bass:     { on: false, v: 40 }, air:      { on: false, v: 35 },
         warmth:   { on: false, v: 30 }, leveler:  { on: false, v: 45 },
@@ -816,7 +834,15 @@
             size: 0.6, decay: 1.8, predelay: 22, diffusion: 0.75,
             damping: 0.4, early: 0.5, mod: 0.2,
             lowcut: 120, highcut: 8000, width: 0.65, mix: 0.35 },
-      spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false, subfeed: false },
+      /* small[] follows a receiver's convention: everything is Small except the sub itself, which is
+         the safe default for PC speakers and what a receiver's own setup picks for anything that
+         isn't a full-range tower. */
+      spk: {
+        trims: [0, 0, 0, 0, 0, 0, 0, 0],
+        upmix: false, subfeed: false,
+        bassmgmt: false, crossover: 80,
+        small: [true, true, true, false, true, true, true, true]
+      },
       settings: {
         runAtLogin: false, closeToTray: true, exclusive: false, autoUpdate: true,
         volumeKeys: true,
@@ -989,8 +1015,7 @@
     send({ t: 'effect', id: id, on: !!f.on, v: f.v / 100 });
   }
   function pushEq() {
-    var g = S.eq.mode === 31 ? S.eq.gains31 : S.eq.gains10;
-    send({ t: 'eq', mode: S.eq.mode, gains: g, on: true });
+    send({ t: 'eq', mode: 10, gains: S.eq.gains, on: true });
   }
   function pushReverb() {
     send({ t: 'reverb', on: !!S.rv.on, size: S.rv.size, decay: S.rv.decay, damping: S.rv.damping,
@@ -1000,6 +1025,15 @@
   }
   function pushUpmix() {
     send({ t: 'upmix', on: !!S.spk.upmix, amount: 0.7, center: 1, lfe: 1, subfeed: !!S.spk.subfeed });
+  }
+
+  function pushBassManagement() {
+    var mask = 0;
+    (S.spk.small || []).forEach(function (isSmall, i) {
+      if (isSmall && i !== 3) { mask |= (1 << i); }   /* the sub is never "small" */
+    });
+    send({ t: 'bassmgmt', on: !!S.spk.bassmgmt, crossover: S.spk.crossover || 80,
+           smallMask: mask, subGain: 1.0 });
   }
   function pushTrims() {
     for (var i = 0; i < 8; i++) { send({ t: 'trim', ch: i, db: S.spk.trims[i] }); }
@@ -1011,6 +1045,7 @@
     pushEq();
     pushReverb();
     pushUpmix();
+    pushBassManagement();
     pushTrims();
   }
 
@@ -1261,8 +1296,8 @@
 
   /* ---------- 6. EQ ------------------------------------------------------------------- */
 
-  function eqFreqs() { return S.eq.mode === 31 ? FREQ31 : FREQ10; }
-  function eqGains() { return S.eq.mode === 31 ? S.eq.gains31 : S.eq.gains10; }
+  function eqFreqs() { return FREQ10; }
+  function eqGains() { return S.eq.gains; }
 
   function gainToTop(db) { return (0.5 - (db / EQ_RANGE) * 0.5) * 100; }   /* % from the top */
   function topToGain(pct) { return clamp((0.5 - pct / 100) * 2 * EQ_RANGE, -EQ_RANGE, EQ_RANGE); }
@@ -1324,11 +1359,8 @@
     var svg = document.createElementNS(SVGNS, 'svg');
     svg.setAttribute('class', 'eqcurve');
     svg.setAttribute('preserveAspectRatio', 'none');
-    var fill = document.createElementNS(SVGNS, 'path');
-    fill.setAttribute('class', 'eqfill');
     var line = document.createElementNS(SVGNS, 'path');
     line.setAttribute('class', 'eqline');
-    svg.appendChild(fill);
     svg.appendChild(line);
     host.insertBefore(svg, host.firstChild);
   }
@@ -1362,9 +1394,6 @@
     }
 
     svg.querySelector('.eqline').setAttribute('d', d);
-    /* Fill back along the zero line so boosts and cuts read as opposite shapes. */
-    svg.querySelector('.eqfill').setAttribute('d',
-      d + 'L' + pts[n - 1][0].toFixed(2) + ',50 L' + pts[0][0].toFixed(2) + ',50 Z');
   }
 
   function hzShort(f) {
@@ -1404,15 +1433,6 @@
     });
   }
 
-  function setEqMode(mode) {
-    S.eq.mode = mode === 31 ? 31 : 10;
-    document.querySelectorAll('#eqMode button').forEach(function (b) {
-      b.classList.toggle('on', +b.dataset.mode === S.eq.mode);
-    });
-    renderEq();
-    pushEq();
-    save();
-  }
 
   /* ---------- 7. sliders, faders, toggles --------------------------------------------- */
 
@@ -1478,6 +1498,7 @@
         '<div class="fader"><div class="ftrack"></div><div class="fzero"></div>' +
         '<div class="ffill"></div><div class="fhandle"></div></div>' +
         '<div class="db">0.0</div>' +
+        '<button class="size" data-size="' + i + '">Small</button>' +
         '<button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button>';
       host.appendChild(strip);
 
@@ -1534,8 +1555,38 @@
       }
       strip.querySelector('.fhandle').style.top = top + '%';
       strip.querySelector('.db').textContent = (db > 0 ? '+' : db < 0 ? '−' : '') + Math.abs(round1(db)).toFixed(1);
+
+      /* Speaker size. The sub can't be Small — it IS the sub — so its chip reads Sub and does
+         nothing, and the whole control is inert until bass management is switched on. */
+      var sizeBtn = strip.querySelector('.size');
+      if (sizeBtn) {
+        if (idx === 3) {
+          sizeBtn.textContent = 'Sub';
+          sizeBtn.classList.remove('small');
+          strip.classList.add('nosub');
+        } else {
+          var isSmall = !!(S.spk.small && S.spk.small[idx]);
+          sizeBtn.textContent = isSmall ? 'Small' : 'Large';
+          sizeBtn.classList.toggle('small', isSmall);
+          sizeBtn.title = isSmall
+            ? 'Small — its bass goes to the subwoofer'
+            : 'Large — it keeps its own bass';
+          strip.classList.toggle('nosub', !S.spk.bassmgmt);
+        }
+      }
     });
+
     syncToggle('upmix', S.spk.upmix);
+    syncToggle('subfeed', S.spk.subfeed);
+    syncToggle('bassmgmt', S.spk.bassmgmt);
+
+    document.querySelectorAll('#xoSeg button').forEach(function (b) {
+      b.classList.toggle('on', +b.dataset.xo === (S.spk.crossover || 80));
+    });
+    var xoNote = document.getElementById('xoNote');
+    if (xoNote) {
+      xoNote.textContent = (S.spk.crossover || 80) + ' Hz — anything below this leaves a Small speaker';
+    }
   }
 
   /* Light the strip AND play a real burst out of that speaker — the button is a calibration tool,
@@ -1562,6 +1613,14 @@
     var on = !sw.classList.contains('on');
     if (key === 'upmix')      { S.spk.upmix = on; pushUpmix(); }
     else if (key === 'subfeed') { S.spk.subfeed = on; pushUpmix(); }
+    else if (key === 'bassmgmt') {
+      S.spk.bassmgmt = on;
+      pushBassManagement();
+      renderSpeakers();
+      if (on) {
+        toast('Bass management on — speakers marked Small hand their low end to the sub.');
+      }
+    }
     else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
     else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
@@ -1592,13 +1651,53 @@
 
   /* Preset curves are anchor points in (Hz, dB); each band takes the value interpolated at its
      own centre frequency, so 10-band and 31-band get the same tonal shape. */
+  /* Preset curves, as (Hz, dB) anchors sampled at each band's centre frequency.
+   *
+   * These follow the principles the research actually agrees on, rather than the "smiley face" that
+   * amateur presets reach for:
+   *
+   *  - A gentle bass shelf and a slow downward tilt toward the top is what listeners consistently
+   *    prefer in a room (the Harman in-room work). Not a big treble boost.
+   *  - Speech intelligibility lives around 2–5 kHz. A small, broad lift there does more for dialogue
+   *    than anything else, and it's why every "clear voice" mode on a TV works there.
+   *  - 200–400 Hz is where boxiness and mud collect. Cutting a little there makes a mix sound
+   *    cleaner without touching the bass you actually want.
+   *  - 6–8 kHz is sibilance. Push it and speech starts to hiss, so these stay conservative up top.
+   *  - Everything is kept within about ±6 dB. Bigger moves eat headroom and start to distort before
+   *    they start to help.
+   */
   var EQ_PRESETS = {
+    /* Reference. Every other preset is a departure from this. */
     'Flat':    [],
-    'Cinema':  [[31, 4], [63, 3.5], [125, 2], [250, 0], [500, -0.5], [1000, 0], [2000, 1], [4000, 1.5], [8000, 2], [16000, 3]],
-    'Music':   [[31, 3], [63, 2.5], [125, 1], [250, 0], [500, -1], [1000, -0.5], [2000, 0.5], [4000, 2], [8000, 3], [16000, 3]],
-    'Podcast': [[31, -6], [63, -4], [125, -1], [250, 0.5], [500, 1], [1000, 2], [2000, 3], [4000, 2.5], [8000, 1], [16000, -1]],
-    'Bass':    [[31, 7], [63, 6], [125, 4], [250, 1.5], [500, 0], [1000, 0], [2000, 0], [4000, 0], [8000, 0.5], [16000, 1]],
-    'Vocal':   [[31, -3], [63, -2], [125, 0], [250, 1], [500, 2], [1000, 2.5], [2000, 2], [4000, 1], [8000, 0], [16000, 0]]
+
+    /* Films: weight underneath, dialogue lifted slightly out of the mix, top gently eased so long
+       viewing doesn't fatigue. The centre channel carries speech, so the 2–4 kHz lift is modest. */
+    'Cinema':  [[31, 3.5], [63, 3], [125, 1.5], [250, -0.5], [500, -0.5],
+                [1000, 0.5], [2000, 1.5], [4000, 1.5], [8000, 0], [16000, -1]],
+
+    /* Music: the in-room preference curve, roughly — a real bass shelf, honest mids, and a slow
+       tilt down rather than a treble spike. */
+    'Music':   [[31, 3.5], [63, 3], [125, 1.5], [250, 0], [500, -0.5],
+                [1000, 0], [2000, 0.5], [4000, 0.5], [8000, -0.5], [16000, -1.5]],
+
+    /* Speech: rumble and handling noise cut below 100, presence lifted where intelligibility lives,
+       sibilance held back so it never turns hissy. */
+    'Podcast': [[31, -6], [63, -4.5], [125, -1], [250, -1], [500, 0.5],
+                [1000, 2], [2000, 3], [4000, 2.5], [8000, -0.5], [16000, -2]],
+
+    /* Bass: weight without mud — the cut at 250–400 is what stops a big low shelf sounding boomy. */
+    'Bass':    [[31, 6], [63, 5.5], [125, 3], [250, -1], [500, -1.5],
+                [1000, 0], [2000, 0], [4000, 0], [8000, 0], [16000, 0]],
+
+    /* Late night: the companion to Night mode. Deep bass out (it travels through walls), speech
+       lifted so you can follow dialogue at a low level without reaching for the volume. */
+    'Late night': [[31, -8], [63, -6], [125, -2.5], [250, -0.5], [500, 1],
+                   [1000, 2], [2000, 3], [4000, 2.5], [8000, 0.5], [16000, -1]],
+
+    /* Games: positional cues — footsteps and reloads sit around 3–6 kHz — with the low-mid clutter
+       pulled back so they aren't buried, and enough sub left for explosions to land. */
+    'Gaming':  [[31, 2.5], [63, 2], [125, 0], [250, -2], [500, -1.5],
+                [1000, 0.5], [2000, 2], [4000, 3], [8000, 1.5], [16000, 0]]
   };
 
   function sampleCurve(anchors, f) {
@@ -1618,8 +1717,7 @@
   function applyEqPreset(name) {
     snapshot('preset ' + name);
     var anchors = EQ_PRESETS[name] || [];
-    S.eq.gains10 = FREQ10.map(function (f) { return round1(sampleCurve(anchors, f)); });
-    S.eq.gains31 = FREQ31.map(function (f) { return round1(sampleCurve(anchors, f)); });
+    S.eq.gains = FREQ10.map(function (f) { return round1(sampleCurve(anchors, f)); });
     S.eq.preset = name;
     renderEq();
     renderEqPresetLabel();
@@ -1668,7 +1766,7 @@
   /* "Yours": a full snapshot — EQ curve, every dial, and the ambience settings. */
   function saveMyPreset(name) {
     S.presets[name] = {
-      eq: { mode: S.eq.mode, gains10: S.eq.gains10.slice(), gains31: S.eq.gains31.slice() },
+      eq: { gains: S.eq.gains.slice() },
       fx: JSON.parse(JSON.stringify(S.fx)),
       rv: JSON.parse(JSON.stringify(S.rv))
     };
@@ -1681,14 +1779,12 @@
   function loadMyPreset(name) {
     var p = S.presets[name];
     if (!p) { return; }
-    S.eq.mode = p.eq.mode;
-    S.eq.gains10 = p.eq.gains10.slice();
-    S.eq.gains31 = p.eq.gains31.slice();
+    /* Presets saved before the 31-band mode was dropped still carry gains10. */
+    S.eq.gains = (p.eq.gains || p.eq.gains10 || S.eq.gains).slice();
     S.eq.preset = 'Custom';
     S.eq.mine = name;
     S.fx = JSON.parse(JSON.stringify(p.fx));
     S.rv = JSON.parse(JSON.stringify(p.rv));
-    setEqMode(S.eq.mode);
     renderEverything();
     pushAll();
     save();
@@ -2341,7 +2437,10 @@
   function installHelp() {
     var spots = {
       calibHelp:   HELP.calib,   outHelp2:    HELP.output,   upmixHelp:  HELP.upmix,
-      subHelp:     HELP.sub,     rvHelpType:  'The kind of space — a small room, a big hall, a plate. Sets several controls at once.',
+      subHelp:     HELP.sub,
+      bmHelp:      'What a receiver calls Speaker Size. A speaker marked Small has its bass taken away and handed to the subwoofer — not copied there. Copying is what makes small speakers sound boomy, because the bass then plays twice.',
+      xoHelp:      'Where the handover happens. 80 Hz is the cinema standard: low enough that you can\'t tell the bass is coming from the sub, high enough to let small speakers off the hook. Raise it if your speakers are very small.',
+      rvHelpType:  'The kind of space — a small room, a big hall, a plate. Sets several controls at once.',
       rvHelpMix:   'How much of the space you hear against the original sound.',
       rvHelpSize:  'How large the room feels. Bigger rooms take longer for sound to bounce back.',
       rvHelpDecay: 'How long the tail lasts before it fades away.',
@@ -2383,9 +2482,6 @@
     renderDevices();
     renderSettings();
     renderAutomations();
-    document.querySelectorAll('#eqMode button').forEach(function (b) {
-      b.classList.toggle('on', +b.dataset.mode === S.eq.mode);
-    });
     var pw = document.querySelector('[data-power]');
     pw.classList.toggle('off', !S.power);
     pw.innerHTML = '<span class="d"></span> ' + (S.power ? 'On' : 'Bypassed');
@@ -2646,12 +2742,30 @@
     var pw = e.target.closest('[data-power]'); if (pw) { setPower(pw.classList.contains('off')); return; }
     var sw = e.target.closest('[data-sw]'); if (sw) { onToggle(sw); return; }
 
-    var sg = e.target.closest('#eqMode button'); if (sg) { setEqMode(+sg.dataset.mode); return; }
     if (e.target.closest('#eqReset')) { applyEqPreset('Flat'); return; }
     if (e.target.closest('#calibReset')) {
       S.spk.trims = [0, 0, 0, 0, 0, 0, 0, 0]; renderSpeakers(); pushTrims(); save(); return;
     }
     if (e.target.closest('#refreshDevices')) { send({ t: 'devices' }); toast('Rescanning audio devices…'); return; }
+    var sizeBtn = e.target.closest('.strip .size');
+    if (sizeBtn) {
+      var si = +sizeBtn.dataset.size;
+      snapshot('speaker size');
+      S.spk.small[si] = !S.spk.small[si];
+      pushBassManagement();
+      renderSpeakers();
+      save();
+      return;
+    }
+    var xo = e.target.closest('#xoSeg button');
+    if (xo) {
+      snapshot('crossover');
+      S.spk.crossover = +xo.dataset.xo;
+      pushBassManagement();
+      renderSpeakers();
+      save();
+      return;
+    }
     if (e.target.closest('#speakerSetup')) { send({ t: 'speakersetup' }); return; }
     if (e.target.closest('#outletFix')) {
       send({ t: 'speakersetup' });
@@ -2853,6 +2967,12 @@
               /* Merge over the defaults so a state file from an older build still opens. */
               S = Object.assign(defaults(), loaded);
               S.eq = Object.assign(defaults().eq, loaded.eq || {});
+              /* Settings written before the 31-band mode was dropped keep their ten-band curve. */
+              if (!S.eq.gains && loaded.eq && loaded.eq.gains10) { S.eq.gains = loaded.eq.gains10.slice(); }
+              if (!S.eq.gains || S.eq.gains.length !== FREQ10.length) {
+                S.eq.gains = FREQ10.map(function () { return 0; });
+              }
+              delete S.eq.gains10; delete S.eq.gains31; delete S.eq.mode;
               S.fx = Object.assign(defaults().fx, loaded.fx || {});
               S.rv = Object.assign(defaults().rv, loaded.rv || {});
               S.spk = Object.assign(defaults().spk, loaded.spk || {});

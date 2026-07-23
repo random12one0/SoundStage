@@ -25,6 +25,8 @@
 #include "soundstage/StereoWidth.h"
 #include "soundstage/Reverb.h"
 #include "soundstage/Upmix.h"
+#include "soundstage/Limiter.h"
+#include "soundstage/BassManager.h"
 #include "soundstage/SmoothedValue.h"
 
 #include <cmath>
@@ -49,6 +51,7 @@ public:
         upmix_.prepare(sampleRate, Upmix::Surround7_1);  // prepare the widest layout; 5.1 is its first 6 ch
         subLp_.setLowpass(sampleRate, 120.0, 0.707);
         subLp_.reset();
+        bass2_.prepare(sampleRate);
 
         // 20 ms enable ramps: inaudible, and long enough that nothing clicks. Effects start OFF, so
         // the chain is transparent out of the box (master on, every effect bypassed -> output = input).
@@ -116,6 +119,10 @@ public:
     /// on ordinary 2.0 material. Independent of the surround fill on purpose — plenty of people want
     /// their sub working without anything being invented for the rear speakers.
     void enableSubFeed(bool on)    { subFeed_ = on; }
+
+    /// Bass management — "Speaker Size: Small" on a receiver. Takes the low end off the speakers that
+    /// can't handle it and gives it to the sub, rather than merely copying it there.
+    BassManager& bassManager()     { return bass2_; }
 
     void setUpmixAmount(double a)  { upmixAmountValue_ = a; upmixAmount_.setTarget(a); }
 
@@ -245,6 +252,11 @@ public:
             sr = mix(origSR, sr, eg);
 
             double frame[kOutChannels] = { l, r, c, lfe, bl, br, sl, sr };
+
+            // Same bass management a real multichannel source gets — a 5.1 film's centre channel
+            // needs its low end redirected just as much as an upmixed one.
+            bass2_.process(frame, outChannels);
+
             for (int i = 0; i < kOutChannels; ++i) {
                 const double t = channelTrim_[i].next();
                 frame[i] = clampSafe(frame[i] * mg * t);
@@ -294,20 +306,26 @@ private:
             if (outChannels == 2) out[1] = clampSafe(r * trim[1]);
             return;
         }
+
+        double frame[kOutChannels] = {0.0};
         if (upmixOn_) {
-            double up[kOutChannels] = {0.0};
-            upmix_.process(l, r, up);  // fills the 7.1 order: FL FR C LFE BL BR SL SR
-            for (int i = 0; i < outChannels && i < kOutChannels; ++i) out[i] = clampSafe(up[i] * trim[i]);
+            upmix_.process(l, r, frame);  // fills the 7.1 order: FL FR C LFE BL BR SL SR
         } else {
             // No upmix on a surround device: front L/R carry the signal, the rest stay silent —
             // except the sub, which can still be fed if the user wants their subwoofer used on
-            // ordinary stereo (bass management, independent of the surround fill).
-            for (int i = 0; i < outChannels; ++i) out[i] = 0.0;
-            out[0] = clampSafe(l * trim[0]);
-            out[1] = clampSafe(r * trim[1]);
-            if (subFeed_ && outChannels > 3) {
-                out[3] = clampSafe(subLp_.process(0.5 * (l + r)) * trim[3]);
+            // ordinary stereo, independent of any surround fill.
+            frame[0] = l;
+            frame[1] = r;
+            if (subFeed_) {
+                frame[kLfeChannel] = subLp_.process(0.5 * (l + r));
             }
+        }
+
+        // Bass management last: it needs the finished per-speaker signal to know what to take away.
+        bass2_.process(frame, outChannels);
+
+        for (int i = 0; i < outChannels && i < kOutChannels; ++i) {
+            out[i] = clampSafe(frame[i] * trim[i]);
         }
     }
 
@@ -333,7 +351,9 @@ private:
 
     // The authoritative settings — what the host asked for, independent of where a ramp happens to
     // be. prepare() re-seeds every smoothed value from these.
-    Biquad subLp_;              // bass-management low-pass for the sub feed
+    static constexpr int kLfeChannel = 3;
+    Biquad subLp_;              // low-pass for the stereo-to-sub feed
+    BassManager bass2_;         // "Speaker Size: Small" — takes bass off satellites, gives it to the sub
     bool   subFeed_ = false;
     bool   eqOn_ = false, bassOn_ = false, compOn_ = false, widthOn_ = false, reverbOn_ = false;
     bool   nightOn_ = false;

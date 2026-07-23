@@ -103,6 +103,14 @@ public sealed class SoundstageEngine : IDisposable
     /// <summary>Feed the subwoofer from the stereo low end even with the upmix off.</summary>
     public void EnableSubFeed(bool on) => ssg_enable_sub_feed(_handle, on ? 1 : 0);
 
+    /// <summary>
+    /// Bass management — a receiver's "Speaker Size: Small". <paramref name="smallMask"/> has bit 0
+    /// for FL through bit 7 for SR; every speaker whose bit is set loses everything below
+    /// <paramref name="crossoverHz"/>, and that content goes to the subwoofer instead.
+    /// </summary>
+    public void SetBassManagement(bool on, double crossoverHz, int smallMask, double subGain)
+        => ssg_bass_management(_handle, on ? 1 : 0, crossoverHz, smallMask, subGain);
+
     /// <summary>Night mode's own dynamics stage, independent of the Leveler.</summary>
     public void EnableNight(bool on) => ssg_enable_night(_handle, on ? 1 : 0);
 
@@ -214,6 +222,10 @@ public sealed class SoundstageEngine : IDisposable
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_enable_sub_feed(IntPtr e, int on);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_bass_management(IntPtr e, int on, double crossoverHz,
+                                                   int smallMask, double subGain);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_enable_night(IntPtr e, int on);

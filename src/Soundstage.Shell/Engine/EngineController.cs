@@ -41,23 +41,19 @@ public sealed class EngineController : IDisposable
     private const int NightHighPassSlot = 34;    // ...and the high-pass under it
     private const int TotalEqBands = 35;
 
-    /// <summary>ISO octave centres — the 10-band graphic EQ.</summary>
+    /// <summary>
+    /// ISO octave centres — the standard ten-band graphic EQ, which is what consumer equalisers use
+    /// and what published preset curves are written against. A third-octave version was tried and
+    /// dropped: it's a measurement tool, and without a measurement it's thirty-one ways to go wrong.
+    /// </summary>
     private static readonly double[] Bands10 =
     {
         31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
     };
 
-    /// <summary>ISO third-octave centres — the 31-band graphic EQ.</summary>
-    private static readonly double[] Bands31 =
-    {
-        20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630,
-        800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000,
-    };
-
     // A bell's Q for a graphic EQ is set by band spacing: neighbouring bands should sum smoothly
-    // rather than ripple. Octave spacing -> ~1.41, third-octave -> ~4.32.
+    // rather than ripple. Octave spacing wants roughly 1.41.
     private const double Q10 = 1.41;
-    private const double Q31 = 4.32;
 
     private readonly SoundstageEngine? _engine;
     private readonly EngineAudioHost? _host;
@@ -224,6 +220,13 @@ public sealed class EngineController : IDisposable
                 case "trim":
                     _engine.SetChannelTrimDb((int)Num(root, "ch", -1), Num(root, "db", 0.0));
                     break;
+                case "bassmgmt":
+                    _engine.SetBassManagement(
+                        Bool(root, "on"),
+                        Num(root, "crossover", 80.0),
+                        (int)Num(root, "smallMask", 0xFF),
+                        Num(root, "subGain", 1.0));
+                    break;
             }
         }
     }
@@ -372,7 +375,7 @@ public sealed class EngineController : IDisposable
             // rather than bypassing the whole section.
             if (!Bool(root, "on"))
             {
-                ApplyGraphicEq((int)Num(root, "mode", 10), Array.Empty<double>());
+                ApplyGraphicEq(10, Array.Empty<double>());
                 return;
             }
         }
@@ -386,7 +389,7 @@ public sealed class EngineController : IDisposable
             }
         }
 
-        ApplyGraphicEq((int)Num(root, "mode", gains.Count == 31 ? 31 : 10), gains.ToArray());
+        ApplyGraphicEq(10, gains.ToArray());
     }
 
     /// <summary>
@@ -403,15 +406,12 @@ public sealed class EngineController : IDisposable
         _engine.EnableEq(true);
         _engine.SetEqBandCount(TotalEqBands);
 
-        double[] freqs = mode == 31 ? Bands31 : Bands10;
-        double q = mode == 31 ? Q31 : Q10;
-
         for (int i = 0; i < GraphicSlots; i++)
         {
-            if (i < freqs.Length)
+            if (i < Bands10.Length)
             {
                 double gain = i < gains.Length ? Math.Clamp(gains[i], -18.0, 18.0) : 0.0;
-                _engine.SetEqBand(i, BandType.Peaking, freqs[i], gain, q);
+                _engine.SetEqBand(i, BandType.Peaking, Bands10[i], gain, Q10);
             }
             else
             {
