@@ -1,19 +1,19 @@
 {
   "state": "done",
-  "headline": "Hardened it — tried hard to break it, then fixed what broke",
-  "note": "Spent this session trying to make it fail the way it would in the wild: corrupted settings, glitchy input samples, garbage in every knob, odd channel counts, in-place buffers, weird sample rates. Found five ways to make the audio engine spit out NaN — which inside Windows' audio service is a loud click at best. All fixed with layered scrubbing: nothing non-finite can now reach your speakers. A corrupted settings file no longer crashes system audio, no longer mutes, and recovers the instant good settings return. The app also survives a totally garbled settings file on launch. Normal sound is untouched — bypass measures exactly 0.00 dB.",
-  "updated": "hardening pass - 20 adversarial tests, all pass",
+  "headline": "The app can see your sound again — meters, now-playing, and the upmix are all live",
+  "note": "Your biggest complaints came from one thing: in plugin mode the app was no longer in the audio path, so it couldn't meter or detect anything. The plugin now reports its live per-speaker levels back to the app. Result: the status shows your actual song (Love — Keyshia Cole), the 2.0→5.1 badge, and every speaker's meter moving — and you can finally SEE the upmix filling your center and surrounds from stereo. Also fixed: 'EXE' now shows the real app name, and I reset the leftover test trims to a clean zero.",
+  "updated": "plugin-mode metering + now-playing, verified on screen with your music",
   "items": [
-    { "text": "Fuzzed the DSP: 13 categories, found 5 NaN paths", "done": true, "active": false },
-    { "text": "Output scrub - no NaN/Inf ever reaches audiodg", "done": true, "active": false },
-    { "text": "Input scrub - a bad sample can't poison a filter forever", "done": true, "active": false },
-    { "text": "Every setting clamped finite + in-range before it hits a filter", "done": true, "active": false },
-    { "text": "Corrupt settings file: no crash, no mute, full recovery", "done": true, "active": false },
-    { "text": "App survives empty/garbage/truncated state.json on launch", "done": true, "active": false },
-    { "text": "Odd channels, in-place, 44/96/192kHz, rapid toggling all clean", "done": true, "active": false },
-    { "text": "Surround/stereo decision now sticky - no popping on quiet film scenes", "done": true, "active": false },
-    { "text": "Regression: normal audio + effects still exact (bypass 0.00, gain -6.00)", "done": true, "active": false },
-    { "text": "Hardened DLL shipped in app + installer, running now", "done": true, "active": false },
-    { "text": "For you: the 30-ideas list - we'll pick from it once base is proven by ear", "done": false, "active": true }
+    { "text": "Root cause: meter loop died when app wasn't capturing (always, in plugin mode)", "done": true, "active": false },
+    { "text": "Plugin reports live per-speaker levels back to the app", "done": true, "active": false },
+    { "text": "Now-playing works: shows your song + 2.0→5.1 badge", "done": true, "active": false },
+    { "text": "Per-speaker meters move again — the feature you missed", "done": true, "active": false },
+    { "text": "Upmix now visible: stereo lights up center + surrounds", "done": true, "active": false },
+    { "text": "'EXE' label bug fixed (desktop apps show real name)", "done": true, "active": false },
+    { "text": "Leftover test trims reset to clean zero", "done": true, "active": false },
+    { "text": "Confirmed installed app launches reliably (6/6 cold starts)", "done": true, "active": false },
+    { "text": "Telemetry write is real-time safe; struct layout verified C++↔C#", "done": true, "active": false },
+    { "text": "Open question for you: want a Boom-style volume boost above unity?", "done": false, "active": true },
+    { "text": "Still to revisit together: which of the 30 ideas to actually build", "done": false, "active": false }
   ]
 }
