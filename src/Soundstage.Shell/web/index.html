@@ -684,6 +684,7 @@
             <div class="setgroup">Plugin mode</div>
             <div class="setrow"><div class="st"><div class="stn">Run inside Windows' audio engine<span id="apoHelp"></span></div><div class="std" id="apoNote">Checking…</div></div><button class="btn" id="apoInstall">Turn on</button></div>
             <div class="setrow" id="apoDetail" style="display:none"><div class="st"><div class="stn">Last thing the plugin did</div><div class="std mono" id="apoActivity">—</div></div></div>
+            <div class="setrow" id="apoRepairRow" style="display:none"><div class="st"><div class="stn">Sound stopped going through Soundstage?<span id="apoRepairHelp"></span></div><div class="std">Switching your speakers to Dolby Atmos or Windows Sonic can make Windows switch off all effects on that device — including this one. This turns them back on and reconnects Soundstage. Needs Administrator; your audio blips for a second.</div></div><button class="btn" id="apoRepair">Repair</button></div>
             <div class="setrow" id="apoRemoveRow" style="display:none"><div class="st"><div class="stn">Remove the plugin</div><div class="std" id="apoRemoveNote">Takes Soundstage back out of Windows and restores what your sound card had before. Needs Administrator, and your audio will cut out for a moment. To stop processing without removing anything, use the power button on the main page instead.</div></div><button class="ghost" id="apoUninstall" style="border-color:#6b3a3f;color:#ff98ac">Remove</button></div>
 
             <div class="setgroup">Audio</div>
@@ -2079,7 +2080,12 @@
 
     var devs = m.devices || [];
     var removeRow = document.getElementById('apoRemoveRow');
+    var repairRow = document.getElementById('apoRepairRow');
     apoActive = !!m.active;
+
+    /* Repair is offered whenever the plugin is installed — that's exactly when the "Atmos switched
+       my effects off" problem can strike. */
+    if (repairRow) { repairRow.style.display = m.registered ? '' : 'none'; }
 
     if (m.active) {
       /* textContent, not innerHTML — these strings come from the registry and there is no reason to
@@ -3114,6 +3120,15 @@
          couple of times rather than showing a stale answer. */
       setTimeout(function () { send({ t: 'apostatus' }); }, 6000);
       setTimeout(function () { send({ t: 'apostatus' }); }, 14000);
+      return;
+    }
+
+    if (e.target.closest('#apoRepair')) {
+      send({ t: 'aporepair' });
+      var rn = document.getElementById('apoNote');
+      if (rn) { rn.textContent = 'Repairing — approve the Administrator prompt…'; }
+      setTimeout(function () { send({ t: 'apostatus' }); }, 7000);
+      setTimeout(function () { send({ t: 'apostatus' }); }, 15000);
       return;
     }
 

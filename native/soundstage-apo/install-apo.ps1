@@ -28,6 +28,11 @@
 [CmdletBinding()]
 param(
     [switch]$Uninstall,
+    # Repair: re-enable effects on any endpoint where Windows disabled them, and re-assert our
+    # attachment. This is the clean recovery for when sound stops going through Soundstage after
+    # toggling Dolby Atmos / Windows Sonic — Windows sets Disable_SysFx on the endpoint, which kills
+    # every effect including ours. Minimal and safe: it never deletes the effect chain.
+    [switch]$Repair,
     # Substring of the device name, e.g. "AV Receiver". Omit to be shown a list.
     [string]$Device
 )
@@ -200,6 +205,50 @@ if ($Uninstall) {
 
     Write-Host ""
     Write-Host "Done. Your devices are back to how they were."
+    return
+}
+
+if ($Repair) {
+    Write-Host "Repairing Soundstage on your playback devices..."
+
+    $DisableSysFx = "{1da5d803-d492-4edd-8c23-e0c0ffee7f0e},5"
+    $touched = 0
+    foreach ($ep in Get-RenderEndpoints) {
+        if (-not $ep.Active) { continue }
+
+        $fxRO = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+            "$RenderBase\$($ep.Id)\FxProperties")
+        if (-not $fxRO) { continue }
+
+        $disabled = $fxRO.GetValue($DisableSysFx)
+        $ours = @($ModeFxProps | ForEach-Object { $fxRO.GetValue($_) }) -contains $CLSID
+        $fxRO.Close()
+
+        # Only touch endpoints that are ours, or that have effects switched off — leave everything
+        # else exactly as Windows left it.
+        if (-not $ours -and $disabled -ne 1) { continue }
+
+        $fx = Open-Fx $ep.Id -Writable
+        if (-not $fx) { continue }
+        try {
+            if ($disabled -eq 1) {
+                $fx.SetValue($DisableSysFx, 0, [Microsoft.Win32.RegistryValueKind]::DWord)
+                Write-Host "  re-enabled effects on: $($ep.Name)"
+            }
+            if ($ours) {
+                foreach ($p in $ModeFxProps) { $fx.SetValue($p, $CLSID) }
+                Write-Host "  re-asserted Soundstage on: $($ep.Name)"
+            }
+        } finally { $fx.Close() }
+        $touched++
+    }
+
+    Start-Process regsvr32.exe -ArgumentList "/s", "`"$dst`"" -Wait -EA SilentlyContinue
+    Restart-AudioService
+
+    Write-Host ""
+    Write-Host "Repaired $touched device(s). Play something to check it's flowing through Soundstage."
+    Write-Host "If sound is still off, a full restart of your PC clears any leftover audio-graph state."
     return
 }
 

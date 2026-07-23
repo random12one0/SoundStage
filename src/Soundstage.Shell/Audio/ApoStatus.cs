@@ -138,7 +138,7 @@ public static class ApoStatus
     /// Launch the installer elevated. Returns false if the user declined the UAC prompt — which is a
     /// normal answer, not an error, and must not be reported as a failure.
     /// </summary>
-    public static bool RunInstaller(bool uninstall, string? deviceMatch = null)
+    public static bool RunInstaller(bool uninstall, string? deviceMatch = null, bool repair = false)
     {
         var script = FindScript();
         if (script == null)
@@ -150,6 +150,10 @@ public static class ApoStatus
         if (uninstall)
         {
             args += " -Uninstall";
+        }
+        else if (repair)
+        {
+            args += " -Repair";
         }
         else if (!string.IsNullOrWhiteSpace(deviceMatch))
         {

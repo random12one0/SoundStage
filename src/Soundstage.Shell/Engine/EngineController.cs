@@ -197,6 +197,9 @@ public sealed class EngineController : IDisposable
                 case "apouninstall":
                     ApoStatus.RunInstaller(uninstall: true);
                     return;
+                case "aporepair":
+                    ApoStatus.RunInstaller(uninstall: false, repair: true);
+                    return;
             }
 
             if (_engine is null)
