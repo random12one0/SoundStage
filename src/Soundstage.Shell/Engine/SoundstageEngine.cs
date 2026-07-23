@@ -22,7 +22,7 @@ public enum BandType
 public sealed class SoundstageEngine : IDisposable
 {
     private const string Lib = "soundstage_engine";
-    private const int ExpectedAbi = 2;
+    private const int ExpectedAbi = 3;
 
     private IntPtr _handle;
     private bool _disposed;
@@ -102,6 +102,13 @@ public sealed class SoundstageEngine : IDisposable
 
     /// <summary>Feed the subwoofer from the stereo low end even with the upmix off.</summary>
     public void EnableSubFeed(bool on) => ssg_enable_sub_feed(_handle, on ? 1 : 0);
+
+    /// <summary>Night mode's own dynamics stage, independent of the Leveler.</summary>
+    public void EnableNight(bool on) => ssg_enable_night(_handle, on ? 1 : 0);
+
+    public void SetNight(double thresholdDb, double ratio, double makeupDb,
+                         double attackMs, double releaseMs)
+        => ssg_night_set(_handle, thresholdDb, ratio, makeupDb, attackMs, releaseMs);
 
     /// <summary>Early reflections (0..1) and modulation (0..1) — the reverb's character controls.</summary>
     public void SetReverbCharacter(double early, double modulation)
@@ -207,6 +214,13 @@ public sealed class SoundstageEngine : IDisposable
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_enable_sub_feed(IntPtr e, int on);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_enable_night(IntPtr e, int on);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_night_set(IntPtr e, double thresholdDb, double ratio,
+                                             double makeupDb, double attackMs, double releaseMs);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_reverb_set_character(IntPtr e, double early, double modulation);

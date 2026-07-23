@@ -92,6 +92,13 @@ SSG_API void        ssg_upmix_set(ssg_engine* e, double amount, double center_ga
 /* Feed the subwoofer from the stereo low end even with the upmix off (bass management). */
 SSG_API void        ssg_enable_sub_feed(ssg_engine* e, int on);
 
+/* Night mode — its own dynamics stage, separate from the Leveler, so you can run both. The point is
+ * to stop sudden loud moments carrying through the house; the bass cut that goes with it is an EQ
+ * shelf the host sets. */
+SSG_API void        ssg_enable_night(ssg_engine* e, int on);
+SSG_API void        ssg_night_set(ssg_engine* e, double threshold_db, double ratio,
+                                  double makeup_db, double attack_ms, double release_ms);
+
 /* Per-speaker output trim in dB — the calibration faders. `ch` is 0..7 in 7.1 order:
  * FL FR C LFE SL SR SBL SBR. Applied after the upmix, so it trims the real speaker. */
 SSG_API void        ssg_set_channel_trim_db(ssg_engine* e, int ch, double db);
@@ -101,7 +108,7 @@ SSG_API double      ssg_meter_reduction_db(ssg_engine* e);
 
 /* ABI/build version, so the app can sanity-check the DLL it loaded. */
 SSG_API int         ssg_abi_version(void);
-#define SSG_ABI_VERSION 2
+#define SSG_ABI_VERSION 3
 
 #ifdef __cplusplus
 }

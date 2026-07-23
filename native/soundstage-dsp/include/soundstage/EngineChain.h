@@ -44,6 +44,7 @@ public:
         eqSide_.prepare(sampleRate);
         bass_.prepare(sampleRate);
         comp_.prepare(sampleRate);
+        nightComp_.prepare(sampleRate);
         reverb_.prepare(sampleRate);
         upmix_.prepare(sampleRate, Upmix::Surround7_1);  // prepare the widest layout; 5.1 is its first 6 ch
         subLp_.setLowpass(sampleRate, 120.0, 0.707);
@@ -61,6 +62,7 @@ public:
         eqEnableExtra_.reset(sampleRate, enableRamp); eqEnableExtra_.setCurrentAndTarget(eqOn_ ? 1.0 : 0.0);
         bassEnable_.reset(sampleRate, enableRamp);    bassEnable_.setCurrentAndTarget(bassOn_ ? 1.0 : 0.0);
         compEnable_.reset(sampleRate, enableRamp);    compEnable_.setCurrentAndTarget(compOn_ ? 1.0 : 0.0);
+        nightEnable_.reset(sampleRate, enableRamp);   nightEnable_.setCurrentAndTarget(nightOn_ ? 1.0 : 0.0);
         widthEnable_.reset(sampleRate, enableRamp);   widthEnable_.setCurrentAndTarget(widthOn_ ? 1.0 : 0.0);
         reverbEnable_.reset(sampleRate, enableRamp);  reverbEnable_.setCurrentAndTarget(reverbOn_ ? 1.0 : 0.0);
 
@@ -86,6 +88,7 @@ public:
         eqSide_.reset();
         bass_.reset();
         comp_.reset();
+        nightComp_.reset();
         reverb_.reset();
     }
 
@@ -101,6 +104,12 @@ public:
     void enableCompressor(bool on) { compOn_ = on;   compEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableWidth(bool on)      { widthOn_ = on;  widthEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableReverb(bool on)     { reverbOn_ = on; reverbEnable_.setTarget(on ? 1.0 : 0.0); }
+
+    /// Night mode: its own compressor, separate from the Leveler's, because the two do different
+    /// jobs and you may well want both. This one exists to stop sudden loud moments carrying through
+    /// the house — the bass cut that goes with it is an EQ shelf the host sets.
+    void enableNight(bool on)      { nightOn_ = on; nightEnable_.setTarget(on ? 1.0 : 0.0); }
+    Compressor& nightCompressor()  { return nightComp_; }
     void enableUpmix(bool on)      { upmixOn_ = on; }  // structural (changes channel count), not crossfaded
 
     /// Feed the LFE from the stereo low end even with the upmix off, so a subwoofer still gets used
@@ -165,6 +174,7 @@ public:
         { double pl = l, pr = r; eq_.process(pl, pr);     const double g = eqEnable_.next();     l = mix(l, pl, g); r = mix(r, pr, g); }
         { double pl = l, pr = r; bass_.process(pl, pr);   const double g = bassEnable_.next();   l = mix(l, pl, g); r = mix(r, pr, g); }
         { double pl = l, pr = r; comp_.process(pl, pr);   const double g = compEnable_.next();   l = mix(l, pl, g); r = mix(r, pr, g); }
+        { double pl = l, pr = r; nightComp_.process(pl, pr); const double g = nightEnable_.next(); l = mix(l, pl, g); r = mix(r, pr, g); }
         { double pl = l, pr = r; width_.process(pl, pr);  const double g = widthEnable_.next();  l = mix(l, pl, g); r = mix(r, pr, g); }
         { double pl = l, pr = r; reverb_.process(pl, pr); const double g = reverbEnable_.next(); l = mix(l, pl, g); r = mix(r, pr, g); }
 
@@ -203,6 +213,7 @@ public:
             { double pl = l, pr = r; eq_.process(pl, pr);     const double g = eqEnable_.next();     l = mix(l, pl, g); r = mix(r, pr, g); }
             { double pl = l, pr = r; bass_.process(pl, pr);   const double g = bassEnable_.next();   l = mix(l, pl, g); r = mix(r, pr, g); }
             { double pl = l, pr = r; comp_.process(pl, pr);   const double g = compEnable_.next();   l = mix(l, pl, g); r = mix(r, pr, g); }
+            { double pl = l, pr = r; nightComp_.process(pl, pr); const double g = nightEnable_.next(); l = mix(l, pl, g); r = mix(r, pr, g); }
             { double pl = l, pr = r; width_.process(pl, pr);  const double g = widthEnable_.next();  l = mix(l, pl, g); r = mix(r, pr, g); }
             { double pl = l, pr = r; reverb_.process(pl, pr); const double g = reverbEnable_.next(); l = mix(l, pl, g); r = mix(r, pr, g); }
 
@@ -309,12 +320,14 @@ private:
     Equalizer    eqCenter_, eqBack_, eqSide_;
     BassEnhancer bass_;
     Compressor   comp_;
+    Compressor   nightComp_;   // night mode's own dynamics, independent of the Leveler
     StereoWidth  width_;
     Reverb       reverb_;
     Upmix        upmix_;
 
     SmoothedValue eqEnable_, bassEnable_, compEnable_, widthEnable_, reverbEnable_;
     SmoothedValue eqEnableExtra_;   // the same EQ enable, advanced once per frame on the extra channels
+    SmoothedValue nightEnable_;
     SmoothedValue masterEnable_, masterGain_, upmixAmount_;
     bool upmixOn_ = false;
 
@@ -323,6 +336,7 @@ private:
     Biquad subLp_;              // bass-management low-pass for the sub feed
     bool   subFeed_ = false;
     bool   eqOn_ = false, bassOn_ = false, compOn_ = false, widthOn_ = false, reverbOn_ = false;
+    bool   nightOn_ = false;
     bool   masterOn_ = true;
     double masterGainLin_ = 1.0;
     double upmixAmountValue_ = 0.7;

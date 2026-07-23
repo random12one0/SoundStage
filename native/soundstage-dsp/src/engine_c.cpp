@@ -100,6 +100,20 @@ void ssg_reverb_set_tone(ssg_engine* e, double diffusion, double low_cut_hz, dou
 
 void ssg_enable_sub_feed(ssg_engine* e, int on) { if (e) e->chain.enableSubFeed(on != 0); }
 
+void ssg_enable_night(ssg_engine* e, int on) { if (e) e->chain.enableNight(on != 0); }
+
+void ssg_night_set(ssg_engine* e, double threshold_db, double ratio,
+                   double makeup_db, double attack_ms, double release_ms) {
+    if (!e) return;
+    auto& c = e->chain.nightCompressor();
+    c.setThresholdDb(threshold_db);
+    c.setRatio(ratio);
+    c.setKneeDb(8.0);          // a wide knee: night mode should tighten, not pump
+    c.setMakeupDb(makeup_db);
+    c.setAttackMs(attack_ms);
+    c.setReleaseMs(release_ms);
+}
+
 void ssg_reverb_set_character(ssg_engine* e, double early, double modulation) {
     if (!e) return;
     e->chain.reverb().setEarlyLevel(early);

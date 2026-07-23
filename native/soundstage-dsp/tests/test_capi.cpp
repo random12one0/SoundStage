@@ -252,6 +252,60 @@ int main() {
         ssg_destroy(t);
     }
 
+    // Night mode is not a volume control. It has to take the low end down (that's what carries
+    // through walls) and hold the peaks back, while leaving speech-range level roughly intact.
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+        ssg_enable_eq(t, 1);
+        ssg_eq_set_num_bands(t, 35);
+        for (int i = 0; i < 33; ++i) ssg_eq_set_band(t, i, SSG_BAND_PEAKING, 1000.0, 0.0, 1.0);
+
+        // One long CONTINUOUS tone, processed in a single call. Feeding the same short buffer over
+        // and over restarts the waveform's phase every block, and those discontinuities ring the
+        // filters — which swamps the very thing we're trying to measure.
+        const int longFrames = 24000;   // half a second at 48 kHz: plenty of 60 Hz cycles
+        auto levelAt = [&](double freq, double amp, bool night) {
+            ssg_reset(t);
+            std::vector<float> sig(longFrames * 2), out(longFrames * 2, 0.0f);
+            for (int n = 0; n < longFrames; ++n) {
+                const float s = (float)(amp * std::sin(2.0 * 3.14159265358979 * freq * n / 48000.0));
+                sig[n * 2] = s; sig[n * 2 + 1] = s;
+            }
+            ssg_eq_set_band(t, 33, SSG_BAND_LOW_SHELF, 150.0, night ? -12.0 : 0.0, 0.707);
+            ssg_eq_set_band(t, 34, SSG_BAND_HIGHPASS, night ? 80.0 : 5.0, 0.0, 0.707);
+            ssg_enable_night(t, night ? 1 : 0);
+            ssg_night_set(t, -16.0, 8.0, 2.5, 5.0, 140.0);
+            ssg_process(t, sig.data(), 2, out.data(), 2, longFrames);
+
+            // Measure the settled second half only, so start-up ramps don't count.
+            double peak = 0.0;
+            for (int i = longFrames; i < longFrames * 2; ++i) {
+                peak = std::fmax(peak, std::fabs((double)out[i]));
+            }
+            return peak;
+        };
+
+        // A quiet 60 Hz tone: the shelf plus high-pass should pull it well down.
+        const double bassOff = levelAt(60.0, 0.05, false);
+        const double bassOn  = levelAt(60.0, 0.05, true);
+        check(bassOn < bassOff * 0.6, "night mode cuts the bass that travels through walls");
+
+        // A quiet 1 kHz tone (speech range) should survive largely intact — night mode is not a
+        // volume knob, and dialogue has to stay audible.
+        const double midOff = levelAt(1000.0, 0.05, false);
+        const double midOn  = levelAt(1000.0, 0.05, true);
+        check(midOn > midOff * 0.7, "night mode leaves speech-range level roughly alone");
+
+        // A loud 1 kHz tone should be held back much harder than the quiet one.
+        const double loudOff = levelAt(1000.0, 0.7, false);
+        const double loudOn  = levelAt(1000.0, 0.7, true);
+        check((loudOn / loudOff) < (midOn / midOff),
+              "night mode squashes loud peaks more than quiet passages");
+
+        ssg_destroy(t);
+    }
+
     // prepare() must not throw away settings. It runs when the audio path opens and on every device
     // or sample-rate change, so if it reset the enables it would silently switch off whatever the
     // user had turned on — the EQ section used to die the instant audio started.

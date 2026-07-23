@@ -37,7 +37,9 @@ public sealed class EngineController : IDisposable
     private const int GraphicSlots = 31;
     private const int WarmthSlot = 31;
     private const int AirSlot = 32;
-    private const int TotalEqBands = 33;
+    private const int NightSlot = 33;            // night mode's bass shelf
+    private const int NightHighPassSlot = 34;    // ...and the high-pass under it
+    private const int TotalEqBands = 35;
 
     /// <summary>ISO octave centres — the 10-band graphic EQ.</summary>
     private static readonly double[] Bands10 =
@@ -266,10 +268,48 @@ public sealed class EngineController : IDisposable
                 _engine.SetEqBand(AirSlot, BandType.HighShelf, 10000.0, on ? v * 8.0 : 0.0, 0.707);
                 break;
             case "night":
-                _nightDb = on ? -12.0 * v : 0.0;
-                ApplyOutputGain();
+                ApplyNight(on, v);
                 break;
         }
+    }
+
+    /// <summary>
+    /// Night mode, as a receiver means it — not a volume knob.
+    ///
+    /// What actually wakes the house is low frequency (it goes through walls and floors where the
+    /// mids and highs don't) and sudden peaks (an explosion after quiet dialogue). So this cuts the
+    /// bass that travels and squashes the peaks that startle, while leaving speech alone — the point
+    /// is to keep everything audible at a lower ceiling, not to make the whole film quieter.
+    /// </summary>
+    private void ApplyNight(bool on, double v)
+    {
+        if (_engine is null)
+        {
+            return;
+        }
+
+        // Two stages on the low end, because a shelf alone is too gentle where it matters. The shelf
+        // thins the upper bass; the high-pass removes the deep rumble underneath it, which is the
+        // part that actually travels through a floor.
+        _engine.SetEqBand(NightSlot, BandType.LowShelf, 150.0, on ? -12.0 * v : 0.0, 0.707);
+        _engine.SetEqBand(NightHighPassSlot, BandType.Highpass,
+            on ? 30.0 + (v * 50.0) : 5.0,   // effectively out of the way when off
+            0.0, 0.707);
+
+        // Dynamics: bring the ceiling down, and lift the quiet parts slightly so dialogue doesn't
+        // disappear along with the explosions. Modest makeup — enough to keep speech up, not enough
+        // to hand back the level we just took off the bass.
+        _engine.EnableNight(on);
+        _engine.SetNight(
+            thresholdDb: -16.0 - ((1.0 - v) * 10.0),   // more amount -> starts working sooner
+            ratio: 2.0 + (v * 6.0),
+            makeupDb: v * 2.5,
+            attackMs: 5.0,
+            releaseMs: 140.0);
+
+        // Only a token trim: the compressor is doing the work, so this is just headroom.
+        _nightDb = on ? -2.0 * v : 0.0;
+        ApplyOutputGain();
     }
 
     // The Ambience page's parameters, kept here so the dashboard dial (which only sets the mix) and
