@@ -111,6 +111,16 @@ public sealed class SoundstageEngine : IDisposable
     public void SetBassManagement(bool on, double crossoverHz, int smallMask, double subGain)
         => ssg_bass_management(_handle, on ? 1 : 0, crossoverHz, smallMask, subGain);
 
+    /// <summary>
+    /// The output limiter. Without it the only thing stopping an over is a hard clamp, and a clamped
+    /// peak is audible as a buzz rather than as loudness.
+    /// </summary>
+    public void SetLimiter(bool on, double ceilingDb, double releaseMs)
+        => ssg_limiter_set(_handle, on ? 1 : 0, ceilingDb, releaseMs);
+
+    /// <summary>How much the limiter is holding back right now, in dB.</summary>
+    public double LimiterReductionDb => _handle == IntPtr.Zero ? 0.0 : ssg_limiter_reduction_db(_handle);
+
     /// <summary>Night mode's own dynamics stage, independent of the Leveler.</summary>
     public void EnableNight(bool on) => ssg_enable_night(_handle, on ? 1 : 0);
 
@@ -226,6 +236,12 @@ public sealed class SoundstageEngine : IDisposable
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_bass_management(IntPtr e, int on, double crossoverHz,
                                                    int smallMask, double subGain);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_limiter_set(IntPtr e, int on, double ceilingDb, double releaseMs);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern double ssg_limiter_reduction_db(IntPtr e);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_enable_night(IntPtr e, int on);

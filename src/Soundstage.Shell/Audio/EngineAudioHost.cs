@@ -50,6 +50,27 @@ public sealed class EngineAudioHost : IDisposable
 
     private int _inChannels = 2;
 
+    /// <summary>
+    /// Roughly how far behind picture we are, in milliseconds: what the outlet holds before handing
+    /// it over, plus our own buffer, plus what the output device holds before it plays. Far more
+    /// useful on screen than the buffer setting alone, which is only one of the three.
+    /// </summary>
+    public int LatencyMsMeasured
+    {
+        get
+        {
+            if (!IsRunning)
+            {
+                return 0;
+            }
+
+            // The capture side runs on the endpoint's own period — 10 ms is the standard shared-mode
+            // period and what every device here reports.
+            const int captureMs = 10;
+            return captureMs + LatencyMs + (LatencyMs / 2);
+        }
+    }
+
     // ---- what is ACTUALLY playing --------------------------------------------------------------
     // The outlet's channel count says nothing about the content: with the cable configured as 5.1,
     // Spotify's stereo still arrives as six channels, four of them silent. So we watch each channel

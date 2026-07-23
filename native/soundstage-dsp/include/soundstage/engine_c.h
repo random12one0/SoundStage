@@ -99,6 +99,11 @@ SSG_API void        ssg_enable_sub_feed(ssg_engine* e, int on);
 SSG_API void        ssg_bass_management(ssg_engine* e, int on, double crossover_hz,
                                         int small_mask, double sub_gain);
 
+/* Output limiter — the safety net. Without it a big boost simply clips, and a clipped peak is a buzz
+ * rather than extra loudness. `ceiling_db` should sit a little under 0. */
+SSG_API void        ssg_limiter_set(ssg_engine* e, int on, double ceiling_db, double release_ms);
+SSG_API double      ssg_limiter_reduction_db(ssg_engine* e);
+
 /* Night mode — its own dynamics stage, separate from the Leveler, so you can run both. The point is
  * to stop sudden loud moments carrying through the house; the bass cut that goes with it is an EQ
  * shelf the host sets. */

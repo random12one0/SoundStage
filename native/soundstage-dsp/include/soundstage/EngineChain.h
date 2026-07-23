@@ -52,6 +52,7 @@ public:
         subLp_.setLowpass(sampleRate, 120.0, 0.707);
         subLp_.reset();
         bass2_.prepare(sampleRate);
+        limiter_.prepare(sampleRate);
 
         // 20 ms enable ramps: inaudible, and long enough that nothing clicks. Effects start OFF, so
         // the chain is transparent out of the box (master on, every effect bypassed -> output = input).
@@ -92,6 +93,8 @@ public:
         bass_.reset();
         comp_.reset();
         nightComp_.reset();
+        limiter_.reset();
+        bass2_.reset();
         reverb_.reset();
     }
 
@@ -123,6 +126,12 @@ public:
     /// Bass management — "Speaker Size: Small" on a receiver. Takes the low end off the speakers that
     /// can't handle it and gives it to the sub, rather than merely copying it there.
     BassManager& bassManager()     { return bass2_; }
+
+    /// The safety net at the end of the chain. Without it the only thing stopping an over is the
+    /// hard clamp, and a clamped peak is audible as a buzz rather than as loudness.
+    void enableLimiter(bool on)    { limiterOn_ = on; }
+    bool limiterEnabled() const    { return limiterOn_; }
+    Limiter& limiter()             { return limiter_; }
 
     void setUpmixAmount(double a)  { upmixAmountValue_ = a; upmixAmount_.setTarget(a); }
 
@@ -193,6 +202,10 @@ public:
         l *= mg;
         r *= mg;
 
+        // Last thing before the speakers: catch anything the chain pushed over full scale. Placed
+        // after the master gain so it protects against the volume control too.
+        if (limiterOn_) { limiter_.process(l, r); }
+
         upmix_.setAmount(upmixAmount_.next());  // keep the surround fill level smoothed too
         writeOut(l, r, out, outChannels);
     }
@@ -228,6 +241,7 @@ public:
             l = mix(origL, l, me);
             r = mix(origR, r, me);
             const double mg = masterGain_.next();
+            if (limiterOn_) { limiter_.process(l, r); }
 
             // The remaining channels: EQ (except the LFE), then the same master fade and gain.
             double c = inChannels > 2 ? src[2] : 0.0;
@@ -354,6 +368,8 @@ private:
     static constexpr int kLfeChannel = 3;
     Biquad subLp_;              // low-pass for the stereo-to-sub feed
     BassManager bass2_;         // "Speaker Size: Small" — takes bass off satellites, gives it to the sub
+    Limiter limiter_;
+    bool   limiterOn_ = false;
     bool   subFeed_ = false;
     bool   eqOn_ = false, bassOn_ = false, compOn_ = false, widthOn_ = false, reverbOn_ = false;
     bool   nightOn_ = false;

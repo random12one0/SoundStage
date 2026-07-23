@@ -381,9 +381,11 @@ public partial class MainWindow : Window
             PollNowPlaying();
             (float inPeak, float outPeak) = _controller.Levels;
             (int inCh, int outCh) = _controller.ActiveLayouts;
+            (int latency, double levelerDb, double limiterDb) = _controller.Meters;
             NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
                 $"{{\"t\":\"level\",\"in\":{inPeak:0.####},\"out\":{outPeak:0.####}," +
-                $"\"inCh\":{inCh},\"outCh\":{outCh},\"live\":true}}"));
+                $"\"inCh\":{inCh},\"outCh\":{outCh},\"latency\":{latency}," +
+                $"\"leveler\":{levelerDb:0.##},\"limiter\":{limiterDb:0.##},\"live\":true}}"));
         };
         _meterTimer.Start();
     }

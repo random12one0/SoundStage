@@ -111,6 +111,15 @@ void ssg_bass_management(ssg_engine* e, int on, double crossover_hz, int small_m
     }
 }
 
+void ssg_limiter_set(ssg_engine* e, int on, double ceiling_db, double release_ms) {
+    if (!e) return;
+    e->chain.enableLimiter(on != 0);
+    e->chain.limiter().setCeilingDb(ceiling_db);
+    e->chain.limiter().setRelease(release_ms);
+}
+
+double ssg_limiter_reduction_db(ssg_engine* e) { return e ? e->chain.limiter().reductionDb() : 0.0; }
+
 void ssg_enable_night(ssg_engine* e, int on) { if (e) e->chain.enableNight(on != 0); }
 
 void ssg_night_set(ssg_engine* e, double threshold_db, double ratio,

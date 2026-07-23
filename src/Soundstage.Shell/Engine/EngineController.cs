@@ -192,6 +192,15 @@ public sealed class EngineController : IDisposable
                     }
 
                     break;
+                case "panic":
+                    // Get out of the way. Stop processing and open the Windows sound dialog so the
+                    // default device can be pointed back at real speakers. Deliberately does not try
+                    // to change the default itself — when someone reaches for this, the last thing
+                    // they need is the app making one more decision on their behalf.
+                    StopProcessing();
+                    AudioDevices.OpenWindowsSpeakerSetup();
+                    _notify?.Invoke(JsonSerializer.Serialize(new { t = "panicked" }));
+                    return;
                 case "engage":
                     // Actually open or release the audio path. Separate from bypass on purpose.
                     if (Bool(root, "on")) { StartProcessing(); } else { StopProcessing(); }
@@ -219,6 +228,9 @@ public sealed class EngineController : IDisposable
                     break;
                 case "trim":
                     _engine.SetChannelTrimDb((int)Num(root, "ch", -1), Num(root, "db", 0.0));
+                    break;
+                case "limiter":
+                    _engine.SetLimiter(Bool(root, "on"), Num(root, "ceiling", -1.0), Num(root, "release", 80.0));
                     break;
                 case "bassmgmt":
                     _engine.SetBassManagement(
@@ -634,6 +646,13 @@ public sealed class EngineController : IDisposable
     /// to the speakers. Not the device's channel count, which says nothing about either.</summary>
     public (int In, int Out) ActiveLayouts
         => _host is null ? (2, 2) : (_host.ActiveInputChannels, _host.ActiveOutputChannels);
+
+    /// <summary>End-to-end delay in ms, and how hard the Leveler and limiter are working — the three
+    /// numbers the UI meters want.</summary>
+    public (int LatencyMs, double LevelerDb, double LimiterDb) Meters
+        => (_host?.LatencyMsMeasured ?? 0,
+            _engine?.GainReductionDb ?? 0.0,
+            _engine?.LimiterReductionDb ?? 0.0);
 
     /// <summary>Send the real playback devices to the UI, so the output row and the settings picker
     /// show what's actually on this machine instead of a hard-coded name.</summary>

@@ -661,7 +661,10 @@
             <div class="setrow" id="layoutRow"><div class="st"><div class="stn">Speaker layout</div><div class="std" id="layoutNote">—</div></div><button class="ghost" id="speakerSetup">Configure in Windows</button></div>
             <div class="setrow"><div class="st"><div class="stn">Take the device exclusively</div><div class="std">Drives every speaker your hardware has, even if Windows is set to stereo. Nothing else can play through it while on.</div></div><div class="sw" data-sw="exclusive"><div class="k"></div></div></div>
             <div class="setrow"><div class="st"><div class="stn">Buffer</div><div class="std" id="latencyNote">40 ms — lower is tighter, higher survives a busy machine</div></div><div class="sl" data-set="latency" style="max-width:180px"></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Protect against clipping<span id="limHelp"></span></div><div class="std">Catches peaks that a big boost pushes past full scale. Without it they square off, which buzzes.</div></div><div class="sw" data-sw="limiter"><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Delay<span id="latHelp"></span></div><div class="std" id="latencyReadout">—</div></div><span class="statusok mono" id="latencyBig">—</span></div>
             <div class="setrow"><div class="st"><div class="stn">Engine</div><div class="std" id="engineStatus">Checking…</div></div><button class="ghost" id="refreshDevices">Rescan devices</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Something's wrong — put it back<span id="panicHelp"></span></div><div class="std">Steps out of the audio path and hands your speakers back to Windows. For when there's no sound and you need it working now.</div></div><button class="ghost" id="panicBtn" style="border-color:#6b3a3f;color:#ff98ac">Restore audio</button></div>
 
             <div class="setgroup">Updates</div>
             <div class="setrow"><div class="st"><div class="stn" id="verLine">Version 1.0.0</div><div class="std" id="updateStatus">Not checked yet</div></div><button class="btn" id="checkUpdate"><svg><use href="#i-refresh"/></svg> Check now</button></div>
@@ -845,7 +848,7 @@
       },
       settings: {
         runAtLogin: false, closeToTray: true, exclusive: false, autoUpdate: true,
-        volumeKeys: true,
+        volumeKeys: true, limiter: true,
         deviceId: null, outletId: null, latency: 40, setupDone: false, lastCheck: 0
       },
       muted: false, volumeBeforeMute: 60,
@@ -1184,7 +1187,10 @@
       if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) { moved = true; }
       if (!turning) { return; }
       var box = d.svg.getBoundingClientRect();
-      opts.set(angleToValue(box.left + box.width / 2, box.top + box.height / 2, e.clientX, e.clientY));
+      var v = angleToValue(box.left + box.width / 2, box.top + box.height / 2, e.clientX, e.clientY);
+      /* Shift pulls the value only a fifth of the way toward the pointer, for fine adjustment. */
+      if (e.shiftKey) { var cur = opts.get(); v = cur + (v - cur) * 0.2; }
+      opts.set(v);
     }, function () {
       if (!turning && !moved && !onHelp && opts.toggle) { opts.toggle(); }
       turning = false;
@@ -1405,11 +1411,18 @@
     var handle = band.querySelector('.bhandle');
     var i = +band.dataset.i;
 
-    function setFromY(clientY) {
+    function setFromY(clientY, fine) {
       var box = band.getBoundingClientRect();
       if (!box.height) { return; }   /* laid out but hidden — a 0-height box would give NaN */
       var pct = clamp((clientY - box.top) / box.height * 100, 0, 100);
       var db = topToGain(pct);
+
+      /* Shift narrows the travel around wherever the value already was, so a full drag covers a
+         fifth of the range instead of all of it. It's the difference between ±5 dB and ±1. */
+      if (fine) {
+        var current = eqGains()[i] || 0;
+        db = current + (db - current) * 0.2;
+      }
       if (Math.abs(db) < 0.35) { db = 0; }        /* a small detent at flat */
       eqGains()[i] = db;
       S.eq.preset = 'Custom';
@@ -1422,12 +1435,12 @@
     /* Grab the handle to drag it. Clicking the column jumps the handle there and keeps
        dragging — the way a fader behaves everywhere else. One snapshot per gesture, not per pixel. */
     draggable(handle, function () { snapshot('eq band'); },
-                      function (e) { setFromY(e.clientY); }, null);
+                      function (e) { setFromY(e.clientY, e.shiftKey); }, null);
     draggable(band, function (e) {
                       snapshot('eq band');
-                      if (e.target !== handle) { setFromY(e.clientY); }
+                      if (e.target !== handle) { setFromY(e.clientY, e.shiftKey); }
                     },
-                    function (e) { setFromY(e.clientY); }, null);
+                    function (e) { setFromY(e.clientY, e.shiftKey); }, null);
     band.addEventListener('dblclick', function () {
       eqGains()[i] = 0; renderEq(); pushEq(); save();
     });
@@ -1503,20 +1516,28 @@
       host.appendChild(strip);
 
       var fader = strip.querySelector('.fader'), handle = strip.querySelector('.fhandle');
-      function setFromY(clientY) {
+      function setFromY(clientY, fine) {
         var box = fader.getBoundingClientRect();
         if (!box.height) { return; }
         var pct = clamp((clientY - box.top) / box.height, 0, 1);
         var db = (0.5 - pct) * 2 * TRIM_RANGE;
+        if (fine) {
+          var cur = S.spk.trims[i] || 0;
+          db = cur + (db - cur) * 0.2;
+        }
         if (Math.abs(db) < 0.4) { db = 0; }
         S.spk.trims[i] = db;
         renderSpeakers();
         send({ t: 'trim', ch: i, db: db });
         save();
       }
-      draggable(handle, null, function (e) { setFromY(e.clientY); }, null);
-      draggable(fader, function (e) { if (e.target !== handle) { setFromY(e.clientY); } },
-                       function (e) { setFromY(e.clientY); }, null);
+      draggable(handle, function () { snapshot('speaker trim'); },
+                        function (e) { setFromY(e.clientY, e.shiftKey); }, null);
+      draggable(fader, function (e) {
+                          snapshot('speaker trim');
+                          if (e.target !== handle) { setFromY(e.clientY, e.shiftKey); }
+                       },
+                       function (e) { setFromY(e.clientY, e.shiftKey); }, null);
       fader.addEventListener('dblclick', function () {
         S.spk.trims[i] = 0; renderSpeakers(); send({ t: 'trim', ch: i, db: 0 }); save();
       });
@@ -1625,6 +1646,10 @@
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
     else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
     else if (key === 'autoUpdate') { S.settings.autoUpdate = on; }
+    else if (key === 'limiter') {
+      S.settings.limiter = on;
+      send({ t: 'limiter', on: on, ceiling: -1.0, release: 80 });
+    }
     else if (key === 'volumeKeys') {
       S.settings.volumeKeys = on;
       send({ t: 'volumekeys', on: on });
@@ -1925,7 +1950,7 @@
   /* ---------- settings rendering -------------------------------------------------------- */
 
   function renderSettings() {
-    ['runAtLogin', 'closeToTray', 'exclusive', 'autoUpdate', 'volumeKeys'].forEach(function (k) {
+    ['runAtLogin', 'closeToTray', 'exclusive', 'autoUpdate', 'volumeKeys', 'limiter'].forEach(function (k) {
       syncToggle(k, S.settings[k]);
     });
 
@@ -2329,6 +2354,38 @@
     }
     liveSound = out > 0.0005;
     renderNowPlaying();
+    showMeters(msg);
+  }
+
+  /* The two "is it working" readouts, kept deliberately small.
+     The Leveler ring shows how hard it's pulling back — a still ring means it isn't earning its
+     place. The latency figure is the three buffers in the path added up, which is what actually
+     matters for lip sync, rather than the buffer setting on its own. */
+  function showMeters(msg) {
+    var lev = document.querySelector('[data-fx="leveler"]');
+    if (lev && lev._dial) {
+      var gr = Math.min(+msg.leveler || 0, 18) / 18;
+      lev._dial.lit.style.filter = gr > 0.02
+        ? 'drop-shadow(0 0 ' + (4 + gr * 10).toFixed(1) + 'px #ffbf6b)'
+        : '';
+      var rv = lev._val;
+      if (rv) {
+        rv.textContent = gr > 0.02
+          ? Math.round(S.fx.leveler.v) + '%  −' + (+msg.leveler).toFixed(1)
+          : Math.round(S.fx.leveler.v) + '%';
+      }
+    }
+
+    var lat = +msg.latency || 0;
+    var big = document.getElementById('latencyBig');
+    var note = document.getElementById('latencyReadout');
+    if (big) { big.textContent = lat ? lat + ' ms' : '—'; }
+    if (note) {
+      note.textContent = lat
+        ? 'About ' + lat + ' ms behind picture — outlet, engine and output buffers added up' +
+          (lat > 70 ? '. Lower the buffer if lips look out of sync.' : '.')
+        : 'Not in the audio path yet';
+    }
   }
 
   /* The status line, in order of how much it actually tells you: the track if Windows knows it,
@@ -2438,6 +2495,9 @@
     var spots = {
       calibHelp:   HELP.calib,   outHelp2:    HELP.output,   upmixHelp:  HELP.upmix,
       subHelp:     HELP.sub,
+      limHelp:     'Effects can add level. Push enough of them and the signal asks for more than a sample can hold — it doesn\'t get louder, it gets squared off, and that buzzes. This eases into the ceiling instead. You won\'t notice it working; you would notice it missing.',
+      latHelp:     'The three buffers in the path added together — what the outlet holds, what we hold, and what your speakers hold. Under about 60 ms and you won\'t see lips out of sync.',
+      panicHelp:   'Stops processing and opens the Windows sound settings so you can point the default output back at your speakers. For when there\'s no sound at all and you need it back now.',
       bmHelp:      'What a receiver calls Speaker Size. A speaker marked Small has its bass taken away and handed to the subwoofer — not copied there. Copying is what makes small speakers sound boomy, because the bass then plays twice.',
       xoHelp:      'Where the handover happens. 80 Hz is the cinema standard: low enough that you can\'t tell the bass is coming from the sub, high enough to let small speakers off the hook. Raise it if your speakers are very small.',
       rvHelpType:  'The kind of space — a small room, a big hall, a plate. Sets several controls at once.',
@@ -2774,6 +2834,13 @@
     }
     if (e.target.closest('#openFolder')) { send({ t: 'openfolder' }); return; }
     if (e.target.closest('#runSetup')) { openSetup(0); return; }
+    if (e.target.closest('#panicBtn')) {
+      send({ t: 'panic' });
+      audioRunning = false;
+      renderNowPlaying();
+      toast('Stepped out of the audio path. Set your speakers as the default output in the window that just opened.');
+      return;
+    }
     if (e.target.closest('#rvAdvToggle')) {
       var adv = document.getElementById('rvAdvanced');
       var open = adv.style.display === 'none';
@@ -2995,6 +3062,7 @@
           pushAll();
           send({ t: 'tray', closeToTray: S.settings.closeToTray });
           send({ t: 'volumekeys', on: S.settings.volumeKeys !== false });
+          send({ t: 'limiter', on: S.settings.limiter !== false, ceiling: -1.0, release: 80 });
           send({ t: 'exclusive', on: S.settings.exclusive });
           send({ t: 'latency', ms: S.settings.latency });
           if (S.settings.outletId) { send({ t: 'outlet', id: S.settings.outletId }); }
