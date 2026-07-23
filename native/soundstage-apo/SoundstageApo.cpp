@@ -31,6 +31,24 @@ const WAVEFORMATEX* FormatOf(IAudioMediaType* type) {
 
 /// We process 32-bit float, which is what the Windows audio engine uses internally. Anything else
 /// is refused rather than mangled — a wrong guess about sample format is loud and horrible.
+/// Return v if it is a finite number, otherwise a safe fallback. The shared settings block is
+/// written by another process and lives in a file, so over a machine's lifetime it can end up
+/// holding a NaN, an infinity, or plain garbage — a half-finished write, a disk hiccup, an older
+/// build. None of that may be allowed to reach a filter coefficient.
+inline double Finite(double v, double fallback) {
+    return (v == v && v != std::numeric_limits<double>::infinity()
+                   && v != -std::numeric_limits<double>::infinity())
+               ? v : fallback;
+}
+
+/// Finite AND within [lo, hi]. Used for every scalar the shared block carries that feeds a gain or a
+/// filter coefficient, so no single corrupt value can mute the mix or destabilise a stage — the
+/// worst a bad file can do is sound wrong, never silent and never a crash.
+inline double Clamp(double v, double lo, double hi, double fallback) {
+    v = Finite(v, fallback);
+    return v < lo ? lo : (v > hi ? hi : v);
+}
+
 bool IsFloat32(const WAVEFORMATEX* fmt) {
     if (!fmt) { return false; }
     if (fmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT) { return fmt->wBitsPerSample == 32; }
@@ -307,6 +325,7 @@ STDMETHODIMP SoundstageApo::UnlockForProcess() {
     framesProcessed_ = 0;
     peakIn_ = 0.0f;
     peakOut_ = 0.0f;
+    surroundHoldFrames_ = 0;
 
     chain_.reset();
     return S_OK;
@@ -381,23 +400,39 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
     // Which path to take is NOT "how many channels does the buffer have" — inside an APO that is
     // always the endpoint's full width. Windows has already padded a stereo app up to 6 or 8
     // channels with the surrounds left silent. So the honest question is "is this actually a
-    // surround recording, or stereo wearing a 5.1 costume", and the answer is: look at whether any
-    // of the non-front channels carry signal this block.
+    // surround recording, or stereo wearing a 5.1 costume", and the answer is: does anything play on
+    // the non-front channels.
     //
     // Getting this wrong is exactly the "my 5.1 is quiet" bug: the multichannel path faithfully
     // preserves those silent surrounds, the upmix never runs, and four of five speakers stay dead.
-    bool sourceIsSurround = false;
+    //
+    // But the decision has to be STICKY, not per-block. A real 5.1 film has quiet passages — a
+    // dialogue scene with nothing in the surrounds — and if we flipped to stereo-upmix the instant
+    // the surrounds fell silent and back again when they returned, the surrounds would pop in and
+    // out as the two code paths (with different filter state) traded off. So: any surround signal
+    // tops up a hold timer, and we only fall back to treating it as stereo after the surrounds have
+    // been silent for the whole hold window. Converging on the right mode a beat late is inaudible;
+    // switching modes every few milliseconds is not.
+    bool surroundThisBlock = false;
     if (ch > 2) {
-        const size_t n = static_cast<size_t>(frames) * ch;
-        for (size_t i = 0; i < n; ++i) {
-            const int c = static_cast<int>(i % ch);
-            if (c == 0 || c == 1) { continue; }         // FL/FR are expected to be full
-            const float a = src[i] < 0.0f ? -src[i] : src[i];
-            if (a > 1.0e-4f) { sourceIsSurround = true; break; }
+        for (UINT32 n = 0; n < frames && !surroundThisBlock; ++n) {
+            const float* frame = src + static_cast<size_t>(n) * ch;
+            for (UINT32 c = 2; c < ch; ++c) {   // skip FL/FR; they're expected to be full
+                const float a = frame[c] < 0.0f ? -frame[c] : frame[c];
+                if (a > 1.0e-4f) { surroundThisBlock = true; break; }
+            }
         }
     }
 
-    if (ch > 2 && sourceIsSurround) {
+    if (surroundThisBlock) {
+        surroundHoldFrames_ = sampleRate_;   // ~1s of "this is really surround" before we reconsider
+    } else if (surroundHoldFrames_ > frames) {
+        surroundHoldFrames_ -= frames;
+    } else {
+        surroundHoldFrames_ = 0;
+    }
+
+    if (ch > 2 && surroundHoldFrames_ > 0) {
         // A real surround recording — keep every channel, just process it.
         chain_.processBlockMulti(src, static_cast<int>(ch), dst, static_cast<int>(ch),
                                  static_cast<int>(frames));
@@ -532,71 +567,92 @@ void SoundstageApo::SyncSettings() {
     lastSequence_ = seq;
 
     chain_.setEnabled(s.masterOn != 0);
-    chain_.setOutputGainDb(s.outputGainDb);
+    // Output gain feeds a dB→linear conversion; a non-finite value there would scale the whole mix
+    // to NaN. Clamp to a sane ±24 dB window as well — nothing legitimate asks for more.
+    chain_.setOutputGainDb(std::max(-24.0, std::min(24.0, Finite(s.outputGainDb, 0.0))));
 
     chain_.enableEq(s.eqOn != 0);
-    chain_.setEqNumBands(s.eqBandCount);
-    for (int i = 0; i < s.eqBandCount && i < 36; ++i) {
+    // Clamp the band count into range before it reaches the equaliser. A corrupted shared block
+    // could carry anything here; a negative or absurd value must not drive a loop or an allocation.
+    int bandCount = s.eqBandCount;
+    if (bandCount < 0) { bandCount = 0; }
+    if (bandCount > 36) { bandCount = 36; }
+    chain_.setEqNumBands(bandCount);
+    for (int i = 0; i < bandCount; ++i) {
         int type = s.eqBands[i].type;
         if (type < 0 || type > 4) { type = 0; }
-        chain_.setEqBand(i, static_cast<soundstage::Equalizer::BandType>(type),
-                         s.eqBands[i].freq, s.eqBands[i].gainDb, s.eqBands[i].q);
+        // Sanitise every band parameter. A zero or non-finite Q divides to infinity in the biquad;
+        // a non-finite frequency or gain poisons its coefficients. Rather than let a bad band
+        // silence itself (NaN coefficients -> the output scrub zeroes it -> that band goes mute), fold
+        // anything out of range back to a harmless identity so the rest of the EQ keeps working.
+        double freq = Finite(s.eqBands[i].freq, 1000.0);
+        double gain = Finite(s.eqBands[i].gainDb, 0.0);
+        double q    = Finite(s.eqBands[i].q, 0.707);
+        if (freq < 10.0 || freq > 22000.0) { freq = 1000.0; gain = 0.0; }   // out of audible band → identity
+        if (q < 0.1 || q > 24.0) { q = 0.707; }
+        if (gain < -48.0 || gain > 48.0) { gain = gain < 0.0 ? -48.0 : 48.0; }
+        chain_.setEqBand(i, static_cast<soundstage::Equalizer::BandType>(type), freq, gain, q);
     }
 
     chain_.enableBass(s.bassOn != 0);
-    chain_.bass().setAmount(s.bassAmount);
-    chain_.bass().setCrossover(s.bassCrossover);
-    chain_.bass().setDrive(s.bassDrive);
+    chain_.bass().setAmount(Clamp(s.bassAmount, 0.0, 1.0, 0.0));
+    chain_.bass().setCrossover(Clamp(s.bassCrossover, 20.0, 500.0, 90.0));
+    chain_.bass().setDrive(Clamp(s.bassDrive, 1.0, 10.0, 1.5));
 
+    // Dynamics: a garbage makeup gain is the classic way a corrupt file silences (huge negative) or
+    // blasts (huge positive) the mix, and a zero/negative ratio or time constant destabilises the
+    // envelope. Clamp every one to the range a real compressor uses.
     chain_.enableCompressor(s.compOn != 0);
-    chain_.compressor().setThresholdDb(s.compThresholdDb);
-    chain_.compressor().setRatio(s.compRatio);
-    chain_.compressor().setKneeDb(s.compKneeDb);
-    chain_.compressor().setMakeupDb(s.compMakeupDb);
-    chain_.compressor().setAttackMs(s.compAttackMs);
-    chain_.compressor().setReleaseMs(s.compReleaseMs);
+    chain_.compressor().setThresholdDb(Clamp(s.compThresholdDb, -60.0, 0.0, -18.0));
+    chain_.compressor().setRatio(Clamp(s.compRatio, 1.0, 20.0, 3.0));
+    chain_.compressor().setKneeDb(Clamp(s.compKneeDb, 0.0, 24.0, 6.0));
+    chain_.compressor().setMakeupDb(Clamp(s.compMakeupDb, 0.0, 24.0, 0.0));
+    chain_.compressor().setAttackMs(Clamp(s.compAttackMs, 0.1, 200.0, 15.0));
+    chain_.compressor().setReleaseMs(Clamp(s.compReleaseMs, 1.0, 2000.0, 150.0));
 
     chain_.enableNight(s.nightOn != 0);
-    chain_.nightCompressor().setThresholdDb(s.nightThresholdDb);
-    chain_.nightCompressor().setRatio(s.nightRatio);
-    chain_.nightCompressor().setMakeupDb(s.nightMakeupDb);
-    chain_.nightCompressor().setAttackMs(s.nightAttackMs);
-    chain_.nightCompressor().setReleaseMs(s.nightReleaseMs);
+    chain_.nightCompressor().setThresholdDb(Clamp(s.nightThresholdDb, -60.0, 0.0, -28.0));
+    chain_.nightCompressor().setRatio(Clamp(s.nightRatio, 1.0, 20.0, 5.0));
+    chain_.nightCompressor().setMakeupDb(Clamp(s.nightMakeupDb, 0.0, 24.0, 6.0));
+    chain_.nightCompressor().setAttackMs(Clamp(s.nightAttackMs, 0.1, 200.0, 5.0));
+    chain_.nightCompressor().setReleaseMs(Clamp(s.nightReleaseMs, 1.0, 2000.0, 250.0));
 
     chain_.enableWidth(s.widthOn != 0);
-    chain_.width().setWidth(s.width);
+    chain_.width().setWidth(Clamp(s.width, 0.0, 2.0, 1.0));
 
     chain_.enableReverb(s.reverbOn != 0);
-    chain_.reverb().setSize(s.rvSize);
-    chain_.reverb().setDecaySeconds(s.rvDecay);
-    chain_.reverb().setDamping(s.rvDamping);
-    chain_.reverb().setPreDelayMs(s.rvPreDelayMs);
-    chain_.reverb().setWidth(s.rvWidth);
-    chain_.reverb().setMix(s.rvMix);
-    chain_.reverb().setDiffusion(s.rvDiffusion);
-    chain_.reverb().setLowCutHz(s.rvLowCutHz);
-    chain_.reverb().setHighCutHz(s.rvHighCutHz);
-    chain_.reverb().setEarlyLevel(s.rvEarly);
-    chain_.reverb().setModulation(s.rvModulation);
+    chain_.reverb().setSize(Clamp(s.rvSize, 0.0, 1.0, 0.5));
+    chain_.reverb().setDecaySeconds(Clamp(s.rvDecay, 0.1, 20.0, 1.6));
+    chain_.reverb().setDamping(Clamp(s.rvDamping, 0.0, 1.0, 0.5));
+    chain_.reverb().setPreDelayMs(Clamp(s.rvPreDelayMs, 0.0, 200.0, 20.0));
+    chain_.reverb().setWidth(Clamp(s.rvWidth, 0.0, 2.0, 1.0));
+    chain_.reverb().setMix(Clamp(s.rvMix, 0.0, 1.0, 0.0));
+    chain_.reverb().setDiffusion(Clamp(s.rvDiffusion, 0.0, 1.0, 0.7));
+    chain_.reverb().setLowCutHz(Clamp(s.rvLowCutHz, 20.0, 2000.0, 200.0));
+    chain_.reverb().setHighCutHz(Clamp(s.rvHighCutHz, 1000.0, 20000.0, 8000.0));
+    chain_.reverb().setEarlyLevel(Clamp(s.rvEarly, 0.0, 1.0, 0.4));
+    chain_.reverb().setModulation(Clamp(s.rvModulation, 0.0, 1.0, 0.3));
 
     chain_.enableUpmix(s.upmixOn != 0);
-    chain_.setUpmixAmount(s.upmixAmount);
-    chain_.upmix().setCenterGain(s.upmixCenter);
-    chain_.upmix().setLfeGain(s.upmixLfe);
+    chain_.setUpmixAmount(Clamp(s.upmixAmount, 0.0, 1.0, 0.7));
+    chain_.upmix().setCenterGain(Clamp(s.upmixCenter, 0.0, 2.0, 1.0));
+    chain_.upmix().setLfeGain(Clamp(s.upmixLfe, 0.0, 2.0, 1.0));
     chain_.enableSubFeed(s.subFeedOn != 0);
 
     chain_.bassManager().setEnabled(s.bassMgmtOn != 0);
-    chain_.bassManager().setCrossover(s.bmCrossover);
-    chain_.bassManager().setSubGain(s.bmSubGain);
+    chain_.bassManager().setCrossover(Clamp(s.bmCrossover, 40.0, 200.0, 80.0));
+    chain_.bassManager().setSubGain(Clamp(s.bmSubGain, 0.0, 4.0, 1.0));
     for (int c = 0; c < 8; ++c) {
         chain_.bassManager().setSmall(c, (s.bmSmallMask & (1 << c)) != 0);
     }
 
     chain_.enableLimiter(s.limiterOn != 0);
-    chain_.limiter().setCeilingDb(s.limCeilingDb);
-    chain_.limiter().setRelease(s.limReleaseMs);
+    chain_.limiter().setCeilingDb(Clamp(s.limCeilingDb, -24.0, 0.0, -1.0));
+    chain_.limiter().setRelease(Clamp(s.limReleaseMs, 1.0, 1000.0, 80.0));
 
+    // Per-speaker trim: the one most able to silence a channel, since it goes straight to a gain.
+    // ±12 dB is the app's own range; anything outside it is corruption, not intent.
     for (int c = 0; c < 8; ++c) {
-        chain_.setChannelTrimDb(c, s.channelTrimDb[c]);
+        chain_.setChannelTrimDb(c, Clamp(s.channelTrimDb[c], -12.0, 12.0, 0.0));
     }
 }

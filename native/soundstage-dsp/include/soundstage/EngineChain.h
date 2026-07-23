@@ -30,6 +30,7 @@
 #include "soundstage/SmoothedValue.h"
 
 #include <cmath>
+#include <limits>
 
 namespace soundstage {
 
@@ -228,8 +229,8 @@ public:
             const float* src = in + (n * inChannels);
             float* dst = out + (n * outChannels);
 
-            double l = src[0];
-            double r = inChannels >= 2 ? src[1] : l;
+            double l = scrubIn(src[0]);
+            double r = inChannels >= 2 ? scrubIn(src[1]) : l;
             const double origL = l, origR = r;
 
             { double pl = l, pr = r; eq_.process(pl, pr);     const double g = eqEnable_.next();     l = mix(l, pl, g); r = mix(r, pr, g); }
@@ -246,12 +247,12 @@ public:
             if (limiterOn_) { limiter_.process(l, r); }
 
             // The remaining channels: EQ (except the LFE), then the same master fade and gain.
-            double c = inChannels > 2 ? src[2] : 0.0;
-            double lfe = inChannels > 3 ? src[3] : 0.0;
-            double bl = inChannels > 4 ? src[4] : 0.0;
-            double br = inChannels > 5 ? src[5] : 0.0;
-            double sl = inChannels > 6 ? src[6] : 0.0;
-            double sr = inChannels > 7 ? src[7] : 0.0;
+            double c = inChannels > 2 ? scrubIn(src[2]) : 0.0;
+            double lfe = inChannels > 3 ? scrubIn(src[3]) : 0.0;
+            double bl = inChannels > 4 ? scrubIn(src[4]) : 0.0;
+            double br = inChannels > 5 ? scrubIn(src[5]) : 0.0;
+            double sl = inChannels > 6 ? scrubIn(src[6]) : 0.0;
+            double sr = inChannels > 7 ? scrubIn(src[7]) : 0.0;
 
             const double origC = c, origBL = bl, origBR = br, origSL = sl, origSR = sr;
             {
@@ -291,10 +292,10 @@ public:
         for (int n = 0; n < numFrames; ++n) {
             double l, r;
             if (inChannels >= 2) {
-                l = static_cast<double>(in[n * inChannels]);
-                r = static_cast<double>(in[n * inChannels + 1]);
+                l = scrubIn(in[n * inChannels]);
+                r = scrubIn(in[n * inChannels + 1]);
             } else {
-                l = r = static_cast<double>(in[n * inChannels]);
+                l = r = scrubIn(in[n * inChannels]);
             }
             double frame[8];
             processFrame(l, r, frame, outChannels);
@@ -307,9 +308,36 @@ public:
 private:
     static inline double mix(double dry, double wet, double g) { return dry + (wet - dry) * g; }
 
-    // Final safety clamp: keeps output inside [-1, 1] so a stray over can never wrap on int conversion.
-    // (A true brickwall limiter comes later; the compressor is the musical dynamics stage.)
-    static inline double clampSafe(double x) { return x < -1.0 ? -1.0 : (x > 1.0 ? 1.0 : x); }
+    // Scrub a sample as it ENTERS the engine. This is separate from the output clamp and just as
+    // important: a filter has feedback state, so if one NaN or Inf sample from a glitching source or
+    // driver reaches a biquad, the filter's memory is poisoned and it emits NaN forever after — long
+    // past the one bad sample. Replacing non-finite input with silence at the door stops a transient
+    // glitch from becoming a permanent one. (Unlike the output clamp this does not limit range —
+    // loud-but-finite input is legitimate and the effects chain is entitled to see it.)
+    static inline double scrubIn(double x) {
+        return (x == x && x != std::numeric_limits<double>::infinity()
+                       && x != -std::numeric_limits<double>::infinity())
+                   ? x : 0.0;
+    }
+
+    // Final safety clamp: keeps output inside [-1, 1] so a stray over can never wrap on int
+    // conversion — and, crucially, scrubs NaN. This is the last thing samples pass through before
+    // they leave the engine for the audio device, so it is the one place that MUST be paranoid.
+    //
+    // The old version was `x < -1 ? -1 : (x > 1 ? 1 : x)`, which silently passes NaN straight
+    // through: `NaN < -1` and `NaN > 1` are both false, so it returned NaN unchanged. A single NaN
+    // sample reaching the hardware is a loud click at best; inside audiodg it is not something to
+    // gamble on. A corrupted settings file, a bad input sample from a glitching source, or an EQ
+    // band with a zero Q can all produce one. Turn any non-finite value into silence: the worst case
+    // becomes a dropped sample, never a blast or a crash. (Inf is already handled by the clamp —
+    // +Inf > 1 → 1, -Inf < -1 → -1 — but the explicit check keeps the intent obvious.)
+    static inline double clampSafe(double x) {
+        if (!(x == x) || x == std::numeric_limits<double>::infinity()
+                      || x == -std::numeric_limits<double>::infinity()) {
+            return 0.0;
+        }
+        return x < -1.0 ? -1.0 : (x > 1.0 ? 1.0 : x);
+    }
 
     inline void writeOut(double l, double r, double* out, int outChannels) {
         // Advance every trim once per frame, whatever the channel count, so they all ramp at the same

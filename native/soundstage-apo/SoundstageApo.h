@@ -220,6 +220,10 @@ private:
     // through it and whether it changed anything. Plain arithmetic on the real-time path — no
     // allocation, no syscalls — and reported once from UnlockForProcess.
     unsigned long long framesProcessed_ = 0;
+    /// Frames remaining before a stream that currently looks like surround is reconsidered as
+    /// stereo. Topped up whenever the surround channels carry signal; keeps the upmix/preserve
+    /// decision from flipping every block through a film's quiet passages. See APOProcess.
+    UINT32 surroundHoldFrames_ = 0;
     float peakIn_ = 0.0f;
     float peakOut_ = 0.0f;
 
