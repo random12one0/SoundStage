@@ -14,12 +14,21 @@ namespace Soundstage.Shell;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private readonly Engine.EngineController _controller = new();
+    private readonly Engine.EngineController _controller;
 
     public MainWindow()
     {
         InitializeComponent();
+        _controller = new Engine.EngineController(NotifyUi);
         Loaded += OnLoaded;
+    }
+
+    // Lets the engine controller send a status back to the page (e.g. "no-cable"). Called on the UI
+    // thread from message handling; posts to the page if it has finished loading.
+    private void NotifyUi(string message)
+    {
+        try { Web.CoreWebView2?.PostWebMessageAsString(message); }
+        catch { /* page not ready yet */ }
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)

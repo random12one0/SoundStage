@@ -19,15 +19,20 @@ namespace Soundstage.Shell.Engine;
 ///   {"t":"effect","id":"bass","on":true,"v":0.6}   an effect dial: enable + 0..1 amount
 ///   {"t":"eq","i":3,"freq":1000,"gain":2.5,"q":1.0,"shape":0}   one EQ band
 ///   {"t":"eqcount","n":10}                      how many EQ bands are live
+///
+/// It can also notify the UI back (via the <c>notify</c> callback), e.g. "no-cable" when the CABLE
+/// outlet isn't set up yet, or "running" once sound is flowing.
 /// </summary>
 public sealed class EngineController : IDisposable
 {
     private readonly SoundstageEngine? _engine;
     private readonly EngineAudioHost? _host;
+    private readonly Action<string>? _notify;
     private bool _disposed;
 
-    public EngineController()
+    public EngineController(Action<string>? notify = null)
     {
+        _notify = notify;
         try
         {
             _engine = new SoundstageEngine();
@@ -67,7 +72,11 @@ public sealed class EngineController : IDisposable
             switch (typeEl.GetString())
             {
                 case "power":
-                    if (Bool(root, "on")) { StartProcessing(); } else { StopProcessing(); }
+                    {
+                        bool on = Bool(root, "on");
+                        _engine.SetEnabled(on);   // master follows the power switch
+                        if (on) { StartProcessing(); } else { StopProcessing(); }
+                    }
                     break;
                 case "master":
                     _engine.SetEnabled(Bool(root, "on"));
@@ -90,7 +99,8 @@ public sealed class EngineController : IDisposable
     }
 
     // Maps a UI effect dial (0..1 amount) onto real engine parameters. First-pass tuning — the exact
-    // curves are easy to adjust once we can hear them.
+    // curves are easy to adjust once we can hear them. Air/Warmth are EQ shelves (bands 1/0); Night is
+    // a simple level trim for v1 (a proper night mode shares the compressor, which the Leveler owns).
     private void ApplyEffect(JsonElement root)
     {
         if (_engine is null)
@@ -119,6 +129,19 @@ public sealed class EngineController : IDisposable
             case "leveler":
                 _engine.EnableCompressor(on);
                 _engine.SetCompressor(-10.0 - v * 20.0, 1.5 + v * 3.0, 6.0, v * 4.0, 15.0, 150.0);
+                break;
+            case "warmth":
+                _engine.EnableEq(true);
+                _engine.SetEqBandCount(2);
+                _engine.SetEqBand(0, BandType.LowShelf, 200.0, on ? v * 8.0 : 0.0, 0.707);
+                break;
+            case "air":
+                _engine.EnableEq(true);
+                _engine.SetEqBandCount(2);
+                _engine.SetEqBand(1, BandType.HighShelf, 10000.0, on ? v * 8.0 : 0.0, 0.707);
+                break;
+            case "night":
+                _engine.SetOutputGainDb(on ? -10.0 * v : 0.0);
                 break;
         }
     }
@@ -159,16 +182,22 @@ public sealed class EngineController : IDisposable
                     speakers = defaultRender;
                 }
 
-                if (cable is not null && speakers is not null &&
-                    !string.Equals(cable.ID, speakers.ID, StringComparison.Ordinal))
+                if (cable is null)
+                {
+                    _notify?.Invoke("no-cable");
+                    return;
+                }
+
+                if (speakers is not null && !string.Equals(cable.ID, speakers.ID, StringComparison.Ordinal))
                 {
                     _host.Start(cable, speakers);
+                    _notify?.Invoke("running");
                 }
             }
         }
         catch
         {
-            // Device layout not ready (e.g. CABLE not installed yet) — first-run help handles this.
+            _notify?.Invoke("audio-error");
         }
     }
 
