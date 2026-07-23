@@ -48,18 +48,25 @@ jobs:
           VERSION: ${{ inputs.version || github.ref_name }}
         run: |
           $notes = @"
-          ## Soundstage $env:VERSION — v1.0 preview (new app, new UI)
+          ## Soundstage $env:VERSION — it processes your audio now
 
-          The first build of the completely rebuilt Soundstage v1.0: **our own audio engine, our own UI, nothing carried over** from the old Equalizer-APO version.
+          The first build where Soundstage **actually runs our engine on your live sound**. Turn it on, flip the effect dials, hear them.
 
-          ### What this preview is
-          The real app **UI running natively** — so you can open it on your PC and click through the actual design (dashboard, EQ, speakers, ambience, automations, settings).
+          ### One-time setup (~2 minutes)
+          Soundstage needs a small free "outlet" to catch your PC's sound so it can process it:
+          1. Install **VB-CABLE** (free): https://vb-audio.com/Cable/ — download, run the installer as admin, reboot if it asks.
+          2. Open Windows **Sound settings** and set **"CABLE Input"** as your default output (playback) device.
+          3. Download **Soundstage.exe** below and run it. (If Windows shows "unknown publisher," click *More info -> Run anyway*. If it asks for the free **WebView2** runtime, that's a Microsoft component already on most Win10/11 PCs.)
 
-          ### What it does NOT do yet
-          **Process audio.** The DSP engine (our own reverb, EQ, compressor, bass, stereo width, surround upmix — all built and tested) and the **virtual audio driver** that routes your system sound through it are wired in over the next builds. This one is look-and-feel, running for real.
+          ### Use it
+          - Press the **power button** (top-right — "Off" turns to "On"). Your sound now flows: your apps -> CABLE -> Soundstage engine -> your speakers.
+          - Tap the effect dials — **Bass, Air, Warmth, Leveler, Ambience, Night** — to turn each on/off and hear the difference.
+          - Turn the power **Off** anytime for untouched sound (or switch your Windows output back to your speakers).
 
-          ### Run it
-          Download **Soundstage.exe** below and run it — no install needed. If Windows prompts for the **WebView2 runtime**, it's a free Microsoft component already on most Windows 10/11 machines. Requires 64-bit Windows 10/11.
+          ### What works vs. what's next
+          Working: power on/off, the effect toggles, and the whole engine (EQ / bass / leveler / reverb...). Next: **dragging the dials + EQ to fine-tune**, presets, and our own **"Soundstage"** output device so you won't need CABLE.
+
+          This is a first working build — expect rough edges, and tell me what you hit. Requires 64-bit Windows 10/11.
           "@
           gh release create "$env:VERSION" `
             "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `
