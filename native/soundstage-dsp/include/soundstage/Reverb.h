@@ -31,6 +31,17 @@ public:
         while (i >= buf_.size()) i -= buf_.size();
         return buf_[i];
     }
+    /// Fractional tap, linearly interpolated — what modulation needs: a delay length that slides
+    /// smoothly instead of stepping between whole samples (which would click).
+    inline double tapLerp(double delay) const {
+        if (delay < 0.0) delay = 0.0;
+        const std::size_t i0 = static_cast<std::size_t>(delay);
+        const double frac = delay - static_cast<double>(i0);
+        const double a = tap(i0);
+        const double b = tap(i0 + 1);
+        return a + (b - a) * frac;
+    }
+    std::size_t size() const { return buf_.size(); }
 private:
     std::vector<double> buf_;
     std::size_t pos_ = 0;
@@ -95,7 +106,24 @@ public:
         // Input diffusion: four short allpasses (prime-ish lengths) build echo density.
         const double apMs[4] = {5.3, 7.1, 9.7, 12.9};
         for (int i = 0; i < 4; ++i) diff_[i].prepare(static_cast<std::size_t>(apMs[i] * 0.001 * fs_) + 1);
-        pre_.prepare(static_cast<std::size_t>(0.2 * fs_) + 4);  // up to 200 ms pre-delay
+        // Pre-delay line, long enough to also host the early-reflection taps beyond it.
+        pre_.prepare(static_cast<std::size_t>(0.32 * fs_) + 4);
+
+        // Early reflection times (ms) and levels — an asymmetric, prime-ish scatter so they read as
+        // a room rather than a rhythm, decaying as later bounces lose energy.
+        const double erMs[kEarly] = {8.3, 13.7, 19.1, 26.3, 34.7, 43.1};
+        for (int i = 0; i < kEarly; ++i) {
+            earlyLen_[i] = static_cast<std::size_t>(erMs[i] * 0.001 * fs_);
+            earlyGain_[i] = 0.62 * std::pow(0.72, static_cast<double>(i));
+        }
+
+        // Modulation LFOs: slow, and mutually irrational so the lines never move in lockstep.
+        const double lfoHz[N] = {0.11, 0.17, 0.23, 0.29, 0.37, 0.41, 0.47, 0.53};
+        for (int i = 0; i < N; ++i) {
+            lfoInc_[i] = 2.0 * 3.14159265358979323846 * lfoHz[i] / fs_;
+            lfoPhase_[i] = static_cast<double>(i) * 0.7853981633974483;   // spread the start phases
+        }
+
         lowCut_.setCutoff(fs_, lowCutHz_);
         highCutL_.setCutoff(fs_, highCutHz_);
         highCutR_.setCutoff(fs_, highCutHz_);
@@ -138,6 +166,14 @@ public:
         highCutR_.setCutoff(fs_, highCutHz_);
     }
 
+    /// Early reflections, 0..1: how much of the discrete first bounces off the walls you hear before
+    /// the diffuse tail arrives. This is most of what tells you how big a room is.
+    void setEarlyLevel(double e01) { early_ = clamp(e01, 0.0, 1.0); }
+
+    /// Modulation, 0..1: slowly detunes the delay lines. A static FDN rings on sustained notes; a
+    /// little movement breaks up that metallic character. Too much and it sounds seasick.
+    void setModulation(double m01) { mod_ = clamp(m01, 0.0, 1.0); }
+
     /// Process one stereo sample in place. Dry signal is preserved and blended per `mix`.
     inline void process(double& left, double& right) {
         const double dryL = left, dryR = right;
@@ -149,9 +185,20 @@ public:
         in = preLen_ > 0 ? pre_.tap(preLen_) : in;
         for (auto& a : diff_) in = a.process(in);
 
-        // Read the eight delay lines.
+        // Read the eight delay lines. With modulation on, each line's length breathes around its
+        // nominal value on its own slow LFO, so no two lines drift together.
         double s[N];
-        for (int i = 0; i < N; ++i) s[i] = lines_[i].tap(len_[i] - 1);
+        if (mod_ > 0.0) {
+            const double depth = mod_ * 3.0;   // samples of swing — subtle by design
+            for (int i = 0; i < N; ++i) {
+                lfoPhase_[i] += lfoInc_[i];
+                if (lfoPhase_[i] > 6.283185307179586) lfoPhase_[i] -= 6.283185307179586;
+                const double d = static_cast<double>(len_[i] - 1) + std::sin(lfoPhase_[i]) * depth;
+                s[i] = lines_[i].tapLerp(d < 1.0 ? 1.0 : d);
+            }
+        } else {
+            for (int i = 0; i < N; ++i) s[i] = lines_[i].tap(len_[i] - 1);
+        }
 
         // Two decorrelated output taps (alternating signs) → stereo.
         double wetL = 0.0, wetR = 0.0;
@@ -160,6 +207,18 @@ public:
             wetR += ((i >> 1) & 1 ? -s[i] : s[i]);
         }
         wetL *= 0.35; wetR *= 0.35;
+
+        // Early reflections: a handful of discrete taps off the pre-delay line, panned apart. They
+        // arrive before the tail and carry most of the sense of room size.
+        if (early_ > 0.0) {
+            double eL = 0.0, eR = 0.0;
+            for (int i = 0; i < kEarly; ++i) {
+                const double t = pre_.tap(earlyLen_[i]);
+                if (i & 1) { eR += t * earlyGain_[i]; } else { eL += t * earlyGain_[i]; }
+            }
+            wetL += eL * early_;
+            wetR += eR * early_;
+        }
         // High cut on the tail only — the dry signal keeps all of its top end.
         wetL = highCutL_.process(wetL);
         wetR = highCutR_.process(wetR);
@@ -217,6 +276,12 @@ private:
     std::size_t baseLen_[N] = {0}, len_[N] = {0}, preLen_ = 0;
     double size_ = 0.7, rt60_ = 2.0, dampHz_ = 9000.0, mix_ = 0.3, width_ = 0.8, fbGain_ = 0.8;
     double lowCutHz_ = 120.0, highCutHz_ = 8000.0;
+
+    static constexpr int kEarly = 6;
+    std::size_t earlyLen_[kEarly] = {0};
+    double earlyGain_[kEarly] = {0.0};
+    double early_ = 0.5, mod_ = 0.2;
+    double lfoPhase_[N] = {0.0}, lfoInc_[N] = {0.0};
 };
 
 }  // namespace soundstage

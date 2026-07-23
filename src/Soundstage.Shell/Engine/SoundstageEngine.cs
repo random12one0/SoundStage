@@ -93,6 +93,10 @@ public sealed class SoundstageEngine : IDisposable
     public void SetReverbTone(double diffusion, double lowCutHz, double highCutHz)
         => ssg_reverb_set_tone(_handle, diffusion, lowCutHz, highCutHz);
 
+    /// <summary>Early reflections (0..1) and modulation (0..1) — the reverb's character controls.</summary>
+    public void SetReverbCharacter(double early, double modulation)
+        => ssg_reverb_set_character(_handle, early, modulation);
+
     /// <summary>Per-speaker output trim in dB. <paramref name="channel"/> is 0..7 in 7.1 order
     /// (FL FR C LFE SL SR SBL SBR) — the calibration faders on the Speakers page.</summary>
     public void SetChannelTrimDb(int channel, double db) => ssg_set_channel_trim_db(_handle, channel, db);
@@ -186,6 +190,9 @@ public sealed class SoundstageEngine : IDisposable
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_reverb_set_tone(IntPtr e, double diffusion,
                                                    double lowCutHz, double highCutHz);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_reverb_set_character(IntPtr e, double early, double modulation);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_set_channel_trim_db(IntPtr e, int ch, double db);

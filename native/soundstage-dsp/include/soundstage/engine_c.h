@@ -78,6 +78,9 @@ SSG_API void        ssg_reverb_set(ssg_engine* e, double size, double decay_s, d
 /* The rest of the Ambience page: input diffusion 0..1, and the send/tail band limits in Hz. */
 SSG_API void        ssg_reverb_set_tone(ssg_engine* e, double diffusion,
                                         double low_cut_hz, double high_cut_hz);
+/* Early reflections 0..1 (the discrete first bounces) and modulation 0..1 (slow detune of the
+ * delay lines, which stops a sustained note ringing metallically). */
+SSG_API void        ssg_reverb_set_character(ssg_engine* e, double early, double modulation);
 SSG_API void        ssg_upmix_set(ssg_engine* e, double amount, double center_gain, double lfe_gain);
 
 /* Per-speaker output trim in dB — the calibration faders. `ch` is 0..7 in 7.1 order:

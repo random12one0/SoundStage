@@ -90,6 +90,12 @@ void ssg_reverb_set_tone(ssg_engine* e, double diffusion, double low_cut_hz, dou
     r.setHighCutHz(high_cut_hz);
 }
 
+void ssg_reverb_set_character(ssg_engine* e, double early, double modulation) {
+    if (!e) return;
+    e->chain.reverb().setEarlyLevel(early);
+    e->chain.reverb().setModulation(modulation);
+}
+
 void ssg_upmix_set(ssg_engine* e, double amount, double center_gain, double lfe_gain) {
     if (!e) return;
     e->chain.setUpmixAmount(amount);

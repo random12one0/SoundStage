@@ -135,6 +135,9 @@ public sealed class EngineController : IDisposable
                 case "devices":
                     SendDeviceList();
                     return;
+                case "sessions":
+                    SendSessions();
+                    return;
                 case "device":
                     _renderDeviceId = root.TryGetProperty("id", out JsonElement devEl) ? devEl.GetString() : null;
                     Restart();
@@ -273,6 +276,7 @@ public sealed class EngineController : IDisposable
     private double _rvSize = 0.6, _rvDecay = 1.8, _rvDamping = 0.4, _rvPreDelay = 22.0, _rvWidth = 0.65;
     private double _rvMixFromDial = 0.14;
     private double _rvDiffusion = 0.75, _rvLowCut = 120.0, _rvHighCut = 8000.0;
+    private double _rvEarly = 0.5, _rvMod = 0.2;
 
     private void ApplyReverb(JsonElement root)
     {
@@ -297,9 +301,12 @@ public sealed class EngineController : IDisposable
         _rvDiffusion = Math.Clamp(Num(root, "diffusion", _rvDiffusion), 0.0, 1.0);
         _rvLowCut = Math.Clamp(Num(root, "lowcut", _rvLowCut), 20.0, 1000.0);
         _rvHighCut = Math.Clamp(Num(root, "highcut", _rvHighCut), 1000.0, 20000.0);
+        _rvEarly = Math.Clamp(Num(root, "early", _rvEarly), 0.0, 1.0);
+        _rvMod = Math.Clamp(Num(root, "mod", _rvMod), 0.0, 1.0);
 
         _engine.SetReverb(_rvSize, _rvDecay, _rvDamping, _rvPreDelay, _rvWidth, mix);
         _engine.SetReverbTone(_rvDiffusion, _rvLowCut, _rvHighCut);
+        _engine.SetReverbCharacter(_rvEarly, _rvMod);
     }
 
     // ---- EQ ---------------------------------------------------------------------------------
@@ -439,7 +446,13 @@ public sealed class EngineController : IDisposable
 
                 if (speakers is null || string.Equals(cable.ID, speakers.ID, StringComparison.Ordinal))
                 {
-                    _notify?.Invoke("audio-error");
+                    _notify?.Invoke(JsonSerializer.Serialize(new
+                    {
+                        t = "audio-error",
+                        detail = speakers is null
+                            ? "No speakers to play to — every device looks like an outlet."
+                            : "The outlet and the output are the same device, which would feed back.",
+                    }));
                     return;
                 }
 
@@ -454,9 +467,31 @@ public sealed class EngineController : IDisposable
                 }));
             }
         }
+        catch (Exception ex)
+        {
+            // Say what actually went wrong. "Couldn't start audio" alone is useless when the cause
+            // is one driver refusing one specific channel layout.
+            _notify?.Invoke(JsonSerializer.Serialize(new
+            {
+                t = "audio-error",
+                detail = _host?.LastError ?? ex.Message,
+            }));
+        }
+    }
+
+    /// <summary>Tell the UI which apps are making sound, so "when Netflix is playing" can fire.</summary>
+    public void SendSessions()
+    {
+        try
+        {
+            var items = SessionWatcher.Active()
+                .Select(s => new { process = s.Process, title = s.Title, active = s.Active })
+                .ToList();
+            _notify?.Invoke(JsonSerializer.Serialize(new { t = "sessions", items }));
+        }
         catch
         {
-            _notify?.Invoke("audio-error");
+            // Sessions are best-effort; automations simply don't fire this tick.
         }
     }
 

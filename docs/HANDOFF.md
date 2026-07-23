@@ -60,13 +60,28 @@ so every claim below is a measurement (baseline = flat EQ, all effects off):
 **This is how the `prepare()` bug was caught** — the UI looked right while Air did literally
 nothing. Re-run the probe after touching the DSP; a control that looks wired is not evidence.
 
-**Still a mockup:** the Automations page. The builder screens work as a designer, but nothing an
-automation says actually fires — no trigger engine behind it. Now-playing text is honest
-("Ready" / "Processing") rather than real track detection.
+**Automations now fire.** Triggers: an app playing (via WASAPI session enumeration + peak, so a
+paused app doesn't count), time of day, device connected, and app startup. Actions: switch preset,
+set volume, set/toggle an effect, all effects off, upmix, notify, wait. Edge-triggered, so "after
+10 PM" runs once rather than stamping on your settings all night. The builder writes real
+automations; quick-start cards add working ones.
 
-**Removed rather than faked:** the Ambience page's Early reflections, Modulation and Surround
-spread sliders had no engine parameter behind them. Diffusion / low cut / high cut were *added* to
-the reverb so those three could stay real.
+**Surround is real.** Verified per-channel on a 5.1 receiver: upmix off drives FL/FR only
+(surrounds at -180 dB); upmix on drives all six — C -26.6, LFE -37.4, SL/SR -31.1 dB.
+
+**Exclusive mode** drives every speaker the hardware has even when Windows' speaker config has
+reverted to stereo, negotiating the format with the driver (widest layout first; NVIDIA HDMI takes
+16-bit only, so the engine's floats are packed to match).
+
+**Guided setup** on first run: four steps that verify the routing against the real machine.
+
+**Still to do:** real now-playing track detection (GlobalSystemMediaTransportControlsSessionManager
+— needs a `net8.0-windows10.x` TFM); our own virtual driver to replace VB-CABLE (task #29); the
+`format` automation trigger (we capture stereo, so there's nothing to branch on yet).
+
+**Reverb** now has diffusion, low cut, high cut, early reflections (tapped off the pre-delay line)
+and modulation (fractional-delay interpolation in the FDN) — every slider on the Ambience page maps
+to a real parameter.
 
 ## Earlier state (v1.0.0-preview.3 shipped)
 - First **working** build: power button starts/stops the audio path; effect dials are **on/off

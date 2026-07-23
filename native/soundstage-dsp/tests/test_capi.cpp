@@ -140,6 +140,60 @@ int main() {
         ssg_destroy(t);
     }
 
+    // Early reflections and modulation must each actually change the tail, and the reverb must stay
+    // stable and finite with both pushed to their limits.
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+        ssg_enable_reverb(t, 1);
+        ssg_reverb_set(t, 0.7, 2.5, 0.4, 20.0, 0.8, 1.0);   // fully wet, so we measure the tail alone
+
+        std::vector<float> burst(frames * 2, 0.0f), tail(frames * 2, 0.0f);
+        for (int n = 0; n < 64; ++n) {                       // a short click to excite the reverb
+            const float s = 0.5f * std::sin(2.0f * 3.14159265f * 1000.0f * n / 48000.0f);
+            burst[n * 2] = s; burst[n * 2 + 1] = s;
+        }
+
+        // The latest early tap is ~43 ms, so a single 512-sample block (10 ms) can't see them all.
+        // Run several blocks and measure once the tail has actually developed.
+        auto tailEnergy = [&](double early, double mod) {
+            ssg_reset(t);
+            ssg_reverb_set_character(t, early, mod);
+            double sum = 0.0;
+            for (int b = 0; b < 8; ++b) {
+                ssg_process(t, burst.data(), 2, tail.data(), 2, frames);
+                if (b >= 2) {
+                    for (int i = 0; i < frames * 2; ++i) sum += (double)tail[i] * (double)tail[i];
+                }
+            }
+            return sum;
+        };
+
+        const double noEarly = tailEnergy(0.0, 0.0);
+        const double withEarly = tailEnergy(1.0, 0.0);
+        check(withEarly > noEarly * 1.2, "early reflections add energy to the tail");
+
+        // Modulation shouldn't change the level much, but it must change the waveform.
+        ssg_reset(t);
+        ssg_reverb_set_character(t, 0.0, 0.0);
+        std::vector<float> flat(frames * 2, 0.0f);
+        for (int b = 0; b < 6; ++b) ssg_process(t, burst.data(), 2, flat.data(), 2, frames);
+        ssg_reset(t);
+        ssg_reverb_set_character(t, 0.0, 1.0);
+        std::vector<float> moved(frames * 2, 0.0f);
+        for (int b = 0; b < 6; ++b) ssg_process(t, burst.data(), 2, moved.data(), 2, frames);
+        double diff = 0.0;
+        bool allFinite = true;
+        for (int i = 0; i < frames * 2; ++i) {
+            diff += std::fabs((double)flat[i] - (double)moved[i]);
+            if (!std::isfinite(moved[i])) allFinite = false;
+        }
+        check(allFinite, "modulated reverb stays finite");
+        check(diff > 1e-3, "modulation actually moves the delay lines");
+
+        ssg_destroy(t);
+    }
+
     // prepare() must not throw away settings. It runs when the audio path opens and on every device
     // or sample-rate change, so if it reset the enables it would silently switch off whatever the
     // user had turned on — the EQ section used to die the instant audio started.

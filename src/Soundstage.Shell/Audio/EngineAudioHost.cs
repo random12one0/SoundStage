@@ -53,12 +53,16 @@ public sealed class EngineAudioHost : IDisposable
     public bool Exclusive { get; set; }
 
     private WaveFormat? _outFormat;
+    private bool _outIsFloat = true;
+
+    /// <summary>Why the audio path last refused to open, for the UI to show instead of a shrug.</summary>
+    public string? LastError { get; private set; }
 
     /// <summary>A short description of what we actually opened, for the UI to show.</summary>
     public string FormatDescription => _outFormat is null
         ? "—"
         : $"{_outFormat.Channels}ch · {_outFormat.SampleRate / 1000.0:0.#} kHz · " +
-          (_outFormat.Encoding == WaveFormatEncoding.IeeeFloat ? "32-bit float" : $"{_outFormat.BitsPerSample}-bit");
+          (_outIsFloat ? "32-bit float" : $"{_outFormat.BitsPerSample}-bit");
 
     /// <summary>
     /// Find a format the device will actually accept, widest layout first. Shared mode only ever has
@@ -69,19 +73,20 @@ public sealed class EngineAudioHost : IDisposable
     {
         if (share == AudioClientShareMode.Shared)
         {
-            // Windows resamples/remaps for us; match its mix format's channel count.
-            int channels = 2;
+            // Use the endpoint's own mix format verbatim. Anything else — even the same channel
+            // count expressed as plain IEEE_FLOAT rather than EXTENSIBLE — can be rejected outright
+            // for multichannel, which is exactly how a 6-channel receiver ended up refusing to open.
             try
             {
-                int mix = device.AudioClient.MixFormat.Channels;
-                if (mix is 6 or 8) { channels = mix; }
+                WaveFormat mix = device.AudioClient.MixFormat;
+                _outIsFloat = true;   // the Windows shared mix format is always 32-bit float
+                return mix;
             }
             catch
             {
-                // Device wouldn't say — stereo is always safe.
+                _outIsFloat = true;
+                return WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
             }
-
-            return WaveFormat.CreateIeeeFloatWaveFormat(rate, channels);
         }
 
         // Exclusive: ask for the speakers the hardware claims, then fall back gracefully.
@@ -103,12 +108,13 @@ public sealed class EngineAudioHost : IDisposable
         {
             foreach (int r in rates)
             {
-                foreach (WaveFormat candidate in Candidates(r, ch))
+                foreach ((WaveFormat candidate, bool isFloat) in Candidates(r, ch))
                 {
                     try
                     {
                         if (device.AudioClient.IsFormatSupported(AudioClientShareMode.Exclusive, candidate))
                         {
+                            _outIsFloat = isFloat;
                             return candidate;
                         }
                     }
@@ -120,15 +126,18 @@ public sealed class EngineAudioHost : IDisposable
             }
         }
 
+        _outIsFloat = true;
         return WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
     }
 
-    private static IEnumerable<WaveFormat> Candidates(int rate, int channels)
+    /// <summary>Formats to try, best first. The bool says whether samples are float or integer PCM —
+    /// WaveFormatExtensible reports its encoding as Extensible either way, so we can't ask it later.</summary>
+    private static IEnumerable<(WaveFormat Format, bool IsFloat)> Candidates(int rate, int channels)
     {
-        yield return WaveFormat.CreateIeeeFloatWaveFormat(rate, channels);
-        yield return new WaveFormatExtensible(rate, 32, channels);
-        yield return new WaveFormatExtensible(rate, 24, channels);
-        yield return new WaveFormatExtensible(rate, 16, channels);
+        yield return (WaveFormat.CreateIeeeFloatWaveFormat(rate, channels), true);
+        yield return (new WaveFormatExtensible(rate, 32, channels), false);
+        yield return (new WaveFormatExtensible(rate, 24, channels), false);
+        yield return (new WaveFormatExtensible(rate, 16, channels), false);
     }
 
     // Peak levels for the UI meter, written on the audio thread and read on the UI thread. Plain
@@ -198,6 +207,7 @@ public sealed class EngineAudioHost : IDisposable
                 return;
             }
 
+            LastError = null;
             _capture = new WasapiLoopbackCapture(captureDevice);
             int rate = _capture.WaveFormat.SampleRate;
             _engine.Prepare(rate);
@@ -218,7 +228,22 @@ public sealed class EngineAudioHost : IDisposable
             };
 
             _output = new WasapiOut(renderDevice, share, useEventSync: true, latency: LatencyMs);
-            _output.Init(_buffer);
+            try
+            {
+                _output.Init(_buffer);
+            }
+            catch (Exception ex)
+            {
+                // Say which device and format failed — "couldn't start audio" on its own is useless
+                // when the cause is a driver refusing one specific layout.
+                LastError = $"{renderDevice.FriendlyName} refused {FormatDescription}" +
+                            (Exclusive ? " in exclusive mode" : "") + $" — {ex.Message}";
+                try { _output.Dispose(); } catch { /* ignore */ }
+                _output = null;
+                try { _capture.Dispose(); } catch { /* ignore */ }
+                _capture = null;
+                throw;
+            }
 
             _capture.DataAvailable += OnData;
             _capture.RecordingStopped += OnRecordingStopped;
@@ -321,7 +346,7 @@ public sealed class EngineAudioHost : IDisposable
     private int PackOutput(int outSamples)
     {
         int bits = _outFormat?.BitsPerSample ?? 32;
-        bool isFloat = (_outFormat?.Encoding ?? WaveFormatEncoding.IeeeFloat) == WaveFormatEncoding.IeeeFloat;
+        bool isFloat = _outIsFloat;
 
         if (isFloat && bits == 32)
         {

@@ -460,6 +460,8 @@
             <div class="setgroup">Tone &amp; character</div>
             <div class="lrow"><span class="ll">Diffusion</span><div class="sl" data-rv="diffusion"></div><span class="val"></span></div>
             <div class="lrow"><span class="ll">Damping</span><div class="sl" data-rv="damping"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Early reflections</span><div class="sl" data-rv="early"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Modulation</span><div class="sl" data-rv="mod"></div><span class="val"></span></div>
             <div class="lrow"><span class="ll">Low cut</span><div class="sl" data-rv="lowcut"></div><span class="val"></span></div>
             <div class="lrow"><span class="ll">High cut</span><div class="sl" data-rv="highcut"></div><span class="val"></span></div>
             <div class="setgroup">Width &amp; mix</div>
@@ -481,9 +483,9 @@
           </div>
           <div class="seclab">Quick start — tap to add</div>
           <div class="sugs">
-            <div class="sug"><div class="stile"><svg class="ico"><use href="#i-game"/></svg></div><div class="sbody"><div class="sw2">When a game launches</div><div class="sth">→ Gaming</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
-            <div class="sug"><div class="stile"><svg class="ico"><use href="#i-phone"/></svg></div><div class="sbody"><div class="sw2">When a call starts</div><div class="sth">→ Voice clarity</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
-            <div class="sug"><div class="stile"><svg class="ico"><use href="#i-cal"/></svg></div><div class="sbody"><div class="sw2">On weekends</div><div class="sth">→ Party</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
+            <div class="sug" data-quick="discord"><div class="stile"><svg class="ico"><use href="#i-phone"/></svg></div><div class="sbody"><div class="sw2">When Discord is playing</div><div class="sth">→ Voice clarity</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
+            <div class="sug" data-quick="youtube"><div class="stile"><svg class="ico"><use href="#i-film"/></svg></div><div class="sbody"><div class="sw2">When a browser is playing</div><div class="sth">→ Cinema</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
+            <div class="sug" data-quick="morning"><div class="stile"><svg class="ico"><use href="#i-clock"/></svg></div><div class="sbody"><div class="sw2">At 7:00 AM</div><div class="sth">→ Night mode off</div></div><span class="add"><svg class="ico"><use href="#i-plus"/></svg></span></div>
           </div>
         </div>
 
@@ -646,6 +648,8 @@
     predelay:  { min: 0,    max: 200,   fmt: function (v) { return Math.round(v) + ' ms'; } },
     diffusion: { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
     damping:   { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    early:     { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    mod:       { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
     lowcut:    { min: 20,   max: 1000,  log: true, fmt: hz },
     highcut:   { min: 1000, max: 20000, log: true, fmt: hz },
     width:     { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
@@ -666,14 +670,26 @@
       },
       rv: { on: false, type: 'Hall', preset: 'Cinema Hall',
             size: 0.6, decay: 1.8, predelay: 22, diffusion: 0.75,
-            damping: 0.4, lowcut: 120, highcut: 8000, width: 0.65, mix: 0.35 },
+            damping: 0.4, early: 0.5, mod: 0.2,
+            lowcut: 120, highcut: 8000, width: 0.65, mix: 0.35 },
       spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false },
       settings: {
         runAtLogin: false, closeToTray: true, exclusive: false, autoUpdate: true,
         deviceId: null, outletId: null, latency: 40, setupDone: false, lastCheck: 0
       },
-      presets: {}   /* the user's own saved presets, by name */
+      presets: {},  /* the user's own saved presets, by name */
+      autos: seedAutomations()
     };
+  }
+
+  /* The four examples the design ships with, as real automations rather than pictures of them. */
+  function seedAutomations() {
+    return [
+      { id: 'a1', on: true,  when: [{ k: 'app', v: 'Netflix' }],     then: [{ k: 'preset', v: 'Cinema' }] },
+      { id: 'a2', on: true,  when: [{ k: 'time', v: '10:00 PM' }],   then: [{ k: 'fxtoggle', v: 'Night', on: true }] },
+      { id: 'a3', on: true,  when: [{ k: 'app', v: 'Spotify' }],     then: [{ k: 'preset', v: 'Music' }] },
+      { id: 'a4', on: false, when: [{ k: 'device', v: 'Headphones' }], then: [{ k: 'fxalloff' }] }
+    ];
   }
 
   /* Buffer size is the one setting with a real range rather than an on/off. */
@@ -786,7 +802,8 @@
   function pushReverb() {
     send({ t: 'reverb', on: !!S.rv.on, size: S.rv.size, decay: S.rv.decay, damping: S.rv.damping,
            predelay: S.rv.predelay, width: S.rv.width, mix: S.rv.mix,
-           diffusion: S.rv.diffusion, lowcut: S.rv.lowcut, highcut: S.rv.highcut });
+           diffusion: S.rv.diffusion, lowcut: S.rv.lowcut, highcut: S.rv.highcut,
+           early: S.rv.early, mod: S.rv.mod });
   }
   function pushUpmix() { send({ t: 'upmix', on: !!S.spk.upmix, amount: 0.7, center: 1, lfe: 1 }); }
   function pushTrims() {
@@ -1274,20 +1291,20 @@
   }
 
   var RV_PRESETS = {
-    'Subtle':      { type: 'Room',      size: 0.35, decay: 0.9, predelay: 12, diffusion: 0.6,  damping: 0.55, lowcut: 180, highcut: 6000,  width: 0.5,  mix: 0.15 },
-    'Cinema Hall': { type: 'Hall',      size: 0.6,  decay: 1.8, predelay: 22, diffusion: 0.75, damping: 0.4,  lowcut: 120, highcut: 8000,  width: 0.65, mix: 0.35 },
-    'Concert':     { type: 'Hall',      size: 0.85, decay: 3.2, predelay: 35, diffusion: 0.85, damping: 0.3,  lowcut: 100, highcut: 9000,  width: 0.8,  mix: 0.4  },
-    'Studio':      { type: 'Plate',     size: 0.4,  decay: 1.2, predelay: 8,  diffusion: 0.9,  damping: 0.25, lowcut: 200, highcut: 12000, width: 0.55, mix: 0.22 },
-    'Cathedral':   { type: 'Cathedral', size: 1.0,  decay: 6.0, predelay: 55, diffusion: 0.9,  damping: 0.2,  lowcut: 90,  highcut: 7000,  width: 0.9,  mix: 0.45 }
+    'Subtle':      { type: 'Room',      size: 0.35, decay: 0.9, predelay: 12, diffusion: 0.6,  damping: 0.55, early: 0.65, mod: 0.1,  lowcut: 180, highcut: 6000,  width: 0.5,  mix: 0.15 },
+    'Cinema Hall': { type: 'Hall',      size: 0.6,  decay: 1.8, predelay: 22, diffusion: 0.75, damping: 0.4,  early: 0.5,  mod: 0.2,  lowcut: 120, highcut: 8000,  width: 0.65, mix: 0.35 },
+    'Concert':     { type: 'Hall',      size: 0.85, decay: 3.2, predelay: 35, diffusion: 0.85, damping: 0.3,  early: 0.4,  mod: 0.3,  lowcut: 100, highcut: 9000,  width: 0.8,  mix: 0.4  },
+    'Studio':      { type: 'Plate',     size: 0.4,  decay: 1.2, predelay: 8,  diffusion: 0.9,  damping: 0.25, early: 0.25, mod: 0.15, lowcut: 200, highcut: 12000, width: 0.55, mix: 0.22 },
+    'Cathedral':   { type: 'Cathedral', size: 1.0,  decay: 6.0, predelay: 55, diffusion: 0.9,  damping: 0.2,  early: 0.35, mod: 0.4,  lowcut: 90,  highcut: 7000,  width: 0.9,  mix: 0.45 }
   };
 
   var RV_TYPES = {
-    'Room':      { size: 0.35, decay: 0.8, diffusion: 0.6,  damping: 0.55 },
-    'Hall':      { size: 0.6,  decay: 1.8, diffusion: 0.75, damping: 0.4  },
-    'Plate':     { size: 0.4,  decay: 1.4, diffusion: 0.9,  damping: 0.25 },
-    'Chamber':   { size: 0.5,  decay: 1.1, diffusion: 0.8,  damping: 0.45 },
-    'Cathedral': { size: 1.0,  decay: 5.5, diffusion: 0.9,  damping: 0.2  },
-    'Spring':    { size: 0.25, decay: 1.6, diffusion: 0.35, damping: 0.6  }
+    'Room':      { size: 0.35, decay: 0.8, diffusion: 0.6,  damping: 0.55, early: 0.7,  mod: 0.1  },
+    'Hall':      { size: 0.6,  decay: 1.8, diffusion: 0.75, damping: 0.4,  early: 0.5,  mod: 0.2  },
+    'Plate':     { size: 0.4,  decay: 1.4, diffusion: 0.9,  damping: 0.25, early: 0.15, mod: 0.25 },
+    'Chamber':   { size: 0.5,  decay: 1.1, diffusion: 0.8,  damping: 0.45, early: 0.6,  mod: 0.15 },
+    'Cathedral': { size: 1.0,  decay: 5.5, diffusion: 0.9,  damping: 0.2,  early: 0.35, mod: 0.4  },
+    'Spring':    { size: 0.25, decay: 1.6, diffusion: 0.35, damping: 0.6,  early: 0.2,  mod: 0.6  }
   };
 
   function applyRvPreset(name) {
@@ -1502,6 +1519,158 @@
                   function () { send({ t: 'latency', ms: S.settings.latency }); });
   }
 
+  /* ---------- automations: the part that actually fires --------------------------------- */
+
+  /* Every automation is edge-triggered: it runs on the transition into "true", not repeatedly
+     while it stays true. Otherwise "after 10 PM" would stamp on your settings every few seconds
+     for the rest of the night. */
+  var sessions = [];
+  var autoState = {};   /* id -> was the condition true last tick */
+
+  function describeWhen(w) {
+    if (w.k === 'app')     { return 'When ' + w.v + ' is playing'; }
+    if (w.k === 'time')    { return 'After ' + w.v; }
+    if (w.k === 'device')  { return 'When ' + w.v + ' connects'; }
+    if (w.k === 'startup') { return 'When Soundstage starts'; }
+    if (w.k === 'format')  { return 'When the source is ' + w.v; }
+    return 'When…';
+  }
+
+  function describeThen(a) {
+    if (a.k === 'preset')   { return '→ ' + a.v; }
+    if (a.k === 'volume')   { return '→ Volume ' + Math.round(a.v) + '%'; }
+    if (a.k === 'fxamount') { return '→ ' + a.v + ' at ' + Math.round(a.amount) + '%'; }
+    if (a.k === 'fxtoggle') { return '→ ' + a.v + (a.on ? ' on' : ' off'); }
+    if (a.k === 'fxalloff') { return '→ All effects off'; }
+    if (a.k === 'upmix')    { return '→ Upmix ' + (a.on ? 'on' : 'off'); }
+    if (a.k === 'notify')   { return '→ Notify'; }
+    return '→ …';
+  }
+
+  /* Is this automation's condition true right now? */
+  function conditionMet(auto) {
+    if (!auto.when || !auto.when.length) { return false; }
+    return auto.when.every(function (w) {
+      if (w.k === 'app') {
+        var needle = (w.v || '').toLowerCase();
+        return sessions.some(function (s) {
+          return s.active &&
+                 ((s.process || '').toLowerCase().indexOf(needle) >= 0 ||
+                  (s.title || '').toLowerCase().indexOf(needle) >= 0);
+        });
+      }
+      if (w.k === 'time') { return pastTime(w.v); }
+      if (w.k === 'device') {
+        var d = (w.v || '').toLowerCase();
+        return devices.some(function (x) { return x.name.toLowerCase().indexOf(d) >= 0; });
+      }
+      if (w.k === 'startup') { return false; }   /* handled once at boot, not polled */
+      return false;
+    });
+  }
+
+  /* "10:00 PM" -> are we in the hour-long window just after it? A window, not an instant, so a
+     laptop that was asleep at exactly 10 still catches up when it wakes. */
+  function pastTime(text) {
+    var m = /^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i.exec((text || '').trim());
+    if (!m) { return false; }
+    var h = +m[1] % 12, mins = +m[2];
+    if (m[3] && m[3].toUpperCase() === 'PM') { h += 12; }
+    var now = new Date();
+    var mn = (now.getHours() * 60) + now.getMinutes();
+    var target = (h * 60) + mins;
+    return mn >= target && mn < target + 60;
+  }
+
+  function runActions(list) {
+    var delay = 0;
+    (list || []).forEach(function (a) {
+      setTimeout(function () { runAction(a); }, delay);
+      if (a.k === 'wait') { delay += (a.seconds || 2) * 1000; }
+    });
+  }
+
+  function runAction(a) {
+    if (a.k === 'preset') {
+      if (EQ_PRESETS[a.v]) { applyEqPreset(a.v); }
+      else if (S.presets[a.v]) { loadMyPreset(a.v); }
+    } else if (a.k === 'volume') {
+      S.volume = clamp(+a.v || 0, 0, 100);
+      renderVolDial(); pushVolume();
+    } else if (a.k === 'fxamount') {
+      var id1 = fxIdFromLabel(a.v);
+      if (id1) { S.fx[id1].v = clamp(+a.amount || 0, 0, 100); S.fx[id1].on = true; pushFx(id1); renderAllDials(); }
+    } else if (a.k === 'fxtoggle') {
+      var id2 = fxIdFromLabel(a.v);
+      if (id2) { S.fx[id2].on = !!a.on; pushFx(id2); renderAllDials(); }
+    } else if (a.k === 'fxalloff') {
+      FX.forEach(function (f) { S.fx[f.id].on = false; pushFx(f.id); });
+      renderAllDials();
+    } else if (a.k === 'upmix') {
+      S.spk.upmix = !!a.on; pushUpmix(); syncToggle('upmix', S.spk.upmix);
+    } else if (a.k === 'notify') {
+      toast(a.v || 'Automation ran.');
+    }
+    save();
+  }
+
+  function fxIdFromLabel(label) {
+    var want = (label || '').toLowerCase().replace(' mode', '');
+    var hit = FX.filter(function (f) { return f.label.toLowerCase() === want || f.id === want; })[0];
+    return hit ? hit.id : null;
+  }
+
+  function tickAutomations() {
+    (S.autos || []).forEach(function (auto) {
+      if (!auto.on) { autoState[auto.id] = false; return; }
+      var met = conditionMet(auto);
+      if (met && !autoState[auto.id]) {
+        runActions(auto.then);
+        toast('Automation: ' + describeWhen(auto.when[0]));
+      }
+      autoState[auto.id] = met;
+    });
+  }
+
+  /* Poll every few seconds. Cheap, and it means an automation reacts within a few seconds of you
+     hitting play rather than needing you to click anything. */
+  function startAutomationLoop() {
+    setInterval(function () {
+      var needsSessions = (S.autos || []).some(function (a) {
+        return a.on && (a.when || []).some(function (w) { return w.k === 'app'; });
+      });
+      if (needsSessions) { send({ t: 'sessions' }); }   /* reply drives tickAutomations */
+      else { tickAutomations(); }
+    }, 4000);
+  }
+
+  function runStartupAutomations() {
+    (S.autos || []).forEach(function (auto) {
+      if (auto.on && (auto.when || []).some(function (w) { return w.k === 'startup'; })) {
+        runActions(auto.then);
+      }
+    });
+  }
+
+  function renderAutomations() {
+    var host = document.querySelector('.autos');
+    if (!host) { return; }
+    var icons = { app: 'i-app', time: 'i-clock', device: 'i-plug', startup: 'i-power', format: 'i-layers' };
+    var tints = { app: 't-violet', time: 't-amber', device: 't-blue', startup: 't-green', format: 't-cyan' };
+
+    host.innerHTML = (S.autos || []).map(function (a) {
+      var w = (a.when && a.when[0]) || { k: 'app' };
+      return '<div class="acard' + (a.on ? '' : ' off') + '" data-auto="' + a.id + '">' +
+        '<div class="atile ' + (tints[w.k] || 't-cyan') + '"><svg class="ico"><use href="#' +
+          (icons[w.k] || 'i-app') + '"/></svg></div>' +
+        '<div class="abody"><div class="awhen">' + describeWhen(w) + '</div>' +
+        '<div class="athen"><span class="ar"></span>' +
+          (a.then || []).map(describeThen).join(', ') + '</div></div>' +
+        '<div class="sw' + (a.on ? ' on' : '') + '" data-auto-sw="' + a.id + '"><div class="k"></div></div>' +
+        '<div class="brm" data-auto-del="' + a.id + '"><svg><use href="#i-x"/></svg></div></div>';
+    }).join('');
+  }
+
   /* ---------- updates ------------------------------------------------------------------ */
 
   var update = { available: false, latest: '', notes: '', url: '', asset: '' };
@@ -1710,6 +1879,7 @@
     renderSpeakers();
     renderDevices();
     renderSettings();
+    renderAutomations();
     document.querySelectorAll('#eqMode button').forEach(function (b) {
       b.classList.toggle('on', +b.dataset.mode === S.eq.mode);
     });
@@ -1769,16 +1939,49 @@
     presets: { title: 'Which preset?', detected: '', items: ['Flat', 'Cinema', 'Music', 'Podcast', 'Bass', 'Vocal'] }
   };
 
+  /* The quick-start cards, as real automations. */
+  var QUICK = {
+    discord: { when: [{ k: 'app', v: 'Discord' }], then: [{ k: 'preset', v: 'Vocal' }] },
+    youtube: { when: [{ k: 'app', v: 'chrome' }],  then: [{ k: 'preset', v: 'Cinema' }] },
+    morning: { when: [{ k: 'time', v: '7:00 AM' }], then: [{ k: 'fxtoggle', v: 'Night', on: false }] }
+  };
+
   var activeDD = null;
   var trigStack = document.getElementById('trigStack');
   var actStack = document.getElementById('actStack');
 
-  function bar(def, h) {
+  function bar(def, h, kind) {
     var el = document.createElement('div');
     el.className = 'barrow';
+    el.dataset.kind = kind;   /* so the builder can be read back out on save */
     el.innerHTML = (h ? '<span class="handle">⋮⋮</span>' : '') +
       '<div class="btile ' + def.t + '"><svg class="ico"><use href="#' + def.ic + '"/></svg></div>' +
       '<div class="bmain">' + def.html + '</div><div class="brm"><svg><use href="#i-x"/></svg></div>';
+
+    /* The little inline sliders inside a bar have to actually move, or the value we read back on
+       save would always be whatever the template happened to say. */
+    [].forEach.call(el.querySelectorAll('.cfg-sl'), function (sl) {
+      var handle = sl.querySelector('b');
+      var fill = sl.querySelector('i');
+      var pct = null;
+      function setFromX(clientX) {
+        var box = sl.getBoundingClientRect();
+        if (!box.width) { return; }
+        var t = clamp((clientX - box.left) / box.width, 0, 1);
+        fill.style.width = (t * 100) + '%';
+        handle.style.left = (t * 100) + '%';
+        pct = pct || sl.parentNode.querySelector('.cfg-pct');
+        if (pct) {
+          pct.textContent = kind === 'spklevel'
+            ? (Math.round((t * 24) - 12) + ' dB')
+            : (Math.round(t * 100) + '%');
+        }
+      }
+      draggable(handle, null, function (e) { setFromX(e.clientX); }, null);
+      draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
+                    function (e) { setFromX(e.clientX); }, null);
+    });
+
     return el;
   }
   function refreshWhen() {
@@ -1791,15 +1994,63 @@
     if (trigStack.children.length) {
       var l = document.createElement('div'); l.className = 'andlabel'; l.textContent = 'AND'; trigStack.appendChild(l);
     }
-    trigStack.appendChild(bar(TRIG[k], false)); refreshWhen();
+    trigStack.appendChild(bar(TRIG[k], false, k)); refreshWhen();
   }
   function addAction(k) {
     if (actStack.children.length) {
       var c = document.createElement('div'); c.className = 'conn'; actStack.appendChild(c);
     }
-    actStack.appendChild(bar(ACT[k], true)); refreshDo();
+    actStack.appendChild(bar(ACT[k], true, k)); refreshDo();
   }
-  function resetBuilder() { trigStack.innerHTML = ''; actStack.innerHTML = ''; refreshWhen(); refreshDo(); }
+  function resetBuilder() {
+    trigStack.innerHTML = '';
+    actStack.innerHTML = '';
+    document.querySelector('#scr-canvas .nm input').value = '';
+    refreshWhen();
+    refreshDo();
+  }
+
+  /* Read the bars the user built back out of the DOM and store them as a real automation. The
+     builder's controls already carry their values (dropdown text, slider width), so this walks
+     them rather than keeping a parallel model in sync on every keystroke. */
+  function saveBuilder() {
+    var when = [], then = [];
+
+    [].forEach.call(trigStack.querySelectorAll('.barrow'), function (row) {
+      var kind = row.dataset.kind;
+      var dd = row.querySelector('.cfg-dd');
+      var value = dd ? dd.textContent.trim() : '';
+      when.push({ k: kind, v: value });
+    });
+
+    [].forEach.call(actStack.querySelectorAll('.barrow'), function (row) {
+      var kind = row.dataset.kind;
+      var dds = row.querySelectorAll('.cfg-dd');
+      var pct = row.querySelector('.cfg-pct');
+      var pill = row.querySelector('.cfg-pills button.on');
+      var input = row.querySelector('.cfg-in');
+      var a = { k: kind };
+      if (dds.length) { a.v = dds[0].textContent.trim(); }
+      if (pct) {
+        var n = parseFloat(pct.textContent.replace(/[^0-9.\-]/g, ''));
+        if (!isNaN(n)) { if (kind === 'volume') { a.v = n; } else { a.amount = n; } }
+      }
+      if (pill) { a.on = pill.textContent.trim().toLowerCase() === 'on'; }
+      if (input) { a.v = input.value; }
+      if (kind === 'wait') { a.seconds = parseFloat(a.v) || 2; }
+      then.push(a);
+    });
+
+    if (!when.length || !then.length) {
+      toast('An automation needs at least one “when” and one “do”.');
+      return;
+    }
+
+    S.autos.push({ id: 'a' + nowMs(), on: true, when: when, then: then });
+    renderAutomations();
+    save();
+    toast('Automation saved — it’s live now.');
+  }
   function openValuePicker(cat, dd) {
     activeDD = dd;
     var v = VALUES[cat];
@@ -1842,7 +2093,30 @@
   document.addEventListener('click', function (e) {
     var op = e.target.closest('[data-open]');
     if (op) { showScr(op.getAttribute('data-open') === 'trigger' ? 'scr-trigger' : 'scr-actions'); return; }
-    var ex = e.target.closest('[data-exit]'); if (ex) { setPage('automations'); return; }
+    var ex = e.target.closest('[data-exit]');
+    if (ex) {
+      if (ex.classList.contains('done')) { saveBuilder(); }
+      setPage('automations');
+      return;
+    }
+
+    var asw = e.target.closest('[data-auto-sw]');
+    if (asw) {
+      var id = asw.dataset.autoSw;
+      S.autos.forEach(function (a) { if (a.id === id) { a.on = !a.on; } });
+      renderAutomations();
+      save();
+      return;
+    }
+    var adel = e.target.closest('[data-auto-del]');
+    if (adel) {
+      var delId = adel.dataset.autoDel;
+      S.autos = S.autos.filter(function (a) { return a.id !== delId; });
+      renderAutomations();
+      save();
+      toast('Automation removed.');
+      return;
+    }
     var bk = e.target.closest('[data-back]'); if (bk) { showScr('scr-canvas'); return; }
     var tr = e.target.closest('[data-trig]'); if (tr) { addTrigger(tr.getAttribute('data-trig')); showScr('scr-canvas'); return; }
     var ac = e.target.closest('[data-act]'); if (ac) { addAction(ac.getAttribute('data-act')); showScr('scr-canvas'); return; }
@@ -1993,8 +2267,18 @@
       return;
     }
 
+    /* Quick-start cards create a working automation rather than just lighting up. */
     var sug = e.target.closest('.sug');
-    if (sug) { sug.style.borderStyle = 'solid'; sug.style.borderColor = '#37e0cf'; return; }
+    if (sug) {
+      var recipe = QUICK[sug.dataset.quick];
+      if (recipe) {
+        S.autos.push({ id: 'a' + nowMs(), on: true, when: recipe.when, then: recipe.then });
+        renderAutomations();
+        save();
+        toast('Added — ' + describeWhen(recipe.when[0]) + '.');
+      }
+      return;
+    }
     closeMenus();
   });
 
@@ -2074,6 +2358,9 @@
           setTimeout(function () {
             if (!S.settings.setupDone) { openSetup(0); } else { maybeAutoCheck(); }
           }, 700);
+
+          runStartupAutomations();
+          startAutomationLoop();
           return;
         }
         if (msg.t === 'devices') {
@@ -2096,9 +2383,15 @@
             : 'The download didn’t finish. You can grab it from the release page instead.');
           return;
         }
+        if (msg.t === 'sessions') { sessions = msg.items || []; tickAutomations(); return; }
         if (msg.t === 'tray-power') { setPower(!!msg.on); return; }
         if (msg.t === 'running') {
           toast('Soundstage is processing your sound — ' + msg.output + ' · ' + msg.format + '.');
+          return;
+        }
+        if (msg.t === 'audio-error') {
+          toast('Couldn’t start audio. ' + (msg.detail || 'Check your output device and try again.'));
+          setPower(false);
           return;
         }
         return;
