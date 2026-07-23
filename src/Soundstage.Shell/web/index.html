@@ -255,7 +255,9 @@
   .radial svg,.vd svg{overflow:visible;}
   .knob-hit{cursor:grab;}
   .dragging .knob-hit{cursor:grabbing;}
-  .knob-hub{cursor:pointer;}
+  /* The whole tile is the on/off button now; only the handle is a knob. */
+  .radial{cursor:pointer;}
+  .radial .knob-hit{cursor:grab;}
   /* The volume dial is the control you reach for most, so it gets the most room. */
   .vd{width:68px;height:68px;touch-action:none;}
   .vd svg{width:68px;height:68px;}
@@ -336,6 +338,24 @@
   #setup .scheck.warn{background:#2a2016;border:1px solid #6b5324;color:#f0cf9a;}
   #setup .srow{display:flex;align-items:center;gap:9px;}
   #setup .srow .sp{flex:1;}
+
+  /* ---- explain-yourself icons ----
+     Every control that isn't self-evident carries one. Someone opening this for the first time
+     should never have to guess what "Leveler" means. */
+  .qm{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;
+      border:1px solid #38485a;color:#7d8c9a;font-size:10px;font-weight:700;line-height:1;
+      cursor:help;flex:none;vertical-align:1px;margin-left:6px;font-family:ui-monospace,monospace;
+      position:relative;}
+  .qm:hover{border-color:var(--glow);color:var(--glow);}
+  .qm .tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+           width:230px;background:#0e1922;border:1px solid #2b5a57;border-radius:10px;
+           padding:9px 11px;font-family:inherit;font-size:11.5px;font-weight:400;line-height:1.45;
+           color:#dbe7ea;text-align:left;box-shadow:0 14px 34px rgba(0,0,0,.55);
+           opacity:0;pointer-events:none;transition:opacity .14s;z-index:400;}
+  .qm:hover .tip{opacity:1;}
+  .radial .qm{position:absolute;top:6px;right:6px;margin:0;}
+  .radial{position:relative;}
+  .fxgrid .qm .tip{left:auto;right:-4px;transform:none;}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
@@ -438,11 +458,34 @@
         <!-- ============ SPEAKERS ============ -->
         <div class="page" data-page="speakers">
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Speaker calibration</h3><span class="sub" id="calibSub">—</span><div class="rt"><button class="btn" id="testall"><svg><use href="#i-play"/></svg> Test all</button><button class="ghost" id="calibReset">Reset</button></div></div>
+            <div class="ph"><h3 class="big">Speaker calibration</h3><span class="sub" id="calibSub">—</span><span id="calibHelp"></span><div class="rt"><button class="btn" id="testall"><svg><use href="#i-play"/></svg> Test all</button><button class="ghost" id="calibReset">Reset</button></div></div>
             <div class="calib" id="calib" data-build>
             </div>
           </section>
-          <section class="panel umrow"><div class="umi"><svg class="ico"><use href="#i-wave"/></svg></div><div class="umt"><div class="umn">Upmix stereo to surround</div><div class="umd">Fill your surround speakers when the source is only stereo (2.0).</div></div><div class="sw" data-sw="upmix"><div class="k"></div></div></section>
+
+          <div class="updbar" id="outletBanner" style="background:linear-gradient(90deg,#2a2016,#1c1a17);border-color:#6b5324">
+            <span class="ub-dot" style="background:#ffbf6b;box-shadow:0 0 10px #ffbf6b"></span>
+            <div class="ub-t">
+              <b>Your outlet is stereo, so 5.1 never reaches Soundstage</b>
+              <span>Windows folds surround down to 2 channels before we see it. Set the CABLE device to 5.1 or 7.1 in Windows to keep it intact.</span>
+            </div>
+            <button class="btn" id="outletFix">Configure outlet</button>
+          </div>
+
+          <section class="panel pad">
+            <div class="setrow" style="border-bottom:1px solid var(--soft-line)">
+              <div class="st"><div class="stn">Playing to<span id="outHelp2"></span></div><div class="std">Switch between your speakers, headphones or receiver</div></div>
+              <div class="pdd" id="devDD2"><button class="pddbtn"><span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
+            </div>
+            <div class="setrow" style="border-bottom:1px solid var(--soft-line)">
+              <div class="st"><div class="stn">Upmix stereo to surround<span id="upmixHelp"></span></div><div class="std">Fill your surround speakers when the source is only stereo (2.0)</div></div>
+              <div class="sw" data-sw="upmix"><div class="k"></div></div>
+            </div>
+            <div class="setrow">
+              <div class="st"><div class="stn">Send bass to the subwoofer<span id="subHelp"></span></div><div class="std">Use your sub even for plain stereo, with upmix off</div></div>
+              <div class="sw" data-sw="subfeed"><div class="k"></div></div>
+            </div>
+          </section>
         </div>
 
         <!-- ============ AMBIENCE ============ -->
@@ -452,21 +495,26 @@
               <div class="pdd" id="rvPresetDD"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
               <div class="sw" data-sw="ambience"><div class="k"></div></div>
             </div></div>
-            <div class="setgroup">Space</div>
-            <div class="lrow"><span class="ll">Type</span><div class="pdd" id="rvTypeDD" style="margin-right:auto"><button class="pddbtn"><span class="pn">Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
-            <div class="lrow"><span class="ll">Size</span><div class="sl" data-rv="size"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Decay time</span><div class="sl" data-rv="decay"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Pre-delay</span><div class="sl" data-rv="predelay"></div><span class="val"></span></div>
-            <div class="setgroup">Tone &amp; character</div>
-            <div class="lrow"><span class="ll">Diffusion</span><div class="sl" data-rv="diffusion"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Damping</span><div class="sl" data-rv="damping"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Early reflections</span><div class="sl" data-rv="early"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Modulation</span><div class="sl" data-rv="mod"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Low cut</span><div class="sl" data-rv="lowcut"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">High cut</span><div class="sl" data-rv="highcut"></div><span class="val"></span></div>
-            <div class="setgroup">Width &amp; mix</div>
-            <div class="lrow"><span class="ll">Width</span><div class="sl" data-rv="width"></div><span class="val"></span></div>
-            <div class="lrow"><span class="ll">Mix</span><div class="sl" data-rv="mix"></div><span class="val"></span></div>
+            <!-- Five controls do ninety percent of the work. The rest is real, but it belongs
+                 behind a door so the page doesn't read as a wall of knobs. -->
+            <div class="lrow"><span class="ll">Space<span id="rvHelpType"></span></span><div class="pdd" id="rvTypeDD" style="margin-right:auto"><button class="pddbtn"><span class="pn">Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
+            <div class="lrow"><span class="ll">Amount<span id="rvHelpMix"></span></span><div class="sl" data-rv="mix"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Size<span id="rvHelpSize"></span></span><div class="sl" data-rv="size"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Decay time<span id="rvHelpDecay"></span></span><div class="sl" data-rv="decay"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Brightness<span id="rvHelpDamp"></span></span><div class="sl" data-rv="damping"></div><span class="val"></span></div>
+
+            <button class="emptyrow" id="rvAdvToggle" style="margin-top:14px">Advanced controls</button>
+            <div id="rvAdvanced" style="display:none">
+              <div class="setgroup">Timing &amp; character</div>
+              <div class="lrow"><span class="ll">Pre-delay</span><div class="sl" data-rv="predelay"></div><span class="val"></span></div>
+              <div class="lrow"><span class="ll">Diffusion</span><div class="sl" data-rv="diffusion"></div><span class="val"></span></div>
+              <div class="lrow"><span class="ll">Early reflections</span><div class="sl" data-rv="early"></div><span class="val"></span></div>
+              <div class="lrow"><span class="ll">Modulation</span><div class="sl" data-rv="mod"></div><span class="val"></span></div>
+              <div class="setgroup">Band limits &amp; width</div>
+              <div class="lrow"><span class="ll">Low cut</span><div class="sl" data-rv="lowcut"></div><span class="val"></span></div>
+              <div class="lrow"><span class="ll">High cut</span><div class="sl" data-rv="highcut"></div><span class="val"></span></div>
+              <div class="lrow"><span class="ll">Width</span><div class="sl" data-rv="width"></div><span class="val"></span></div>
+            </div>
           </section>
           <section class="panel pad" style="padding:13px 17px"><div style="font-size:12px;color:var(--dim)">The sub (LFE) stays dry, so the low end never turns to mud.</div></section>
         </div>
@@ -625,21 +673,60 @@
                 800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000];
   var EQ_RANGE = 12;   /* the fader travel, in dB either side of flat */
 
-  var CHANNELS = [
+  /* Windows interleaves by channel-mask bit order, so index 4/5 are the BACK speakers and 6/7 are
+     the SIDES — not the other way round. Labelling 4/5 as "Side" meant moving that fader changed a
+     speaker with a different name on it. In a 5.1 layout there are no sides at all, and people call
+     the rear pair "surround", so the names follow the layout. */
+  var CHANNELS_71 = [
     { key: 'FL',  name: 'Front L' }, { key: 'FR',  name: 'Front R' },
     { key: 'C',   name: 'Center'  }, { key: 'LFE', name: 'Sub', sub: true },
-    { key: 'SL',  name: 'Side L'  }, { key: 'SR',  name: 'Side R' },
-    { key: 'SBL', name: 'Back L'  }, { key: 'SBR', name: 'Back R' }
+    { key: 'BL',  name: 'Back L'  }, { key: 'BR',  name: 'Back R' },
+    { key: 'SL',  name: 'Side L'  }, { key: 'SR',  name: 'Side R' }
+  ];
+  var CHANNELS_51 = [
+    { key: 'FL',  name: 'Front L' },    { key: 'FR',  name: 'Front R' },
+    { key: 'C',   name: 'Center'  },    { key: 'LFE', name: 'Sub', sub: true },
+    { key: 'SL',  name: 'Surround L' }, { key: 'SR',  name: 'Surround R' },
+    { key: 'BL',  name: 'Back L'  },    { key: 'BR',  name: 'Back R' }
+  ];
+  function channelLayout() { return activeChannels(currentDevice()) >= 8 ? CHANNELS_71 : CHANNELS_51; }
+
+  /* Plain-language descriptions. Someone opening this for the first time shouldn't have to guess
+     what "Leveler" is, so every effect carries its own explanation in the UI. */
+  var FX = [
+    { id: 'bass',     label: 'Bass',
+      help: 'Adds weight and punch to the low end, without just turning the bass knob up — it fills in the fundamentals your speakers struggle with.' },
+    { id: 'air',      label: 'Air',
+      help: 'Lifts the very top end. Cymbals, breath and detail feel more open. Too much gets hissy.' },
+    { id: 'warmth',   label: 'Warmth',
+      help: 'A gentle lift in the lower mids. Makes thin, harsh recordings sound fuller and more analogue.' },
+    { id: 'leveler',  label: 'Leveler',
+      help: 'Evens out loud and quiet parts, so you stop reaching for the volume during films. Higher = more even, less dynamic.' },
+    { id: 'ambience', label: 'Ambience',
+      help: 'Our reverb — adds a sense of space, as if the sound were in a room rather than in your head. Fine-tune it on the Ambience page.' },
+    { id: 'night',    label: 'Night',
+      help: 'Night mode: pulls the overall level down so you can watch late without waking the house.' }
   ];
 
-  var FX = [
-    { id: 'bass',     label: 'Bass'     },
-    { id: 'air',      label: 'Air'      },
-    { id: 'warmth',   label: 'Warmth'   },
-    { id: 'leveler',  label: 'Leveler'  },
-    { id: 'ambience', label: 'Ambience' },
-    { id: 'night',    label: 'Night'    }
-  ];
+  /* Help text for everything else that isn't obvious on sight. */
+  var HELP = {
+    power:   'Starts and stops processing. Your apps play into the outlet device, Soundstage processes that, and sends it to your speakers.',
+    volume:  'Soundstage\'s own output level, on top of the Windows volume.',
+    eq:      'Shapes the tone across the frequency range. Drag a handle up to boost that band, down to cut it. Double-click a band to reset it.',
+    eqmode:  '10 bands is quick and broad. 31 bands is one-third-octave — finer control, for fixing a specific problem frequency.',
+    preset:  'Ready-made tone curves. Picking one replaces your EQ; "Yours" saves everything — EQ, dials and ambience — under a name.',
+    output:  'Where Soundstage sends the finished sound. This is the one to change when you switch to headphones.',
+    outlet:  'The virtual device your apps play into, which Soundstage captures. Normally the CABLE device.',
+    calib:   'Trim each speaker so they sound equally loud from where you sit. Press a speaker\'s play button to hear just that one.',
+    upmix:   'Spreads stereo across all your speakers, so a 2-channel source still uses your surrounds.',
+    sub:     'Sends the low end to your subwoofer even when the source is plain stereo and upmix is off.',
+    exclusive: 'Takes the output device for Soundstage alone. Drives every speaker your hardware has even if Windows is set to stereo — but nothing else can play through that device.',
+    buffer:  'How much audio is held ahead of time. Lower feels tighter with video; higher survives a busy PC without crackling.'
+  };
+
+  function qm(text) {
+    return '<span class="qm" tabindex="0">?<span class="tip">' + text + '</span></span>';
+  }
 
   /* Ambience parameters: how each slider maps to a real engine value, and how it reads out. */
   var RV = {
@@ -647,7 +734,10 @@
     decay:     { min: 0.2,  max: 8,     fmt: function (v) { return round1(v) + ' s'; } },
     predelay:  { min: 0,    max: 200,   fmt: function (v) { return Math.round(v) + ' ms'; } },
     diffusion: { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
-    damping:   { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    /* Shown as "Brightness" because that's what people hear, but the engine parameter is damping —
+       more damping is a darker tail — so the slider runs backwards against the stored value. */
+    damping:   { min: 0,    max: 1,     inv: true,
+                 fmt: function (v) { return Math.round((1 - v) * 100) + '%'; } },
     early:     { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
     mod:       { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
     lowcut:    { min: 20,   max: 1000,  log: true, fmt: hz },
@@ -672,7 +762,7 @@
             size: 0.6, decay: 1.8, predelay: 22, diffusion: 0.75,
             damping: 0.4, early: 0.5, mod: 0.2,
             lowcut: 120, highcut: 8000, width: 0.65, mix: 0.35 },
-      spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false },
+      spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false, subfeed: false },
       settings: {
         runAtLogin: false, closeToTray: true, exclusive: false, autoUpdate: true,
         deviceId: null, outletId: null, latency: 40, setupDone: false, lastCheck: 0
@@ -701,6 +791,8 @@
   var ready = false;      /* true once the host's saved state has been applied */
   var appVersion = '1.0.0';
   var statePath = '';
+  var liveIn = 0;            /* channels actually arriving from the outlet while running */
+  var outletChannels = 0;    /* channels the outlet is configured for — the ceiling on everything */
 
   /* ---------- 2. bridge --------------------------------------------------------------- */
 
@@ -805,7 +897,9 @@
            diffusion: S.rv.diffusion, lowcut: S.rv.lowcut, highcut: S.rv.highcut,
            early: S.rv.early, mod: S.rv.mod });
   }
-  function pushUpmix() { send({ t: 'upmix', on: !!S.spk.upmix, amount: 0.7, center: 1, lfe: 1 }); }
+  function pushUpmix() {
+    send({ t: 'upmix', on: !!S.spk.upmix, amount: 0.7, center: 1, lfe: 1, subfeed: !!S.spk.subfeed });
+  }
   function pushTrims() {
     for (var i = 0; i < 8; i++) { send({ t: 'trim', ch: i, db: S.spk.trims[i] }); }
   }
@@ -899,15 +993,16 @@
     var d = buildDial(el, opts.colour, opts.size, opts.r, opts.hub);
     el._dial = d;
 
-    /* The hub's on/off has to be driven from pointerup, not a click listener: the drag helper calls
-       preventDefault on pointerdown (so a turn never selects text or starts a native drag), and that
-       also suppresses the compatibility click event — which is why toggling used to need two presses.
-       A press that lands on the hub and doesn't travel is a toggle. */
-    var turning = false, onHub = false, moved = false, downX = 0, downY = 0;
+    /* Two gestures, no ambiguity: drag the handle to set the amount, click anywhere else on the tile
+       to switch the effect on or off. The toggle fires from pointerup rather than a click listener
+       because the drag helper calls preventDefault on pointerdown (so a turn can't select text), and
+       that suppresses the compatibility click event. */
+    var turning = false, moved = false, downX = 0, downY = 0;
 
-    draggable(d.svg, function (e) {
+    var onHelp = false;
+    draggable(el, function (e) {
+      onHelp = !!(e.target.closest && e.target.closest('.qm'));   /* the ? is not a switch */
       turning = (e.target === d.hit);
-      onHub = (e.target === d.hub);
       moved = false;
       downX = e.clientX;
       downY = e.clientY;
@@ -918,9 +1013,9 @@
       var box = d.svg.getBoundingClientRect();
       opts.set(angleToValue(box.left + box.width / 2, box.top + box.height / 2, e.clientX, e.clientY));
     }, function () {
-      if (onHub && !moved && opts.toggle) { opts.toggle(); }
+      if (!turning && !moved && !onHelp && opts.toggle) { opts.toggle(); }
       turning = false;
-      onHub = false;
+      onHelp = false;
     });
 
     /* Wheel over the dial nudges it — the fine adjustment a drag can't give you. */
@@ -941,6 +1036,14 @@
       el.appendChild(label);
       el.appendChild(val);
       el._val = val;
+
+      var spec = FX.filter(function (f) { return f.id === id; })[0];
+      if (spec && spec.help) {
+        var help = document.createElement('span');
+        help.className = 'qm';
+        help.innerHTML = '?<span class="tip">' + spec.help + '</span>';
+        el.appendChild(help);
+      }
       initDial(el, {
         colour: el.dataset.color || '#37e0cf', size: 76, r: 28, hub: 14, reset: 50,
         get: function () { return S.fx[id].v; },
@@ -1109,6 +1212,7 @@
         var box = sl.getBoundingClientRect();
         if (!box.width) { return; }
         var t = clamp((clientX - box.left) / box.width, 0, 1);
+        if (spec.inv) { t = 1 - t; }
         S.rv[key] = spec.log
           ? spec.min * Math.pow(spec.max / spec.min, t)
           : spec.min + t * (spec.max - spec.min);
@@ -1130,6 +1234,7 @@
       var t = spec.log
         ? Math.log(v / spec.min) / Math.log(spec.max / spec.min)
         : (v - spec.min) / (spec.max - spec.min);
+      if (spec.inv) { t = 1 - t; }
       t = clamp(t, 0, 1) * 100;
       sl.querySelector('i').style.width = t + '%';
       sl.querySelector('b').style.left = t + '%';
@@ -1139,6 +1244,7 @@
     setDD('rvTypeDD', S.rv.type);
     setDD('rvPresetDD', S.rv.preset);
     syncToggle('ambience', S.rv.on);
+    syncToggle('subfeed', S.spk.subfeed);
   }
 
   /* Speaker calibration faders: -12..+12 dB, centre detent at 0. */
@@ -1148,7 +1254,7 @@
     var host = document.getElementById('calib');
     if (!host) { return; }
     host.innerHTML = '';
-    CHANNELS.forEach(function (ch, i) {
+    channelLayout().forEach(function (ch, i) {
       var strip = document.createElement('div');
       strip.className = 'strip' + (ch.sub ? ' sub' : '');
       strip.dataset.ch = i;
@@ -1187,11 +1293,20 @@
     /* Dim the channels this device doesn't have, rather than offering faders for speakers that
        aren't there. */
     var ch = activeChannels(currentDevice());
+    var layout = channelLayout();
     document.querySelectorAll('#calib .strip').forEach(function (strip) {
       var idx = +strip.dataset.ch;
       var have = idx < ch;
       strip.style.opacity = have ? '' : '.32';
       strip.title = have ? '' : 'Your output device doesn’t have this speaker';
+
+      /* Names follow the layout — a 5.1 rig has surrounds where a 7.1 rig has backs. */
+      var def = layout[idx];
+      if (def) {
+        strip.querySelector('.cl').textContent = def.key;
+        strip.querySelector('.cn').textContent = def.name;
+        strip.classList.toggle('sub', !!def.sub);
+      }
       var i = idx, db = S.spk.trims[i] || 0;
       var top = (0.5 - db / (2 * TRIM_RANGE)) * 100;
       var fill = strip.querySelector('.ffill');
@@ -1231,6 +1346,7 @@
     var key = sw.dataset.sw;
     var on = !sw.classList.contains('on');
     if (key === 'upmix')      { S.spk.upmix = on; pushUpmix(); }
+    else if (key === 'subfeed') { S.spk.subfeed = on; pushUpmix(); }
     else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
     else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
@@ -1417,9 +1533,10 @@
   function renderDevices() {
     var sel = currentDevice();
 
-    fillDD('devDD', devices.filter(function (d) { return !d.isCable; })
-                           .map(function (d) { return { label: d.name, value: d.id }; }),
-           sel ? sel.name : '—');
+    var outs = devices.filter(function (d) { return !d.isCable; })
+                      .map(function (d) { return { label: d.name, value: d.id }; });
+    fillDD('devDD', outs, sel ? sel.name : '—');
+    fillDD('devDD2', outs, sel ? sel.name : '—');   /* the same picker, on the Speakers page */
 
     var outlets = [{ label: 'Automatic', value: '' }].concat(
       devices.map(function (d) { return { label: d.name, value: d.id }; }));
@@ -1438,7 +1555,19 @@
       var cs = document.getElementById('calibSub');
       if (cs) { cs.textContent = sel.name + ' · ' + layoutName(ch); }
       var fmt = document.getElementById('fmtChip');
-      if (fmt) { fmt.innerHTML = '<b>2.0 → ' + layoutShort(ch) + '</b> · <b>48</b> kHz'; }
+      if (fmt) {
+        var inShort = layoutShort(liveIn || outletChannels || 2);
+        fmt.innerHTML = '<b>' + inShort + ' → ' + layoutShort(ch) + '</b> · <b>48</b> kHz';
+      }
+
+      /* The outlet is the ceiling. If it's stereo, a 5.1 film is already flattened before it
+         reaches us — worth saying out loud, because nothing in this app can undo it. */
+      var ob = document.getElementById('outletBanner');
+      if (ob) {
+        var stereoOutlet = outletChannels > 0 && outletChannels <= 2;
+        var surroundRig = ch >= 6;
+        ob.classList.toggle('show', stereoOutlet && surroundRig);
+      }
 
       /* Say plainly when the hardware can do more than Windows is currently asking of it — that
          mismatch is invisible everywhere else and it's why a 5.1 receiver plays as stereo. */
@@ -1869,7 +1998,43 @@
 
   /* ---------- render everything ------------------------------------------------------- */
 
+  /* Drop a ? next to everything that isn't self-explanatory. Done once, from the HELP table, so the
+     markup stays clean and the wording lives in one place. */
+  function installHelp() {
+    var spots = {
+      calibHelp:   HELP.calib,   outHelp2:    HELP.output,   upmixHelp:  HELP.upmix,
+      subHelp:     HELP.sub,     rvHelpType:  'The kind of space — a small room, a big hall, a plate. Sets several controls at once.',
+      rvHelpMix:   'How much of the space you hear against the original sound.',
+      rvHelpSize:  'How large the room feels. Bigger rooms take longer for sound to bounce back.',
+      rvHelpDecay: 'How long the tail lasts before it fades away.',
+      rvHelpDamp:  'How bright the tail is. Real rooms absorb high frequencies, so lower is more natural.'
+    };
+    Object.keys(spots).forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el && !el.innerHTML) { el.innerHTML = qm(spots[id]); }
+    });
+
+    /* Panel headings and settings rows that need a word of explanation. */
+    var eqh = document.querySelector('.eqpanel .ph h3');
+    if (eqh && !eqh.querySelector('.qm')) { eqh.innerHTML = 'Equalizer' + qm(HELP.eq); }
+    var pwr = document.querySelector('.screen .np .src');
+    if (pwr && !pwr.querySelector('.qm')) { pwr.innerHTML = 'Soundstage' + qm(HELP.power); }
+    labelHelp('Output device', HELP.output);
+    labelHelp('Outlet device', HELP.outlet);
+    labelHelp('Take the device exclusively', HELP.exclusive);
+    labelHelp('Buffer', HELP.buffer);
+  }
+
+  function labelHelp(text, help) {
+    [].forEach.call(document.querySelectorAll('.setrow .stn'), function (el) {
+      if (el.textContent.trim() === text && !el.querySelector('.qm')) {
+        el.innerHTML = text + qm(help);
+      }
+    });
+  }
+
   function renderEverything() {
+    installHelp();
     fillStaticMenus();
     renderAllDials();
     renderEq();
@@ -2150,8 +2315,21 @@
     }
     if (e.target.closest('#refreshDevices')) { send({ t: 'devices' }); toast('Rescanning audio devices…'); return; }
     if (e.target.closest('#speakerSetup')) { send({ t: 'speakersetup' }); return; }
+    if (e.target.closest('#outletFix')) {
+      send({ t: 'speakersetup' });
+      toast('In the Playback tab, select the CABLE device → Configure → pick 5.1 or 7.1, then restart playback.');
+      return;
+    }
     if (e.target.closest('#openFolder')) { send({ t: 'openfolder' }); return; }
     if (e.target.closest('#runSetup')) { openSetup(0); return; }
+    if (e.target.closest('#rvAdvToggle')) {
+      var adv = document.getElementById('rvAdvanced');
+      var open = adv.style.display === 'none';
+      adv.style.display = open ? 'block' : 'none';
+      document.getElementById('rvAdvToggle').textContent = open ? 'Hide advanced controls' : 'Advanced controls';
+      if (open) { renderReverb(); }   /* the sliders need a laid-out box to measure */
+      return;
+    }
     if (e.target.closest('#checkUpdate')) {
       document.getElementById('updateStatus').textContent = 'Checking…';
       send({ t: 'update-check' });
@@ -2238,7 +2416,13 @@
       if (owner.id === 'eqPresetDD')      { applyEqPreset(pi.textContent); }
       else if (owner.id === 'rvPresetDD') { applyRvPreset(pi.textContent); }
       else if (owner.id === 'rvTypeDD')   { applyRvType(pi.textContent); }
-      else if (owner.id === 'devDD')      { S.settings.deviceId = v; send({ t: 'device', id: v }); renderDevices(); save(); }
+      else if (owner.id === 'devDD' || owner.id === 'devDD2') {
+        S.settings.deviceId = v;
+        send({ t: 'device', id: v });
+        renderDevices();
+        save();
+        toast('Now playing to ' + pi.textContent + '.');
+      }
       else if (owner.id === 'outletDD')   {
         S.settings.outletId = v || null;
         send({ t: 'outlet', id: v || null });
@@ -2386,6 +2570,9 @@
         if (msg.t === 'sessions') { sessions = msg.items || []; tickAutomations(); return; }
         if (msg.t === 'tray-power') { setPower(!!msg.on); return; }
         if (msg.t === 'running') {
+          liveIn = msg.inChannels || 2;
+          outletChannels = msg.outletChannels || 2;
+          renderDevices();
           toast('Soundstage is processing your sound — ' + msg.output + ' · ' + msg.format + '.');
           return;
         }

@@ -39,10 +39,15 @@ public:
     void prepare(double sampleRate) {
         fs_ = sampleRate;
         eq_.prepare(sampleRate);
+        eqCenter_.prepare(sampleRate);
+        eqBack_.prepare(sampleRate);
+        eqSide_.prepare(sampleRate);
         bass_.prepare(sampleRate);
         comp_.prepare(sampleRate);
         reverb_.prepare(sampleRate);
         upmix_.prepare(sampleRate, Upmix::Surround7_1);  // prepare the widest layout; 5.1 is its first 6 ch
+        subLp_.setLowpass(sampleRate, 120.0, 0.707);
+        subLp_.reset();
 
         // 20 ms enable ramps: inaudible, and long enough that nothing clicks. Effects start OFF, so
         // the chain is transparent out of the box (master on, every effect bypassed -> output = input).
@@ -53,6 +58,7 @@ public:
         // bug where the EQ section died the moment the audio path opened.
         const double enableRamp = 0.02;
         eqEnable_.reset(sampleRate, enableRamp);      eqEnable_.setCurrentAndTarget(eqOn_ ? 1.0 : 0.0);
+        eqEnableExtra_.reset(sampleRate, enableRamp); eqEnableExtra_.setCurrentAndTarget(eqOn_ ? 1.0 : 0.0);
         bassEnable_.reset(sampleRate, enableRamp);    bassEnable_.setCurrentAndTarget(bassOn_ ? 1.0 : 0.0);
         compEnable_.reset(sampleRate, enableRamp);    compEnable_.setCurrentAndTarget(compOn_ ? 1.0 : 0.0);
         widthEnable_.reset(sampleRate, enableRamp);   widthEnable_.setCurrentAndTarget(widthOn_ ? 1.0 : 0.0);
@@ -75,6 +81,9 @@ public:
     /// Clear all filter/delay state (e.g. on a device or sample-rate change). Does not change settings.
     void reset() {
         eq_.reset();
+        eqCenter_.reset();
+        eqBack_.reset();
+        eqSide_.reset();
         bass_.reset();
         comp_.reset();
         reverb_.reset();
@@ -86,12 +95,18 @@ public:
     void setOutputGainDb(double db) { masterGainLin_ = std::pow(10.0, db / 20.0); masterGain_.setTarget(masterGainLin_); }
 
     // ---- per-effect on/off (each ramps, pop-free) ----
-    void enableEq(bool on)         { eqOn_ = on;     eqEnable_.setTarget(on ? 1.0 : 0.0); }
+    void enableEq(bool on)         { eqOn_ = on;     eqEnable_.setTarget(on ? 1.0 : 0.0);
+                                                     eqEnableExtra_.setTarget(on ? 1.0 : 0.0); }
     void enableBass(bool on)       { bassOn_ = on;   bassEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableCompressor(bool on) { compOn_ = on;   compEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableWidth(bool on)      { widthOn_ = on;  widthEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableReverb(bool on)     { reverbOn_ = on; reverbEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableUpmix(bool on)      { upmixOn_ = on; }  // structural (changes channel count), not crossfaded
+
+    /// Feed the LFE from the stereo low end even with the upmix off, so a subwoofer still gets used
+    /// on ordinary 2.0 material. Independent of the surround fill on purpose — plenty of people want
+    /// their sub working without anything being invented for the rear speakers.
+    void enableSubFeed(bool on)    { subFeed_ = on; }
 
     void setUpmixAmount(double a)  { upmixAmountValue_ = a; upmixAmount_.setTarget(a); }
 
@@ -110,6 +125,24 @@ public:
 
     double channelTrimDb(int c) const {
         return (c < 0 || c >= kOutChannels) ? 0.0 : channelTrimDb_[c];
+    }
+
+    // ---- EQ, applied to every speaker ----
+    // The graphic EQ is a tone control for the whole system, so it has to hit the centre and the
+    // surrounds too, not just the front pair. Each group keeps its own filter state (you can't share
+    // biquad memory between channels) but they all take the same coefficients.
+    void setEqNumBands(int n) {
+        eq_.setNumBands(n);
+        eqCenter_.setNumBands(n);
+        eqBack_.setNumBands(n);
+        eqSide_.setNumBands(n);
+    }
+
+    void setEqBand(int i, Equalizer::BandType type, double freq, double gainDb, double q) {
+        eq_.setBand(i, type, freq, gainDb, q);
+        eqCenter_.setBand(i, type, freq, gainDb, q);
+        eqBack_.setBand(i, type, freq, gainDb, q);
+        eqSide_.setBand(i, type, freq, gainDb, q);
     }
 
     // ---- direct access to configure each effect (the host drives these) ----
@@ -145,6 +178,71 @@ public:
 
         upmix_.setAmount(upmixAmount_.next());  // keep the surround fill level smoothed too
         writeOut(l, r, out, outChannels);
+    }
+
+    /// Process a buffer that is ALREADY multichannel — a real 5.1/7.1 source, rather than stereo we
+    /// have to invent surrounds for.
+    ///
+    /// The front pair goes through the whole chain. The centre and surrounds get the EQ, the master
+    /// switch, the output gain and their speaker trim, but not the stereo-only effects: width and
+    /// reverb are built on an L/R relationship that doesn't exist for a centre channel, and running
+    /// them per-speaker would smear a mix someone already balanced. The LFE is deliberately left
+    /// alone apart from its trim — EQ'ing a channel that is already nothing but bass just doubles
+    /// whatever the graphic EQ is doing down there.
+    void processBlockMulti(const float* in, int inChannels, float* out, int outChannels, int numFrames) {
+        const int copyCh = inChannels < outChannels ? inChannels : outChannels;
+
+        for (int n = 0; n < numFrames; ++n) {
+            const float* src = in + (n * inChannels);
+            float* dst = out + (n * outChannels);
+
+            double l = src[0];
+            double r = inChannels >= 2 ? src[1] : l;
+            const double origL = l, origR = r;
+
+            { double pl = l, pr = r; eq_.process(pl, pr);     const double g = eqEnable_.next();     l = mix(l, pl, g); r = mix(r, pr, g); }
+            { double pl = l, pr = r; bass_.process(pl, pr);   const double g = bassEnable_.next();   l = mix(l, pl, g); r = mix(r, pr, g); }
+            { double pl = l, pr = r; comp_.process(pl, pr);   const double g = compEnable_.next();   l = mix(l, pl, g); r = mix(r, pr, g); }
+            { double pl = l, pr = r; width_.process(pl, pr);  const double g = widthEnable_.next();  l = mix(l, pl, g); r = mix(r, pr, g); }
+            { double pl = l, pr = r; reverb_.process(pl, pr); const double g = reverbEnable_.next(); l = mix(l, pl, g); r = mix(r, pr, g); }
+
+            const double me = masterEnable_.next();
+            l = mix(origL, l, me);
+            r = mix(origR, r, me);
+            const double mg = masterGain_.next();
+
+            // The remaining channels: EQ (except the LFE), then the same master fade and gain.
+            double c = inChannels > 2 ? src[2] : 0.0;
+            double lfe = inChannels > 3 ? src[3] : 0.0;
+            double bl = inChannels > 4 ? src[4] : 0.0;
+            double br = inChannels > 5 ? src[5] : 0.0;
+            double sl = inChannels > 6 ? src[6] : 0.0;
+            double sr = inChannels > 7 ? src[7] : 0.0;
+
+            const double origC = c, origBL = bl, origBR = br, origSL = sl, origSR = sr;
+            {
+                double dummy = 0.0;
+                eqCenter_.process(c, dummy);
+                eqBack_.process(bl, br);
+                eqSide_.process(sl, sr);
+            }
+            const double eg = eqEnableExtra_.next();
+            c  = mix(origC,  c,  eg);
+            bl = mix(origBL, bl, eg);
+            br = mix(origBR, br, eg);
+            sl = mix(origSL, sl, eg);
+            sr = mix(origSR, sr, eg);
+
+            double frame[kOutChannels] = { l, r, c, lfe, bl, br, sl, sr };
+            for (int i = 0; i < kOutChannels; ++i) {
+                const double t = channelTrim_[i].next();
+                frame[i] = clampSafe(frame[i] * mg * t);
+            }
+
+            for (int i = 0; i < outChannels; ++i) {
+                dst[i] = (i < copyCh || i < kOutChannels) ? static_cast<float>(frame[i]) : 0.0f;
+            }
+        }
     }
 
     /// Process an interleaved buffer — what the driver calls. `in` is `inChannels` interleaved
@@ -187,13 +285,18 @@ private:
         }
         if (upmixOn_) {
             double up[kOutChannels] = {0.0};
-            upmix_.process(l, r, up);  // fills the 7.1 order: FL FR C LFE SL SR SBL SBR
+            upmix_.process(l, r, up);  // fills the 7.1 order: FL FR C LFE BL BR SL SR
             for (int i = 0; i < outChannels && i < kOutChannels; ++i) out[i] = clampSafe(up[i] * trim[i]);
         } else {
-            // No upmix on a surround device: front L/R carry the signal, the rest stay silent.
+            // No upmix on a surround device: front L/R carry the signal, the rest stay silent —
+            // except the sub, which can still be fed if the user wants their subwoofer used on
+            // ordinary stereo (bass management, independent of the surround fill).
             for (int i = 0; i < outChannels; ++i) out[i] = 0.0;
             out[0] = clampSafe(l * trim[0]);
             out[1] = clampSafe(r * trim[1]);
+            if (subFeed_ && outChannels > 3) {
+                out[3] = clampSafe(subLp_.process(0.5 * (l + r)) * trim[3]);
+            }
         }
     }
 
@@ -202,6 +305,8 @@ private:
     double fs_ = 48000.0;
 
     Equalizer    eq_;
+    // Same coefficients, separate filter state, for the channels a real multichannel source carries.
+    Equalizer    eqCenter_, eqBack_, eqSide_;
     BassEnhancer bass_;
     Compressor   comp_;
     StereoWidth  width_;
@@ -209,11 +314,14 @@ private:
     Upmix        upmix_;
 
     SmoothedValue eqEnable_, bassEnable_, compEnable_, widthEnable_, reverbEnable_;
+    SmoothedValue eqEnableExtra_;   // the same EQ enable, advanced once per frame on the extra channels
     SmoothedValue masterEnable_, masterGain_, upmixAmount_;
     bool upmixOn_ = false;
 
     // The authoritative settings — what the host asked for, independent of where a ramp happens to
     // be. prepare() re-seeds every smoothed value from these.
+    Biquad subLp_;              // bass-management low-pass for the sub feed
+    bool   subFeed_ = false;
     bool   eqOn_ = false, bassOn_ = false, compOn_ = false, widthOn_ = false, reverbOn_ = false;
     bool   masterOn_ = true;
     double masterGainLin_ = 1.0;

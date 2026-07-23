@@ -55,6 +55,13 @@ public sealed class SoundstageEngine : IDisposable
     public void Process(float[] input, int inChannels, float[] output, int outChannels, int frames)
         => ssg_process(_handle, input, inChannels, output, outChannels, frames);
 
+    /// <summary>
+    /// Process a source that is already multichannel, keeping its channels intact instead of folding
+    /// them to stereo. Order is the Windows one: FL FR FC LFE BL BR SL SR.
+    /// </summary>
+    public void ProcessMulti(float[] input, int inChannels, float[] output, int outChannels, int frames)
+        => ssg_process_mc(_handle, input, inChannels, output, outChannels, frames);
+
     // ---- master ----
     public void SetEnabled(bool on) => ssg_set_enabled(_handle, on ? 1 : 0);
     public void SetOutputGainDb(double db) => ssg_set_output_gain_db(_handle, db);
@@ -92,6 +99,9 @@ public sealed class SoundstageEngine : IDisposable
     /// <summary>The rest of the Ambience page: input diffusion (0..1) and the reverb's band limits.</summary>
     public void SetReverbTone(double diffusion, double lowCutHz, double highCutHz)
         => ssg_reverb_set_tone(_handle, diffusion, lowCutHz, highCutHz);
+
+    /// <summary>Feed the subwoofer from the stereo low end even with the upmix off.</summary>
+    public void EnableSubFeed(bool on) => ssg_enable_sub_feed(_handle, on ? 1 : 0);
 
     /// <summary>Early reflections (0..1) and modulation (0..1) — the reverb's character controls.</summary>
     public void SetReverbCharacter(double early, double modulation)
@@ -138,6 +148,10 @@ public sealed class SoundstageEngine : IDisposable
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_process(IntPtr e, float[] input, int inChannels,
                                            float[] output, int outChannels, int frames);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_process_mc(IntPtr e, float[] input, int inChannels,
+                                              float[] output, int outChannels, int frames);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_set_enabled(IntPtr e, int on);
@@ -190,6 +204,9 @@ public sealed class SoundstageEngine : IDisposable
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_reverb_set_tone(IntPtr e, double diffusion,
                                                    double lowCutHz, double highCutHz);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_enable_sub_feed(IntPtr e, int on);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_reverb_set_character(IntPtr e, double early, double modulation);

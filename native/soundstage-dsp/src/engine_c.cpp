@@ -31,6 +31,12 @@ void ssg_process(ssg_engine* e, const float* in, int in_ch, float* out, int out_
     }
 }
 
+void ssg_process_mc(ssg_engine* e, const float* in, int in_ch, float* out, int out_ch, int frames) {
+    if (e && in && out && frames > 0 && in_ch > 0 && out_ch > 0) {
+        e->chain.processBlockMulti(in, in_ch, out, out_ch, frames);
+    }
+}
+
 void ssg_set_enabled(ssg_engine* e, int on) { if (e) e->chain.setEnabled(on != 0); }
 void ssg_set_output_gain_db(ssg_engine* e, double db) { if (e) e->chain.setOutputGainDb(db); }
 
@@ -41,12 +47,14 @@ void ssg_enable_width(ssg_engine* e, int on)      { if (e) e->chain.enableWidth(
 void ssg_enable_reverb(ssg_engine* e, int on)     { if (e) e->chain.enableReverb(on != 0); }
 void ssg_enable_upmix(ssg_engine* e, int on)      { if (e) e->chain.enableUpmix(on != 0); }
 
-void ssg_eq_set_num_bands(ssg_engine* e, int n) { if (e) e->chain.eq().setNumBands(n); }
+/* These fan out to every channel group's EQ — the graphic EQ is a system tone control, so it has to
+ * reach the centre and surrounds, not only the front pair. */
+void ssg_eq_set_num_bands(ssg_engine* e, int n) { if (e) e->chain.setEqNumBands(n); }
 
 void ssg_eq_set_band(ssg_engine* e, int index, int type, double freq, double gain_db, double q) {
     if (!e) return;
     if (type < 0 || type > 4) type = 0;
-    e->chain.eq().setBand(index, static_cast<Equalizer::BandType>(type), freq, gain_db, q);
+    e->chain.setEqBand(index, static_cast<Equalizer::BandType>(type), freq, gain_db, q);
 }
 
 void ssg_bass_set(ssg_engine* e, double amount, double crossover_hz, double drive) {
@@ -89,6 +97,8 @@ void ssg_reverb_set_tone(ssg_engine* e, double diffusion, double low_cut_hz, dou
     r.setLowCutHz(low_cut_hz);
     r.setHighCutHz(high_cut_hz);
 }
+
+void ssg_enable_sub_feed(ssg_engine* e, int on) { if (e) e->chain.enableSubFeed(on != 0); }
 
 void ssg_reverb_set_character(ssg_engine* e, double early, double modulation) {
     if (!e) return;

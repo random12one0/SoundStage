@@ -210,6 +210,7 @@ public sealed class EngineController : IDisposable
                 case "upmix":
                     _engine.EnableUpmix(Bool(root, "on"));
                     _engine.SetUpmix(Num(root, "amount", 0.7), Num(root, "center", 1.0), Num(root, "lfe", 1.0));
+                    _engine.EnableSubFeed(Bool(root, "subfeed"));
                     break;
                 case "trim":
                     _engine.SetChannelTrimDb((int)Num(root, "ch", -1), Num(root, "db", 0.0));
@@ -464,6 +465,8 @@ public sealed class EngineController : IDisposable
                     output = speakers.FriendlyName,
                     format = _host.FormatDescription,
                     channels = _host.OutputChannels,
+                    inChannels = _host.InputChannels,
+                    outletChannels = OutletChannelCount(cable),
                 }));
             }
         }
@@ -477,6 +480,17 @@ public sealed class EngineController : IDisposable
                 detail = _host?.LastError ?? ex.Message,
             }));
         }
+    }
+
+    /// <summary>
+    /// How many channels the outlet is configured for. This is the ceiling on everything: if the
+    /// virtual cable is set to stereo, Windows downmixes a 5.1 film before Soundstage ever sees it,
+    /// and no amount of processing on our side can put the centre channel back.
+    /// </summary>
+    private static int OutletChannelCount(MMDevice device)
+    {
+        try { return device.AudioClient.MixFormat.Channels; }
+        catch { return 2; }
     }
 
     /// <summary>Tell the UI which apps are making sound, so "when Netflix is playing" can fire.</summary>

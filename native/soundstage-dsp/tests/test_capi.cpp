@@ -194,6 +194,64 @@ int main() {
         ssg_destroy(t);
     }
 
+    // A real 5.1 source must survive as 5.1 — every channel distinct, nothing folded into the
+    // fronts, and the centre/surrounds must not be silently dropped.
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+
+        // Six channels, each carrying a different level so we can tell them apart on the way out.
+        const float level[6] = {0.50f, 0.45f, 0.40f, 0.35f, 0.30f, 0.25f};
+        std::vector<float> in6(frames * 6), out6(frames * 6, 0.0f);
+        for (int n = 0; n < frames; ++n) {
+            const float s = std::sin(2.0f * 3.14159265f * 220.0f * n / 48000.0f);
+            for (int c = 0; c < 6; ++c) in6[n * 6 + c] = s * level[c];
+        }
+
+        ssg_process_mc(t, in6.data(), 6, out6.data(), 6, frames);
+
+        double peak[6] = {0.0};
+        bool finite = true;
+        for (int n = 0; n < frames; ++n) {
+            for (int c = 0; c < 6; ++c) {
+                const double v = out6[n * 6 + c];
+                if (!std::isfinite(v)) finite = false;
+                peak[c] = std::fmax(peak[c], std::fabs(v));
+            }
+        }
+
+        check(finite, "multichannel output is finite");
+        bool allPresent = true, ordered = true;
+        for (int c = 0; c < 6; ++c) {
+            if (peak[c] < 0.05) allPresent = false;
+            if (c > 0 && peak[c] > peak[c - 1] + 0.02) ordered = false;
+        }
+        check(allPresent, "every channel of a 5.1 source reaches the output");
+        check(ordered, "channels keep their relative levels (nothing is folded together)");
+
+        // Default state is transparent, so a 5.1 source should come out essentially untouched.
+        double worst = 0.0;
+        for (int n = 0; n < frames; ++n) {
+            for (int c = 0; c < 6; ++c) {
+                worst = std::fmax(worst, std::fabs((double)out6[n * 6 + c] - (double)in6[n * 6 + c]));
+            }
+        }
+        check(worst < 1e-4, "a 5.1 source passes through untouched with every effect off");
+
+        // A speaker trim must move only its own channel.
+        ssg_set_channel_trim_db(t, 2, -20.0);
+        for (int b = 0; b < 8; ++b) ssg_process_mc(t, in6.data(), 6, out6.data(), 6, frames);
+        double trimmedC = 0.0, untouchedBL = 0.0;
+        for (int n = 0; n < frames; ++n) {
+            trimmedC = std::fmax(trimmedC, std::fabs((double)out6[n * 6 + 2]));
+            untouchedBL = std::fmax(untouchedBL, std::fabs((double)out6[n * 6 + 4]));
+        }
+        check(trimmedC < peak[2] * 0.25, "trimming the centre attenuates the centre");
+        check(std::fabs(untouchedBL - peak[4]) < 1e-3, "trimming the centre leaves the surrounds alone");
+
+        ssg_destroy(t);
+    }
+
     // prepare() must not throw away settings. It runs when the audio path opens and on every device
     // or sample-rate change, so if it reset the enables it would silently switch off whatever the
     // user had turned on — the EQ section used to die the instant audio started.

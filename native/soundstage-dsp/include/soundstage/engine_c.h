@@ -52,6 +52,13 @@ SSG_API void        ssg_reset(ssg_engine* e);   /* clear filter/delay state; kee
 SSG_API void        ssg_process(ssg_engine* e, const float* in, int in_ch,
                                 float* out, int out_ch, int frames);
 
+/* For a source that is ALREADY multichannel (a real 5.1/7.1 stream rather than stereo we would have
+ * to invent surrounds for). Channel order is the Windows one: FL FR FC LFE BL BR SL SR. The front
+ * pair gets the whole chain; the centre and surrounds get EQ, master and their trim; the LFE gets
+ * its trim only. */
+SSG_API void        ssg_process_mc(ssg_engine* e, const float* in, int in_ch,
+                                   float* out, int out_ch, int frames);
+
 /* ---- master ---- */
 SSG_API void        ssg_set_enabled(ssg_engine* e, int on);        /* clean bypass when off */
 SSG_API void        ssg_set_output_gain_db(ssg_engine* e, double db);
@@ -82,6 +89,8 @@ SSG_API void        ssg_reverb_set_tone(ssg_engine* e, double diffusion,
  * delay lines, which stops a sustained note ringing metallically). */
 SSG_API void        ssg_reverb_set_character(ssg_engine* e, double early, double modulation);
 SSG_API void        ssg_upmix_set(ssg_engine* e, double amount, double center_gain, double lfe_gain);
+/* Feed the subwoofer from the stereo low end even with the upmix off (bass management). */
+SSG_API void        ssg_enable_sub_feed(ssg_engine* e, int on);
 
 /* Per-speaker output trim in dB — the calibration faders. `ch` is 0..7 in 7.1 order:
  * FL FR C LFE SL SR SBL SBR. Applied after the upmix, so it trims the real speaker. */

@@ -45,6 +45,12 @@ public sealed class EngineAudioHost : IDisposable
     /// <summary>Channels currently being rendered, for the UI.</summary>
     public int OutputChannels => _outChannels;
 
+    /// <summary>Channels actually arriving from the outlet — 2 means the source reached us as
+    /// stereo, whatever it started as.</summary>
+    public int InputChannels => _inChannels;
+
+    private int _inChannels = 2;
+
     /// <summary>
     /// Take the output device exclusively. This is how we drive all of a receiver's speakers even
     /// when Windows' "Configure Speakers" has reverted to stereo — but nothing else can play through
@@ -298,21 +304,48 @@ public sealed class EngineAudioHost : IDisposable
 
         EnsureScratch(frames);
 
-        // De-interleave the captured frame to stereo (first two channels; mono is duplicated).
         ReadOnlySpan<float> src = MemoryMarshal.Cast<byte, float>(e.Buffer.AsSpan(0, frames * channels * 4));
+        int outCh = _outChannels;
+
+        // If the outlet is genuinely carrying more than two channels, the source is a real 5.1/7.1
+        // stream and folding it to stereo would throw away the centre and surrounds that the whole
+        // point of this app is to deliver. Keep them.
+        bool multi = channels > 2;
+        int inCh = multi ? Math.Min(channels, 8) : 2;
+
         float inPeak = 0f;
         for (int n = 0; n < frames; n++)
         {
-            float l = src[n * channels];
-            float r = channels >= 2 ? src[n * channels + 1] : l;
-            _inScratch[n * 2] = l;
-            _inScratch[n * 2 + 1] = r;
-            float m = Math.Max(Math.Abs(l), Math.Abs(r));
-            if (m > inPeak) { inPeak = m; }
+            if (multi)
+            {
+                for (int c = 0; c < inCh; c++)
+                {
+                    float v = src[(n * channels) + c];
+                    _inScratch[(n * inCh) + c] = v;
+                    float a = Math.Abs(v);
+                    if (a > inPeak) { inPeak = a; }
+                }
+            }
+            else
+            {
+                float l = src[n * channels];
+                float r = channels >= 2 ? src[(n * channels) + 1] : l;
+                _inScratch[n * 2] = l;
+                _inScratch[(n * 2) + 1] = r;
+                float m = Math.Max(Math.Abs(l), Math.Abs(r));
+                if (m > inPeak) { inPeak = m; }
+            }
         }
 
-        int outCh = _outChannels;
-        _engine.Process(_inScratch, 2, _outScratch, outCh, frames);
+        _inChannels = inCh;
+        if (multi)
+        {
+            _engine.ProcessMulti(_inScratch, inCh, _outScratch, outCh, frames);
+        }
+        else
+        {
+            _engine.Process(_inScratch, 2, _outScratch, outCh, frames);
+        }
 
         int outSamples = frames * outCh;
         float outPeak = 0f;
@@ -394,10 +427,10 @@ public sealed class EngineAudioHost : IDisposable
 
     private void EnsureScratch(int frames)
     {
-        int stereo = frames * 2;
-        if (_inScratch.Length < stereo)
+        int inSamples = frames * 8;   // widest input layout we accept
+        if (_inScratch.Length < inSamples)
         {
-            _inScratch = new float[stereo];
+            _inScratch = new float[inSamples];
         }
 
         int outSamples = frames * _outChannels;

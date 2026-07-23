@@ -77,9 +77,12 @@ public sealed class SpeakerTest : IDisposable
 
         try
         {
-            _channels = device.AudioClient.MixFormat.Channels;
-            int rate = device.AudioClient.MixFormat.SampleRate;
-            _source = new BurstSource(rate, _channels);
+            // Use the endpoint's own mix format. Building our own multichannel format gets rejected
+            // outright by some drivers — which is exactly why testing a centre or surround speaker
+            // used to claim the device didn't have it.
+            WaveFormat mix = device.AudioClient.MixFormat;
+            _channels = mix.Channels;
+            _source = new BurstSource(mix);
             _out = new WasapiOut(device, AudioClientShareMode.Shared, useEventSync: true, latency: 60);
             _out.Init(_source);
             _out.Play();
@@ -138,8 +141,14 @@ public sealed class SpeakerTest : IDisposable
     /// cosine fade at both ends so it never clicks. The audio thread reads these fields while the UI
     /// thread writes them; a burst that starts a buffer late is imperceptible, so no lock is taken on
     /// the audio path.
+    ///
+    /// This is an <see cref="IWaveProvider"/> rather than an ISampleProvider on purpose: a device's
+    /// mix format is WAVE_FORMAT_EXTENSIBLE, and NAudio's sample-provider path rejects that with
+    /// "Must be already floating point" even though the samples underneath are float. Writing bytes
+    /// ourselves sidesteps the check — which is what stopped the centre and surround test tones from
+    /// ever playing on a 5.1 endpoint.
     /// </summary>
-    private sealed class BurstSource : ISampleProvider
+    private sealed class BurstSource : IWaveProvider
     {
         private readonly int _channels;
         private readonly int _burstFrames;
@@ -152,12 +161,12 @@ public sealed class SpeakerTest : IDisposable
         private long _endFrame;
         private float _lp;
 
-        public BurstSource(int rate, int channels)
+        public BurstSource(WaveFormat format)
         {
-            WaveFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, channels);
-            _channels = channels;
-            _burstFrames = (int)(rate * 0.6);
-            _fadeFrames = rate / 50;   // 20 ms in and out
+            WaveFormat = format;
+            _channels = format.Channels;
+            _burstFrames = (int)(format.SampleRate * 0.6);
+            _fadeFrames = format.SampleRate / 50;   // 20 ms in and out
         }
 
         public WaveFormat WaveFormat { get; }
@@ -171,11 +180,13 @@ public sealed class SpeakerTest : IDisposable
             Interlocked.Exchange(ref _endFrame, Interlocked.Read(ref _frame) + _burstFrames);
         }
 
-        public int Read(float[] buffer, int offset, int count)
+        public int Read(byte[] buffer, int offset, int count)
         {
-            int frames = count / _channels;
-            Array.Clear(buffer, offset, count);
+            Span<float> samples = System.Runtime.InteropServices.MemoryMarshal
+                .Cast<byte, float>(buffer.AsSpan(offset, count));
+            samples.Clear();
 
+            int frames = samples.Length / _channels;
             int ch = _channel;
             float gain = _gain;
             long end = Interlocked.Read(ref _endFrame);
@@ -198,7 +209,7 @@ public sealed class SpeakerTest : IDisposable
                 else if (into > _burstFrames - _fadeFrames) { env = (_burstFrames - into) / (float)_fadeFrames; }
 
                 env = 0.5f * (1f - MathF.Cos(MathF.PI * Math.Clamp(env, 0f, 1f)));   // raised cosine
-                buffer[offset + (n * _channels) + ch] = _lp * gain * env;
+                samples[(n * _channels) + ch] = _lp * gain * env;
             }
 
             return count;
