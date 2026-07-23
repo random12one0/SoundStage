@@ -732,7 +732,8 @@
 
             <div class="setgroup">Plugin mode</div>
             <div class="setrow"><div class="st"><div class="stn">Run inside Windows' audio engine<span id="apoHelp"></span></div><div class="std" id="apoNote">Checking…</div></div><button class="btn" id="apoInstall">Turn on</button></div>
-            <div class="setrow" id="apoDetail" style="display:none"><div class="st"><div class="stn">Last thing the plugin did</div><div class="std mono" id="apoActivity">—</div></div><button class="ghost" id="apoUninstall" style="border-color:#6b3a3f;color:#ff98ac">Turn off</button></div>
+            <div class="setrow" id="apoDetail" style="display:none"><div class="st"><div class="stn">Last thing the plugin did</div><div class="std mono" id="apoActivity">—</div></div></div>
+            <div class="setrow" id="apoRemoveRow" style="display:none"><div class="st"><div class="stn">Remove the plugin</div><div class="std" id="apoRemoveNote">Takes Soundstage back out of Windows and restores what your sound card had before. Needs Administrator, and your audio will cut out for a moment. To stop processing without removing anything, use the power button on the main page instead.</div></div><button class="ghost" id="apoUninstall" style="border-color:#6b3a3f;color:#ff98ac">Remove</button></div>
 
             <div class="setgroup">Audio</div>
             <!-- Shown only in plugin mode, where the routing rows below are hidden because there is
@@ -2261,6 +2262,7 @@
      What replaces them is one sentence saying where sound actually goes, which is wherever Windows
      is already sending it. That is the whole mental model, and it's simpler than the old one. */
   var pluginMode = false;
+  var apoDisarmTimer = null;
 
   function applyPluginMode() {
     document.body.classList.toggle('pluginmode', pluginMode);
@@ -2281,25 +2283,29 @@
     if (!note || !btn) { return; }
 
     var devs = m.devices || [];
+    var removeRow = document.getElementById('apoRemoveRow');
     apoActive = !!m.active;
 
     if (m.active) {
       /* textContent, not innerHTML — these strings come from the registry and there is no reason to
          hand device names to the HTML parser. */
-      note.textContent = 'On — processing ' + devs.join(', ') +
+      note.textContent = 'Installed — processing ' + devs.join(', ') +
                          ' from inside Windows. No virtual cable needed.';
       btn.textContent = 'Add another device';
       if (detail) { detail.style.display = ''; }
+      if (removeRow) { removeRow.style.display = ''; }
       if (act) { act.textContent = m.lastActivity || 'Nothing yet — play something to wake it.'; }
     } else if (m.registered) {
       note.textContent = 'Installed, but not attached to any speakers yet.';
       btn.textContent = 'Choose a device';
       if (detail) { detail.style.display = 'none'; }
+      if (removeRow) { removeRow.style.display = ''; }
     } else {
-      note.textContent = 'Off — Soundstage is using the virtual-cable route instead. ' +
-                         'Turning this on needs Administrator once.';
-      btn.textContent = 'Turn on';
+      note.textContent = 'Not installed — Soundstage is using the virtual-cable route instead. ' +
+                         'Installing needs Administrator once.';
+      btn.textContent = 'Install';
       if (detail) { detail.style.display = 'none'; }
+      if (removeRow) { removeRow.style.display = 'none'; }
     }
   }
   var apoActive = false;
@@ -3209,6 +3215,25 @@
     }
 
     if (e.target.closest('#apoUninstall')) {
+      /* Two presses, because this one is not a toggle. It unregisters the plugin, restores what
+         your sound card had before and restarts the audio service — recoverable, but not something
+         anyone should be able to trigger by misreading a label. The first press says what will
+         happen; the second does it. */
+      var rm = document.getElementById('apoUninstall');
+      if (!rm.dataset.armed) {
+        rm.dataset.armed = '1';
+        rm.textContent = 'Really remove?';
+        clearTimeout(apoDisarmTimer);
+        apoDisarmTimer = setTimeout(function () {
+          delete rm.dataset.armed;
+          rm.textContent = 'Remove';
+        }, 5000);
+        return;
+      }
+
+      clearTimeout(apoDisarmTimer);
+      delete rm.dataset.armed;
+      rm.textContent = 'Remove';
       send({ t: 'apouninstall' });
       var n2 = document.getElementById('apoNote');
       if (n2) { n2.textContent = 'Removing — approve the Administrator prompt…'; }
