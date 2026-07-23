@@ -136,24 +136,25 @@
   .strip{flex:1;display:flex;flex-direction:column;align-items:center;gap:10px;background:var(--surf2);border:1px solid var(--line);border-radius:12px;padding:13px 6px;transition:.16s;}
   .strip .cl{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.06em;color:var(--ink);}
   .strip .cn{font-size:9px;letter-spacing:.04em;color:var(--faint);text-transform:uppercase;margin-top:-6px;}
-  .fader{position:relative;height:150px;width:100%;}
-  .ftrack{position:absolute;left:50%;top:0;bottom:0;width:5px;transform:translateX(-50%);background:#0e1822;border-radius:4px;}
-  /* Live level for this speaker, sitting alongside the trim it belongs to. Set the trim and watch
-     the speaker respond in the same place, instead of looking somewhere else to see if it worked.
-     Its own track is always drawn, so a silent speaker reads as "silent" and not as "missing". */
+  /* The fader box is now the level meter itself: a live "liquid" fills it, and the trim track and
+     handle sit on top. A faint rounded well is drawn under it so a silent speaker still reads as a
+     box, not a gap. */
+  .fader{position:relative;height:150px;width:100%;border-radius:9px;background:#0a121b;
+         box-shadow:inset 0 0 0 1px #14212e;overflow:hidden;}
+  .ftrack{position:absolute;left:50%;top:0;bottom:0;width:5px;transform:translateX(-50%);background:#0e1822;border-radius:4px;z-index:2;opacity:.75;}
+
   /* Plugin mode: the routing controls describe a path that no longer exists. */
   body.pluginmode #devRow, body.pluginmode #outletRow, body.pluginmode #devRow2,
   body.pluginmode #exclusiveRow, body.pluginmode #latencyRow, body.pluginmode #delayRow { display:none; }
 
-  .fmeter{position:absolute;left:50%;top:0;bottom:0;width:3px;transform:translateX(-11px);background:#0e1822;border-radius:3px;overflow:hidden;}
-  .fmeter i{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#37e0cf,#1a9d92);
-            border-radius:3px;transition:height .07s linear;}
-  /* Loud enough to be near clipping — worth seeing before you hear it. */
-  .fmeter i.hot{background:linear-gradient(#ff8ba3,#e0485f);}
-  .strip.sub .fmeter i{background:linear-gradient(#ffbf6b,#b5822f);}
-  .fzero{position:absolute;left:calc(50% - 13px);width:26px;top:50%;height:1px;background:#31485a;}
-  .ffill{position:absolute;left:50%;width:5px;transform:translateX(-50%);background:linear-gradient(#37e0cf,#1a9d92);border-radius:4px;box-shadow:0 0 8px #37e0cf44;}
-  .fhandle{position:absolute;left:50%;width:16px;height:16px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);box-shadow:0 0 10px #37e0cf88;cursor:grab;transition:transform .15s,box-shadow .15s;}
+  /* The live level, drawn each frame by JS. It fills the whole box; a soft radial mask feathers the
+     edges so it reads as light welling up rather than a hard-edged rectangle. */
+  .fliquid{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;
+    -webkit-mask-image:radial-gradient(132% 118% at 50% 52%,#000 80%,transparent 100%);
+            mask-image:radial-gradient(132% 118% at 50% 52%,#000 80%,transparent 100%);}
+  .fzero{position:absolute;left:calc(50% - 13px);width:26px;top:50%;height:1px;background:#31485a;z-index:2;}
+  .ffill{position:absolute;left:50%;width:5px;transform:translateX(-50%);background:linear-gradient(#37e0cf,#1a9d92);border-radius:4px;box-shadow:0 0 8px #37e0cf44;z-index:3;}
+  .fhandle{position:absolute;left:50%;width:16px;height:16px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);box-shadow:0 0 10px #37e0cf88;cursor:grab;transition:transform .15s,box-shadow .15s;z-index:4;}
   .fhandle:hover{transform:translate(-50%,-50%) scale(1.2);}
   .strip .db{font-family:ui-monospace,monospace;font-size:11px;color:var(--glow-ink);}
   .strip .test{width:30px;height:30px;border-radius:9px;background:#0e1620;border:1px solid var(--line);display:grid;place-items:center;color:var(--dim);cursor:pointer;transition:.15s;}
@@ -1577,13 +1578,14 @@
       strip.dataset.ch = i;
       strip.innerHTML =
         '<div class="cl">' + ch.key + '</div><div class="cn">' + ch.name + '</div>' +
-        '<div class="fader"><div class="ftrack"></div><div class="fzero"></div>' +
-        '<div class="fmeter"><i></i></div>' +
+        '<div class="fader"><canvas class="fliquid"></canvas>' +
+        '<div class="ftrack"></div><div class="fzero"></div>' +
         '<div class="ffill"></div><div class="fhandle"></div></div>' +
         '<div class="db">0.0</div>' +
         '<button class="size" data-size="' + i + '">Small</button>' +
         '<button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button>';
       host.appendChild(strip);
+      sizeLiquid(strip.querySelector('.fliquid'));
 
       var fader = strip.querySelector('.fader'), handle = strip.querySelector('.fhandle');
       function setFromY(clientY, fine) {
@@ -1614,6 +1616,7 @@
       strip.querySelector('.test').addEventListener('click', function () { playOne(strip, i); });
     });
     renderSpeakers();
+    startLiquid();
   }
 
   function renderSpeakers() {
@@ -2468,27 +2471,114 @@
   }
 
   var lastLevel = 0;
-  /* Each speaker's live level, drawn into its own fader. Pass null to clear them all.
 
-     The scale is dB, not the raw peak: a linear meter sits near the floor for everything you
-     actually listen to, so it reads as broken. −54 dBFS to 0 spread over the full height matches
-     what the main meter does and what a mixing desk would show. */
+  /* ---- the liquid meter ---------------------------------------------------------------------
+     Each speaker's fader IS its meter: a live liquid wells up to the current level, its surface
+     gently rippling, shifting teal -> amber -> red as it nears clipping. Drawn on a per-fader
+     canvas so the motion is smooth and cheap. Falls back to a still fill when the viewer prefers
+     reduced motion. */
+  var LIQUID_REDUCE = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var LIQUID_DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  var liquidRAF = null;
+
+  function sizeLiquid(cv) {
+    if (!cv) { return; }
+    var w = cv.clientWidth || 44, h = cv.clientHeight || 150;
+    cv.width = Math.round(w * LIQUID_DPR);
+    cv.height = Math.round(h * LIQUID_DPR);
+  }
+
+  /* One fill, coloured by level and — the point of the whole exercise — with a soft rippling top
+     rather than a hard edge. `flat` freezes the surface for reduced-motion. */
+  function drawLiquid(cv, lvl, time, isSub, flat) {
+    var ctx = cv.getContext('2d');
+    var w = cv.width, h = cv.height;
+    ctx.clearRect(0, 0, w, h);
+    if (lvl < 0.004) { return; }
+
+    var surface = h * (1 - lvl);
+    var amp = flat ? 0 : (2.2 + lvl * 6) * LIQUID_DPR;
+
+    var bot, top;
+    if (lvl > 0.9)        { bot = '#e0485f'; top = '#ff8ba3'; }   /* clipping — red */
+    else if (lvl > 0.78)  { bot = '#c98a2f'; top = '#ffbf6b'; }   /* hot — amber */
+    else if (isSub)       { bot = '#b5822f'; top = '#ffd08a'; }   /* the sub is always amber */
+    else                  { bot = '#1a9d92'; top = '#37e0cf'; }   /* normal — teal */
+
+    var g = ctx.createLinearGradient(0, h, 0, surface);
+    g.addColorStop(0, bot);
+    g.addColorStop(1, top);
+
+    ctx.beginPath();
+    ctx.moveTo(0, h);
+    ctx.lineTo(0, surface);
+    for (var x = 0; x <= w; x += 3 * LIQUID_DPR) {
+      var y = surface
+            + Math.sin(x * 0.05 / LIQUID_DPR + time * 3.0) * amp * 0.5
+            + Math.sin(x * 0.021 / LIQUID_DPR - time * 2.0) * amp * 0.5;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(w, h);
+    ctx.closePath();
+    ctx.fillStyle = g;
+    ctx.globalAlpha = 0.82;
+    ctx.fill();
+
+    /* a brighter crest line rides the surface — reads as the "top" of the level */
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = top;
+    ctx.lineWidth = 1.4 * LIQUID_DPR;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawStrip(s, time, flat) {
+    var cv = s.querySelector('.fliquid');
+    if (!cv) { return; }
+    /* Re-fit the backing store if the fader was laid out (or resized) since we last drew — the
+       Speakers page can be hidden at build time, so its faders have no size until first shown. */
+    var cw = Math.round((cv.clientWidth || 44) * LIQUID_DPR);
+    var chh = Math.round((cv.clientHeight || 150) * LIQUID_DPR);
+    if (cw && chh && (cv.width !== cw || cv.height !== chh)) { cv.width = cw; cv.height = chh; }
+
+    var tgt = s._lvlTarget || 0;
+    var cur = s._lvl || 0;
+    cur += (tgt - cur) * (tgt > cur ? 0.5 : 0.16);   /* fast attack, gentle release — like a meter */
+    if (cur < 0.0005) { cur = 0; }
+    s._lvl = cur;
+    drawLiquid(cv, cur, time, s.classList.contains('sub'), flat);
+  }
+
+  function startLiquid() {
+    if (LIQUID_REDUCE || liquidRAF) { return; }
+    var t0 = performance.now();
+    (function loop(now) {
+      var time = (now - t0) / 1000;
+      var strips = document.querySelectorAll('#calib .strip');
+      for (var i = 0; i < strips.length; i++) { drawStrip(strips[i], time, false); }
+      liquidRAF = requestAnimationFrame(loop);
+    })(performance.now());
+  }
+
+  /* Each speaker's live level, stored as the target the liquid eases toward. Pass null to clear.
+     The scale is dB, not raw peak: a linear meter sits near the floor for everything you actually
+     listen to. −54 dBFS to 0 over the full height matches the main meter and a mixing desk. */
   function paintChannelMeters(levels) {
     var strips = document.querySelectorAll('#calib .strip');
     for (var i = 0; i < strips.length; i++) {
-      var fill = strips[i].querySelector('.fmeter i');
-      if (!fill) { continue; }
-
-
       var v = (levels && levels.length > i) ? +levels[i] || 0 : 0;
       var pct = 0;
       if (v > 0.0002) {
         var d = 20 * Math.log(v) / Math.LN10;
-        pct = clamp((d + 54) / 54, 0, 1) * 100;
+        pct = clamp((d + 54) / 54, 0, 1);
       }
 
-      fill.style.height = pct + '%';
-      fill.classList.toggle('hot', v > 0.89);
+      strips[i]._lvlTarget = pct;
+    }
+
+    /* With no animation loop running, the level still needs to move — draw a still fill each update. */
+    if (LIQUID_REDUCE) {
+      for (var j = 0; j < strips.length; j++) { drawStrip(strips[j], 0, true); }
     }
   }
 
