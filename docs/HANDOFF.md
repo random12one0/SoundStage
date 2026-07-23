@@ -30,7 +30,26 @@ default output; we WASAPI-loopback-capture it, process, and render to the real s
 Phase 3 replaces CABLE with our **own "Soundstage" virtual driver** (WDK; needs test-signing for dev,
 EV cert for clean distribution) — task #29, deferred.
 
-## Current state (v1.0.0-preview.3 shipped)
+## Front end is wired (local Windows session, 22 Jul 2026)
+Built and ran on the user's Windows machine for the first time — native engine + app both build,
+`ctest` passes, and the app runs. Everything below was verified in the running app, not written blind.
+
+**Working:** window drag (needed `IsNonClientRegionSupportEnabled`; the CSS alone did nothing) ·
+dials turn by grabbing the handle and swinging it round the arc, hub click toggles, wheel nudges ·
+EQ band handles drag, 10/31-band modes, preset curves (Flat/Cinema/Music/Podcast/Bass/Vocal) ·
+user presets save/load/delete · volume dial · speaker calibration faders · Ambience page sliders ·
+upmix toggle · real device enumeration · launch-at-login · state persisted to
+`%APPDATA%/Soundstage/state.json` and restored on launch.
+
+**Still a mockup:** the Automations page. The builder screens work as a designer, but nothing an
+automation says actually fires — no trigger engine behind it. Now-playing text is honest
+("Ready" / "Processing") rather than real track detection.
+
+**Removed rather than faked:** the Ambience page's Early reflections, Modulation and Surround
+spread sliders had no engine parameter behind them. Diffusion / low cut / high cut were *added* to
+the reverb so those three could stay real.
+
+## Earlier state (v1.0.0-preview.3 shipped)
 - First **working** build: power button starts/stops the audio path; effect dials are **on/off
   toggles** wired to the engine (Bass→bass, Ambience→reverb, Leveler→compressor, Air/Warmth→EQ
   shelves, Night→level trim). The whole DSP chain runs and is tested.
@@ -50,8 +69,8 @@ check each one first:**
   (GlobalSystemMediaTransportControlsSessionManager) is still to do.
 
 ## What's next
-1. **Drag-to-adjust** the dials + EQ bands + wire presets (currently toggle-only) — task #33.
-2. Retune the effect→param curves by ear (user judges sound).
+1. Retune the effect→param curves by ear (user judges sound) — `EngineController.ApplyEffect`.
+2. Make the Automations page real (trigger engine: time of day, app playing, device connected).
 3. Our own **Soundstage virtual driver** to replace VB-CABLE — task #29.
 4. Multichannel/surround render (v1 is stereo end-to-end).
 5. Clean up / remove the old pre-reset projects.
