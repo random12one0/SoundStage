@@ -662,7 +662,13 @@ void SoundstageApo::SyncSettings() {
         double freq = Finite(s.eqBands[i].freq, 1000.0);
         double gain = Finite(s.eqBands[i].gainDb, 0.0);
         double q    = Finite(s.eqBands[i].q, 0.707);
-        if (freq < 10.0 || freq > 22000.0) { freq = 1000.0; gain = 0.0; }   // out of audible band → identity
+        // Clamp the frequency into a broad valid range — NOT fold it to 1 kHz. A very low frequency
+        // is a legitimate way to disable a filter: night mode parks its high-pass at 5 Hz when off,
+        // which passes everything. Folding that to 1 kHz turned the "off" high-pass into one that
+        // stripped all bass below 1 kHz — so night mode read as INVERTED (off cut the bass, on
+        // barely did). Clamp to [1 Hz, just under Nyquist] and leave the filter's own shape alone.
+        if (freq < 1.0) { freq = 1.0; }
+        if (freq > 21000.0) { freq = 21000.0; }
         if (q < 0.1 || q > 24.0) { q = 0.707; }
         if (gain < -48.0 || gain > 48.0) { gain = gain < 0.0 ? -48.0 : 48.0; }
         chain_.setEqBand(i, static_cast<soundstage::Equalizer::BandType>(type), freq, gain, q);
