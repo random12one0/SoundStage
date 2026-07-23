@@ -53,6 +53,11 @@
   .np .src{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--amber);opacity:.85;}
   .np .trk{font-size:16px;font-weight:600;color:var(--ink);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:24vw;}
   .fmt{font-family:ui-monospace,Menlo,monospace;font-size:11px;color:var(--dim);background:#0e1620;border:1px solid var(--line);border-radius:9px;padding:5px 10px;}
+  /* Amber, not the usual teal: this chip means "something is shaping your sound" — worth noticing,
+     not worth alarming anyone. Clickable, because the first thing you want on seeing it is off. */
+  .eqchip{margin-left:6px;cursor:pointer;color:var(--amber);border-color:#5a4526;background:#1a1610;}
+  .eqchip:hover{border-color:var(--amber);}
+  .eqchip b{color:var(--amber);}
   .fmt b{color:var(--amber);}
   .tools{margin-left:auto;display:flex;align-items:center;gap:13px;}
   .power{font:inherit;font-weight:600;font-size:12px;letter-spacing:.06em;color:var(--glow);background:#0e1c1f;border:1px solid #2b5a57;border-radius:11px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;}
@@ -509,6 +514,12 @@
         <div class="screen" id="statusStrip">
           <div class="np"><div class="bars" id="npBars"><i></i><i></i><i></i><i></i></div><div><div class="src">Soundstage</div><div class="trk" id="npText">Ready — press power to start</div></div></div>
           <span class="fmt" id="fmtChip"><b>2.0 → 2.0</b> · <b>48</b> kHz</span>
+          <!-- The equaliser is a separate stage that runs whether or not any effect tile is on, so a
+               loaded preset shapes your sound with everything else switched off. Without this chip
+               that is invisible, and the app sounds like it's doing something you didn't ask for. -->
+          <span class="fmt eqchip" id="eqChip" style="display:none" title="Click to flatten the equaliser">
+            <b id="eqChipName">EQ</b> · <b id="eqChipPeak"></b>
+          </span>
           <div class="tools">
             <button class="power off" data-power><span class="d"></span> Off</button>
             <div class="voldial"><span class="lab">Vol</span><div class="vd" data-dial="volume"></div><span class="vn" id="volNum">68</span></div>
@@ -1376,7 +1387,13 @@
     var f = S.fx[el.dataset.fx];
     el.classList.toggle('off', !f.on);
     paintDial(el._dial, f.v);
-    el._val.textContent = Math.round(f.v) + '%';
+
+    /* An effect that is off reads "Off", not "96%".
+       Showing a big percentage on a switched-off effect is actively misleading: the tile looks like
+       it is on and turned up, so when you change it and hear nothing, the app appears broken. It
+       isn't — a value only does something once the effect is on. The dial still shows where the
+       knob is pointing, but the number says the truth. */
+    el._val.textContent = f.on ? Math.round(f.v) + '%' : 'Off';
   }
 
   function renderVolDial() {
@@ -1399,7 +1416,29 @@
   function gainToTop(db) { return (0.5 - (db / EQ_RANGE) * 0.5) * 100; }   /* % from the top */
   function topToGain(pct) { return clamp((0.5 - pct / 100) * 2 * EQ_RANGE, -EQ_RANGE, EQ_RANGE); }
 
+  /* Show the chip whenever the curve is doing something you could hear. 0.5 dB is the threshold
+     because anything smaller isn't worth a warning, and floating-point drift shouldn't light it up. */
+  function renderEqChip() {
+    var chip = document.getElementById('eqChip');
+    if (!chip) { return; }
+
+    var gains = eqGains() || [];
+    var peak = 0;
+    for (var i = 0; i < gains.length; i++) {
+      var g = Math.abs(+gains[i] || 0);
+      if (g > peak) { peak = g; }
+    }
+
+    if (peak < 0.5) { chip.style.display = 'none'; return; }
+
+    chip.style.display = '';
+    document.getElementById('eqChipName').textContent =
+      (S.eq && S.eq.preset && S.eq.preset !== 'Flat') ? ('EQ · ' + S.eq.preset) : 'EQ';
+    document.getElementById('eqChipPeak').textContent = '±' + peak.toFixed(1) + ' dB';
+  }
+
   function renderEq() {
+    renderEqChip();
     var host = document.querySelector('[data-eq]');
     if (!host) { return; }
     var freqs = eqFreqs(), gains = eqGains();
@@ -3202,6 +3241,16 @@
     }
     if (e.target.closest('#openFolder')) { send({ t: 'openfolder' }); return; }
     if (e.target.closest('#openWinSound')) { send({ t: 'speakersetup' }); return; }
+
+    /* The chip exists to answer "why does this sound different?", so it also has to answer
+       "make it stop" — one click flattens, routed through the same button rather than a second
+       code path that could drift. */
+    if (e.target.closest('#eqChip')) {
+      var flat = document.getElementById('eqReset');
+      if (flat) { flat.click(); }
+      toast('Equaliser flattened.');
+      return;
+    }
 
     if (e.target.closest('#apoInstall')) {
       send({ t: 'apoinstall' });
