@@ -101,6 +101,8 @@ public:
     // ---- master controls ----
     // Each setter remembers the value as well as ramping to it, so prepare() can restore it.
     void setEnabled(bool on)        { masterOn_ = on; masterEnable_.setTarget(on ? 1.0 : 0.0); }
+    /// The switch position, not the ramp — asked for when Windows wants to show our on/off state.
+    bool enabled() const            { return masterOn_; }
     void setOutputGainDb(double db) { masterGainLin_ = std::pow(10.0, db / 20.0); masterGain_.setTarget(masterGainLin_); }
 
     // ---- per-effect on/off (each ramps, pop-free) ----

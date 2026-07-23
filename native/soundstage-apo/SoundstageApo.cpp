@@ -5,10 +5,16 @@
 #include <ksmedia.h>
 #include <propkey.h>
 #include <new>
+#include <cstdarg>
+#include <cstdio>
 
 // {6F3C9A21-4E7B-4B36-9E1D-2A55C0D8E401}
 extern "C" const GUID CLSID_SoundstageApo =
     { 0x6f3c9a21, 0x4e7b, 0x4b36, { 0x9e, 0x1d, 0x2a, 0x55, 0xc0, 0xd8, 0xe4, 0x01 } };
+
+// {6F3C9A22-4E7B-4B36-9E1D-2A55C0D8E401}
+extern "C" const GUID EFFECT_Soundstage =
+    { 0x6f3c9a22, 0x4e7b, 0x4b36, { 0x9e, 0x1d, 0x2a, 0x55, 0xc0, 0xd8, 0xe4, 0x01 } };
 
 extern std::atomic<long> g_dllRefs;
 
@@ -38,7 +44,44 @@ bool IsFloat32(const WAVEFORMATEX* fmt) {
 
 }  // namespace
 
-SoundstageApo::SoundstageApo() : refs_(1) {
+/// Append one line to C:\ProgramData\Soundstage\apo.log.
+///
+/// This exists because there is no other way to see what happens in here. audiodg.exe is a protected
+/// process: you cannot attach a debugger to it, and even an elevated `tasklist /m` cannot enumerate
+/// its modules — so "is our plugin actually loaded?" has no answer from outside. The plugin has to
+/// say so itself.
+///
+/// Called ONLY from the setup and teardown paths (Initialize, LockForProcess, UnlockForProcess),
+/// never from APOProcess. Opening a file on the real-time thread would cause exactly the dropouts
+/// this whole design is arranged to avoid.
+void SoundstageLog(const char* fmt, ...) {
+    char line[512];
+    va_list args;
+    va_start(args, fmt);
+    const int n = vsnprintf(line, sizeof(line) - 2, fmt, args);
+    va_end(args);
+    if (n <= 0) { return; }
+
+    line[n] = '\n';
+    line[n + 1] = '\0';
+
+    // FILE_APPEND_DATA rather than GENERIC_WRITE: several endpoints can have their own instance of
+    // this plugin, and append-only opens let them share the file without trampling each other.
+    HANDLE h = CreateFileW(SOUNDSTAGE_LOG_PATH, FILE_APPEND_DATA,
+                           FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+                           OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (h == INVALID_HANDLE_VALUE) { return; }
+
+    DWORD written = 0;
+    WriteFile(h, line, static_cast<DWORD>(n + 1), &written, nullptr);
+    CloseHandle(h);
+}
+
+SoundstageApo::SoundstageApo(IUnknown* outer) : refs_(1) {
+    inner_.self = this;
+    // Not aggregated? Then we are our own controlling object, and the delegating methods below become
+    // a straight call into the internal ones. One path, both cases.
+    outer_ = outer ? outer : static_cast<IUnknown*>(&inner_);
     g_dllRefs.fetch_add(1, std::memory_order_relaxed);
 }
 
@@ -47,14 +90,32 @@ SoundstageApo::~SoundstageApo() {
     g_dllRefs.fetch_sub(1, std::memory_order_relaxed);
 }
 
-// ---- IUnknown ---------------------------------------------------------------------------------
+// ---- IUnknown, delegating ----------------------------------------------------------------------
+// These are what callers reach through IAudioProcessingObject and friends. Under aggregation they
+// must forward to the controlling object, so that the whole aggregate looks like one COM identity.
 
 STDMETHODIMP SoundstageApo::QueryInterface(REFIID riid, void** ppv) {
+    return outer_->QueryInterface(riid, ppv);
+}
+
+STDMETHODIMP_(ULONG) SoundstageApo::AddRef() {
+    return outer_->AddRef();
+}
+
+STDMETHODIMP_(ULONG) SoundstageApo::Release() {
+    return outer_->Release();
+}
+
+// ---- IUnknown, non-delegating -------------------------------------------------------------------
+// The real thing: our reference count, and the only place that knows which interfaces we implement.
+
+HRESULT SoundstageApo::InternalQueryInterface(REFIID riid, void** ppv) {
     if (!ppv) { return E_POINTER; }
     *ppv = nullptr;
 
     if (IsEqualIID(riid, __uuidof(IUnknown))) {
-        *ppv = static_cast<IAudioProcessingObject*>(this);
+        // Must be the non-delegating one — COM identity rules require IUnknown to be stable.
+        *ppv = static_cast<IUnknown*>(&inner_);
     } else if (IsEqualIID(riid, __uuidof(IAudioProcessingObject))) {
         *ppv = static_cast<IAudioProcessingObject*>(this);
     } else if (IsEqualIID(riid, __uuidof(IAudioProcessingObjectConfiguration))) {
@@ -63,19 +124,33 @@ STDMETHODIMP SoundstageApo::QueryInterface(REFIID riid, void** ppv) {
         *ppv = static_cast<IAudioProcessingObjectRT*>(this);
     } else if (IsEqualIID(riid, __uuidof(IAudioSystemEffects))) {
         *ppv = static_cast<IAudioSystemEffects*>(this);
+    } else if (IsEqualIID(riid, __uuidof(IAudioSystemEffects2))) {
+        *ppv = static_cast<IAudioSystemEffects2*>(this);
+    } else if (IsEqualIID(riid, __uuidof(IAudioSystemEffects3))) {
+        *ppv = static_cast<IAudioSystemEffects3*>(this);
     } else {
         return E_NOINTERFACE;
     }
 
-    AddRef();
+    // AddRef through the pointer we are about to return — NOT unconditionally on our own count.
+    //
+    // This looks like a pedantic distinction and is not. The interfaces above have *delegating*
+    // AddRef/Release: calling Release on one of them decrements the outer object. So if we counted
+    // those references on ourselves, every acquire would land on our count and every release on the
+    // aggregator's — the two drift apart, the aggregate is destroyed while still in use, and
+    // audiodg.exe dies with an access violation somewhere that looks nothing like the real cause.
+    //
+    // Going through *ppv gets it right in both cases automatically: for IUnknown that is our
+    // non-delegating AddRef, for everything else it is the delegating one.
+    static_cast<IUnknown*>(*ppv)->AddRef();
     return S_OK;
 }
 
-STDMETHODIMP_(ULONG) SoundstageApo::AddRef() {
+ULONG SoundstageApo::InternalAddRef() {
     return refs_.fetch_add(1, std::memory_order_relaxed) + 1;
 }
 
-STDMETHODIMP_(ULONG) SoundstageApo::Release() {
+ULONG SoundstageApo::InternalRelease() {
     const ULONG left = refs_.fetch_sub(1, std::memory_order_acq_rel) - 1;
     if (left == 0) { delete this; }
     return left;
@@ -124,6 +199,8 @@ STDMETHODIMP SoundstageApo::GetRegistrationProperties(APO_REG_PROPERTIES** ppReg
 
 STDMETHODIMP SoundstageApo::Initialize(UINT32 /*cbDataSize*/, BYTE* /*pbyData*/) {
     OpenSharedState();
+    SoundstageLog("[init]   instance created, pid=%lu, settings=%s",
+        GetCurrentProcessId(), shared_ ? "connected" : "not found (app not running?)");
     return S_OK;
 }
 
@@ -170,7 +247,12 @@ STDMETHODIMP SoundstageApo::LockForProcess(UINT32 u32NumInputConnections,
     }
 
     const WAVEFORMATEX* inFmt = FormatOf(ppInputConnections[0]->pFormat);
-    if (!IsFloat32(inFmt)) { return APOERR_FORMAT_NOT_SUPPORTED; }
+    if (!IsFloat32(inFmt)) {
+        SoundstageLog("[lock]   REFUSED: not float32 (tag=%u bits=%u ch=%u)",
+            inFmt ? inFmt->wFormatTag : 0, inFmt ? inFmt->wBitsPerSample : 0,
+            inFmt ? inFmt->nChannels : 0);
+        return APOERR_FORMAT_NOT_SUPPORTED;
+    }
 
     channels_ = inFmt->nChannels;
     sampleRate_ = inFmt->nSamplesPerSec;
@@ -190,11 +272,26 @@ STDMETHODIMP SoundstageApo::LockForProcess(UINT32 u32NumInputConnections,
     SyncSettings();
 
     locked_ = true;
+    SoundstageLog("[lock]   RUNNING: %u ch @ %u Hz, max %u frames/buffer, settings=%s",
+        channels_, sampleRate_, maxFrames_, shared_ ? "connected" : "not found");
     return S_OK;
 }
 
 STDMETHODIMP SoundstageApo::UnlockForProcess() {
     locked_ = false;
+
+    // The one honest answer to "is it actually doing anything?", reported where it is safe to write
+    // a file. Frames > 0 means audio really came through us; peak out differing from peak in means
+    // we changed it rather than passing it along.
+    const double inDb  = peakIn_  > 0.0f ? 20.0 * log10(static_cast<double>(peakIn_))  : -999.0;
+    const double outDb = peakOut_ > 0.0f ? 20.0 * log10(static_cast<double>(peakOut_)) : -999.0;
+    SoundstageLog("[stats]  %llu frames, peak in %.2f dBFS, peak out %.2f dBFS, delta %+.2f dB",
+                  framesProcessed_, inDb, outDb, outDb - inDb);
+
+    framesProcessed_ = 0;
+    peakIn_ = 0.0f;
+    peakOut_ = 0.0f;
+
     chain_.reset();
     return S_OK;
 }
@@ -249,6 +346,22 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
 
     SyncSettings();
 
+    // Every gain change ramps rather than steps, so for the first few milliseconds after a setting
+    // arrives the output still reflects the OLD value. A peak taken over the whole stream would be
+    // set by that ramp-in and would report almost no change no matter what was asked for. Waiting
+    // half a second before measuring compares steady state against steady state.
+    const bool measure = framesProcessed_ > sampleRate_ / 2;
+
+    if (measure) {
+        const size_t n = static_cast<size_t>(frames) * ch;
+        float p = peakIn_;
+        for (size_t i = 0; i < n; ++i) {
+            const float a = src[i] < 0.0f ? -src[i] : src[i];
+            if (a > p) { p = a; }
+        }
+        peakIn_ = p;
+    }
+
     // The engine takes a stereo pair in and writes the endpoint's layout out. When the source is
     // already multichannel, the multichannel path keeps every channel instead of folding it down.
     if (ch > 2) {
@@ -259,8 +372,77 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
                             static_cast<int>(frames));
     }
 
+    if (measure) {
+        const size_t n = static_cast<size_t>(frames) * ch;
+        float p = peakOut_;
+        for (size_t i = 0; i < n; ++i) {
+            const float a = dst[i] < 0.0f ? -dst[i] : dst[i];
+            if (a > p) { p = a; }
+        }
+        peakOut_ = p;
+    }
+    framesProcessed_ += frames;
+
     out->u32ValidFrameCount = frames;
     out->u32BufferFlags = BUFFER_VALID;
+}
+
+// ---- IAudioSystemEffects2 / 3 -------------------------------------------------------------------
+//
+// These exist so Windows can describe and toggle our processing from its own Sound settings. We
+// present the whole chain as ONE effect named Soundstage rather than enumerating EQ, bass, reverb and
+// the rest: those are ours to control from our own UI, and exposing a dozen switches Windows could
+// flip independently would let the two interfaces disagree about what is on.
+//
+// Every one of these allocates with CoTaskMemAlloc because the caller frees it with CoTaskMemFree.
+
+STDMETHODIMP SoundstageApo::GetEffectsList(LPGUID* ppEffectsIds, UINT* pcEffects, HANDLE /*Event*/) {
+    if (!ppEffectsIds || !pcEffects) { return E_POINTER; }
+
+    *ppEffectsIds = nullptr;
+    *pcEffects = 0;
+
+    auto* ids = static_cast<LPGUID>(CoTaskMemAlloc(sizeof(GUID)));
+    if (!ids) { return E_OUTOFMEMORY; }
+
+    ids[0] = EFFECT_Soundstage;
+    *ppEffectsIds = ids;
+    *pcEffects = 1;
+    return S_OK;
+}
+
+STDMETHODIMP SoundstageApo::GetControllableSystemEffectsList(AUDIO_SYSTEMEFFECT** effects,
+                                                             UINT* numEffects, HANDLE /*event*/) {
+    if (!effects || !numEffects) { return E_POINTER; }
+
+    *effects = nullptr;
+    *numEffects = 0;
+
+    auto* list = static_cast<AUDIO_SYSTEMEFFECT*>(CoTaskMemAlloc(sizeof(AUDIO_SYSTEMEFFECT)));
+    if (!list) { return E_OUTOFMEMORY; }
+
+    ZeroMemory(list, sizeof(AUDIO_SYSTEMEFFECT));
+    list[0].id = EFFECT_Soundstage;
+    // Windows may switch the whole chain off — that is the same thing our own bypass does, and it
+    // would be rude to show a control that does nothing.
+    list[0].canSetState = TRUE;
+    list[0].state = chain_.enabled() ? AUDIO_SYSTEMEFFECT_STATE_ON : AUDIO_SYSTEMEFFECT_STATE_OFF;
+
+    *effects = list;
+    *numEffects = 1;
+    return S_OK;
+}
+
+STDMETHODIMP SoundstageApo::SetAudioSystemEffectState(GUID effectId, AUDIO_SYSTEMEFFECT_STATE state) {
+    if (!IsEqualGUID(effectId, EFFECT_Soundstage)) { return E_INVALIDARG; }
+
+    const bool on = (state == AUDIO_SYSTEMEFFECT_STATE_ON);
+    SoundstageLog("[call]   SetAudioSystemEffectState -> %s", on ? "on" : "off");
+
+    // Windows' switch and our own bypass are the same switch. Note the app will overwrite this the
+    // next time it publishes settings — which is correct: our UI is the authority.
+    chain_.setEnabled(on);
+    return S_OK;
 }
 
 // ---- shared settings ---------------------------------------------------------------------------

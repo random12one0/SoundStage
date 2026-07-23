@@ -2,6 +2,7 @@
 #
 #   Run as Administrator:
 #     powershell -ExecutionPolicy Bypass -File install-apo.ps1
+#     powershell -ExecutionPolicy Bypass -File install-apo.ps1 -Device "AV Receiver"
 #     powershell -ExecutionPolicy Bypass -File install-apo.ps1 -Uninstall
 #
 # Two separate things happen here, and it helps to keep them apart:
@@ -11,63 +12,92 @@
 #   2. Endpoint attachment - telling one specific playback device to run our plugin. Per device, and
 #      the reason this script needs to ask which device you mean.
 #
-# Every value this script overwrites is saved first, under a Soundstage.Backup key beside it, and
-# -Uninstall puts them all back. That matters because the effect properties are how the manufacturer's
-# own audio software hooks in; clobbering them without a way back is how people end up with a device
-# that has lost its features and no idea why.
+# On permissions, which are stranger here than you would expect. The endpoint keys under MMDevices
+# are owned by SYSTEM and grant Administrators only *SetValue and ReadKey* - not Full Control. So
+# even a fully elevated process can change a value on these keys but CANNOT create a subkey under
+# them, and cannot open them with the usual KEY_WRITE (which implies CreateSubKey). Two consequences
+# shape the code below:
+#
+#   * every access asks for exactly SetValue/QueryValues rather than "write", and
+#   * backups live under HKLM\SOFTWARE\Soundstage, not in a subkey beside the values themselves.
+#
+# Backups matter because the effect properties are how the manufacturer's own audio software hooks
+# in. Overwriting them with no way back is how a device quietly loses its features, so every value is
+# saved before it is touched and -Uninstall puts them all back.
 
 [CmdletBinding()]
 param(
     [switch]$Uninstall,
-    # Substring of the device name, e.g. "Realtek" or "NVIDIA". Omit to be shown a list.
+    # Substring of the device name, e.g. "AV Receiver". Omit to be shown a list.
     [string]$Device
 )
 
 $ErrorActionPreference = "Stop"
 
-$CLSID       = "{6F3C9A21-4E7B-4B36-9E1D-2A55C0D8E401}"
-$RenderRoot  = "HKLM:\SYSTEM\CurrentControlSet\Control\MMDevices\Audio\Render"
-$FxGuid      = "{d04e05a6-594b-4fb6-a80d-01af5eed7d1d}"
-$BackupKey   = "Soundstage.Backup"
+$CLSID      = "{6F3C9A21-4E7B-4B36-9E1D-2A55C0D8E401}"
+# Under SOFTWARE\Microsoft\Windows\CurrentVersion, not SYSTEM\CurrentControlSet\Control - the audio
+# endpoint store is a Windows component, not a driver service.
+$RenderBase = "SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render"
+$BackupBase = "SOFTWARE\Soundstage\EndpointBackup"
+$FxGuid     = "{d04e05a6-594b-4fb6-a80d-01af5eed7d1d}"
+# Two properties, because either alone is ambiguous. The description is the short label Windows shows
+# ("Speakers"), which is not unique - a PC with onboard audio and a virtual device has two of them.
+# The friendly name carries the adapter ("Realtek(R) Audio"), which is what tells them apart.
+$DescProp     = "{a45c254e-df1c-4efd-8020-67d146a850e0},2"
+$FriendlyProp = "{b3f8fa53-0004-438e-9003-51a46e139bfc},6"
 
-# The device-name property, and the effect slots we write.
-$NameProp    = "{a45c254e-df1c-4efd-8020-67d146a850e0},2"
-
-# Windows looks for effects under several property ids. The pair below is the "mode effect" slot -
-# post-mix, so it sees the final multichannel stream rather than one app's stereo. 6 is the original
-# id and 14 the one added in Windows 10; both are still consulted, and writing both is what every
-# shipping APO does, because which one applies depends on the driver's own registration style.
+# Windows consults several property ids for effects. This pair is the "mode effect" slot - post-mix,
+# so it sees the final multichannel stream rather than one app's stereo. 6 is the original id and 14
+# the one added in Windows 10; both are still honoured, and which one applies depends on the driver's
+# own registration style, so shipping APOs write both.
 $ModeFxProps = @("$FxGuid,6", "$FxGuid,14")
 
-# PKEY_FX_Association - which pin the effect belongs to. KSNODETYPE_ANY: apply regardless.
-$AssocProp   = "$FxGuid,0"
-$AssocAny    = "{00000000-0000-0000-0000-000000000000}"
+# PKEY_FX_Association - which pin the effect belongs to. All-zero GUID: apply regardless.
+$AssocProp = "$FxGuid,0"
+$AssocAny  = "{00000000-0000-0000-0000-000000000000}"
+
+# Exactly the rights these keys grant Administrators. Asking for more fails outright.
+$FxRights = [System.Security.AccessControl.RegistryRights]"SetValue,QueryValues,EnumerateSubKeys,Notify"
 
 function Assert-Admin {
-    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $p  = [Security.Principal.WindowsPrincipal]::new($id)
+    $p = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        throw "This script must run as Administrator. Right-click PowerShell -> Run as administrator."
+        throw "This script must run as Administrator."
     }
 }
 
-function Get-RenderEndpoints {
-    Get-ChildItem $RenderRoot -ErrorAction SilentlyContinue | ForEach-Object {
-        $props = Join-Path $_.PSPath "Properties"
-        $name = $null
-        try { $name = (Get-ItemProperty -Path $props -Name $NameProp -ErrorAction Stop).$NameProp } catch {}
-        $state = $null
-        try { $state = (Get-ItemProperty -Path $_.PSPath -Name "DeviceState" -ErrorAction Stop).DeviceState } catch {}
-        if ($name) {
-            [pscustomobject]@{
-                Id      = $_.PSChildName
-                Name    = $name
-                Active  = ($state -eq 1)
-                Path    = $_.PSPath
-                FxPath  = Join-Path $_.PSPath "FxProperties"
-            }
-        }
+function Open-Fx($endpointId, [switch]$Writable) {
+    $path = "$RenderBase\$endpointId\FxProperties"
+    if ($Writable) {
+        return [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey(
+            $path, [Microsoft.Win32.RegistryKeyPermissionCheck]::ReadWriteSubTree, $FxRights)
     }
+    return [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey($path)
+}
+
+function Get-RenderEndpoints {
+    $root = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey($RenderBase)
+    if (-not $root) { return @() }
+    try {
+        foreach ($id in $root.GetSubKeyNames()) {
+            $ep = $root.OpenSubKey($id)
+            if (-not $ep) { continue }
+            try {
+                $state = $ep.GetValue("DeviceState")
+                $props = $ep.OpenSubKey("Properties")
+                $desc = $null; $friendly = $null
+                if ($props) {
+                    $desc = $props.GetValue($DescProp)
+                    $friendly = $props.GetValue($FriendlyProp)
+                    $props.Close()
+                }
+                if ($desc) {
+                    $label = if ($friendly) { "$desc ($friendly)" } else { $desc }
+                    [pscustomobject]@{ Id = $id; Name = $label; Active = ($state -eq 1) }
+                }
+            } finally { $ep.Close() }
+        }
+    } finally { $root.Close() }
 }
 
 function Select-Endpoint {
@@ -77,8 +107,8 @@ function Select-Endpoint {
     if ($Device) {
         $hit = @($all | Where-Object { $_.Name -like "*$Device*" })
         if ($hit.Count -eq 1) { return $hit[0] }
-        if ($hit.Count -gt 1) { throw "'$Device' matches $($hit.Count) devices. Be more specific." }
-        throw "No active playback device matching '$Device'."
+        if ($hit.Count -gt 1) { throw "'$Device' matches $($hit.Count) devices: $($hit.Name -join ', ')" }
+        throw "No active playback device matching '$Device'. Found: $($all.Name -join ', ')"
     }
 
     Write-Host ""
@@ -91,40 +121,44 @@ function Select-Endpoint {
     return $all[$n]
 }
 
-function Backup-Value($fxPath, $name) {
-    $backupPath = Join-Path $fxPath $BackupKey
-    if (-not (Test-Path $backupPath)) { New-Item -Path $backupPath -Force | Out-Null }
-
-    # Only ever back up once. Running install twice must not overwrite the real original with our own
-    # value - that would make the uninstall restore Soundstage instead of removing it.
-    $existing = $null
-    try { $existing = (Get-ItemProperty -Path $backupPath -Name $name -ErrorAction Stop).$name } catch {}
-    if ($null -ne $existing) { return }
-
-    $current = ""
-    try { $current = (Get-ItemProperty -Path $fxPath -Name $name -ErrorAction Stop).$name } catch {}
-    New-ItemProperty -Path $backupPath -Name $name -Value $current -PropertyType String -Force | Out-Null
+function Backup-Value($endpointId, $name, $current) {
+    $bk = [Microsoft.Win32.Registry]::LocalMachine.CreateSubKey("$BackupBase\$endpointId")
+    try {
+        # Back up once only. A second install must not overwrite the true original with our own
+        # value - that would make the uninstall restore Soundstage instead of removing it.
+        if ($null -ne $bk.GetValue($name)) { return }
+        # Empty string is the sentinel for "there was nothing here".
+        $bk.SetValue($name, $(if ($null -eq $current) { "" } else { $current }))
+    } finally { $bk.Close() }
 }
 
-function Restore-Value($fxPath, $name) {
-    $backupPath = Join-Path $fxPath $BackupKey
-    $saved = $null
-    try { $saved = (Get-ItemProperty -Path $backupPath -Name $name -ErrorAction Stop).$name } catch {}
+function Restore-Endpoint($endpointId) {
+    $bk = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey("$BackupBase\$endpointId", $true)
+    if (-not $bk) { return $false }
 
-    if ($null -eq $saved) { return }
-    if ($saved -eq "") {
-        Remove-ItemProperty -Path $fxPath -Name $name -ErrorAction SilentlyContinue
-    } else {
-        New-ItemProperty -Path $fxPath -Name $name -Value $saved -PropertyType String -Force | Out-Null
-    }
-    Remove-ItemProperty -Path $backupPath -Name $name -ErrorAction SilentlyContinue
+    $fx = Open-Fx $endpointId -Writable
+    if (-not $fx) { $bk.Close(); return $false }
+
+    try {
+        foreach ($name in $bk.GetValueNames()) {
+            $saved = $bk.GetValue($name)
+            if ([string]::IsNullOrEmpty($saved)) {
+                try { $fx.DeleteValue($name, $false) } catch {}
+            } else {
+                $fx.SetValue($name, $saved)
+            }
+        }
+    } finally { $fx.Close(); $bk.Close() }
+
+    [Microsoft.Win32.Registry]::LocalMachine.DeleteSubKeyTree("$BackupBase\$endpointId", $false)
+    return $true
 }
 
 function Restart-AudioService {
     Write-Host "Restarting the audio service so the change takes effect..."
     # AudioEndpointBuilder holds Audiosrv as a dependent; -Force takes both down together.
     Restart-Service -Name AudioEndpointBuilder -Force
-    Start-Sleep -Seconds 2
+    Start-Sleep -Seconds 3
 }
 
 # ---------------------------------------------------------------------------------------------
@@ -140,29 +174,15 @@ if ($Uninstall) {
 
     $touched = 0
     foreach ($ep in Get-RenderEndpoints) {
-        if (-not (Test-Path $ep.FxPath)) { continue }
-        $isOurs = $false
-        foreach ($p in $ModeFxProps) {
-            $v = $null
-            try { $v = (Get-ItemProperty -Path $ep.FxPath -Name $p -ErrorAction Stop).$p } catch {}
-            if ($v -eq $CLSID) { $isOurs = $true }
+        if (Restore-Endpoint $ep.Id) {
+            Write-Host "  detached from: $($ep.Name)"
+            $touched++
         }
-        if (-not $isOurs) { continue }
-
-        foreach ($p in $ModeFxProps) { Restore-Value $ep.FxPath $p }
-        Restore-Value $ep.FxPath $AssocProp
-
-        $backupPath = Join-Path $ep.FxPath $BackupKey
-        if (Test-Path $backupPath) {
-            if (-not (Get-Item $backupPath).Property) { Remove-Item $backupPath -Force }
-        }
-        Write-Host "  detached from: $($ep.Name)"
-        $touched++
     }
     Write-Host "  $touched device(s) restored."
 
     if (Test-Path $dst) {
-        & regsvr32.exe /s /u $dst
+        Start-Process regsvr32.exe -ArgumentList "/s", "/u", "`"$dst`"" -Wait
         Write-Host "  unregistered the COM class."
     }
 
@@ -170,8 +190,12 @@ if ($Uninstall) {
 
     # Delete last - audiodg has to let go of it first.
     if (Test-Path $dst) {
-        try { Remove-Item $dst -Force; Write-Host "  removed $dst" }
-        catch { Write-Warning "Could not delete $dst (still loaded). Reboot and delete it by hand." }
+        try {
+            [System.IO.File]::Delete($dst)
+            Write-Host "  removed $dst"
+        } catch {
+            Write-Warning "Could not delete $dst (still loaded). Reboot and delete it by hand."
+        }
     }
 
     Write-Host ""
@@ -182,33 +206,33 @@ if ($Uninstall) {
 if (-not (Test-Path $src)) { throw "SoundstageApo.dll not found. Run build.ps1 first." }
 
 $target = Select-Endpoint
-
 Write-Host ""
-Write-Host "Installing Soundstage onto: $($target.Name)"
+Write-Host "Installing Soundstage onto: $($target.Name)   [$($target.Id)]"
 
 Copy-Item $src $dst -Force
 Write-Host "  copied the plugin to System32"
 
-# audiodg.exe runs stripped of privileges, under a restricted token. It has to be able to read the
-# DLL, and the default System32 permissions already allow that - but a file copied from a user
-# profile can arrive carrying inherited ACLs that don't. Re-inheriting from System32 fixes it.
+# audiodg.exe runs stripped of privileges. It must be able to read the DLL, and System32's own
+# permissions already allow that - but a file copied out of a user profile can arrive carrying
+# inherited ACLs that do not. Re-inheriting from System32 fixes it.
 $acl = Get-Acl $dst
 $acl.SetAccessRuleProtection($false, $false)
 Set-Acl -Path $dst -AclObject $acl
 
-$reg = Start-Process -FilePath "regsvr32.exe" -ArgumentList "/s", "`"$dst`"" -Wait -PassThru
+$reg = Start-Process regsvr32.exe -ArgumentList "/s", "`"$dst`"" -Wait -PassThru
 if ($reg.ExitCode -ne 0) { throw "regsvr32 failed ($($reg.ExitCode))." }
 Write-Host "  registered the COM class"
 
-if (-not (Test-Path $target.FxPath)) { New-Item -Path $target.FxPath -Force | Out-Null }
-
-foreach ($p in $ModeFxProps) {
-    Backup-Value $target.FxPath $p
-    New-ItemProperty -Path $target.FxPath -Name $p -Value $CLSID -PropertyType String -Force | Out-Null
-}
-Backup-Value $target.FxPath $AssocProp
-New-ItemProperty -Path $target.FxPath -Name $AssocProp -Value $AssocAny -PropertyType String -Force | Out-Null
-Write-Host "  attached to the device (previous values saved)"
+$fx = Open-Fx $target.Id -Writable
+if (-not $fx) { throw "Could not open FxProperties for write on $($target.Name)." }
+try {
+    foreach ($p in @($ModeFxProps + $AssocProp)) {
+        Backup-Value $target.Id $p $fx.GetValue($p)
+    }
+    foreach ($p in $ModeFxProps) { $fx.SetValue($p, $CLSID) }
+    $fx.SetValue($AssocProp, $AssocAny)
+} finally { $fx.Close() }
+Write-Host "  attached to the device (previous values saved under HKLM\$BackupBase)"
 
 Restart-AudioService
 
@@ -218,7 +242,7 @@ Write-Host ""
 Write-Host "What to expect:"
 Write-Host "  * Play something. If you hear audio, the plugin loaded and is passing sound through."
 Write-Host "  * Open Soundstage and move a control - it publishes settings to the plugin live."
-Write-Host "  * If audio goes silent or the device disappears, run:"
+Write-Host "  * To undo everything:"
 Write-Host "      powershell -ExecutionPolicy Bypass -File install-apo.ps1 -Uninstall"
 Write-Host ""
 Write-Host "  Windows disables an effect that misbehaves rather than breaking your sound. If the"

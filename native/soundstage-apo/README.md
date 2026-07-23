@@ -95,14 +95,66 @@ sentinels — including `eqBands[35]`, the last element of the largest array —
 Matching offsets alone would not be enough; a field with the wrong *type* has the right offset and the
 wrong value. Comparing values catches both.
 
+## Three things that must all be right, or nothing loads
+
+Getting this running took finding three separate requirements, none of which produce a useful error
+message when unmet. They are recorded here because each one costs an afternoon to rediscover.
+
+**1. There are two registrations, not one.** Registering the COM class is necessary and not
+sufficient. The audio engine looks plugins up in its own list at
+`HKLM\SOFTWARE\Classes\AudioEngine\AudioProcessingObjects\{CLSID}`, holding a mirror of
+`APO_REG_PROPERTIES` as registry values. A CLSID missing from that list is skipped in silence — no
+event log entry, no failed stream, just an effect that never runs. `DllRegisterServer` writes both.
+
+**2. The engine aggregates.** It creates the APO with a controlling `IUnknown`, so a class factory
+that returns `CLASS_E_NOAGGREGATION` — which is what almost all COM boilerplate does — makes every
+attempt to open a stream on that device fail outright.
+
+**3. `IAudioSystemEffects3` is not optional.** A mode-effect APO is asked for it, and on Windows 11
+refusing it does not degrade gracefully: `audiodg.exe` takes an access violation and all system audio
+stops until the service restarts.
+
+There is also a subtle fourth, in the aggregation itself. The non-delegating `QueryInterface` must
+`AddRef` **through the pointer it returns**, not unconditionally on its own count. The interfaces
+handed out have delegating `Release`, so counting acquisitions internally while releases go to the
+outer object makes the two drift apart — the aggregate is freed while still in use, and audiodg dies
+somewhere that looks nothing like the cause.
+
+## Diagnosing it
+
+`audiodg.exe` is a protected process: it cannot be debugged and its modules cannot be enumerated,
+even from an elevated prompt. So the plugin narrates to `C:\ProgramData\Soundstage\apo.log` from its
+setup and teardown paths — never from `APOProcess`, where opening a file would cause dropouts.
+
+A healthy run looks like:
+
+```
+[load]   DLL mapped into pid=9696
+[factory] instance constructed (aggregated=yes)
+[init]   instance created, pid=9696, settings=connected
+[lock]   RUNNING: 2 ch @ 48000 Hz, max 528 frames/buffer, settings=connected
+[stats]  194400 frames, peak in -12.04 dBFS, peak out -32.04 dBFS, delta -20.00 dB
+```
+
+The `[stats]` line is the useful one: frames > 0 proves audio flowed through us, and the delta proves
+we changed it. It measures only after the first half-second, because gain changes ramp and a peak
+taken across the ramp-in would under-report the change no matter how large it was.
+
 ## Status
 
 | | |
 |---|---|
-| Builds | yes — 60 KB, four COM exports verified present |
+| Builds | yes — ~66 KB, four COM exports verified present |
 | Struct layout C# ↔ C++ | verified, 33/33 sentinels round-trip |
 | App publishes live settings | verified — counter advances, stays even, values correct |
-| Loaded by `audiodg.exe` | **not yet tested** — needs an elevated install |
+| Loaded by `audiodg.exe` | **verified** — loads, aggregates, locks the stream |
+| Reads settings from the app | **verified** — `settings=connected` |
+| Actually processes audio | **verified** — asked for 0 / −20 / −6 dB, measured 0.00 / −20.00 / −6.00 |
+| Bypass leaves audio untouched | **verified** — master off measures +0.00 dB |
+| Analog endpoint (Realtek, 2 ch) | working |
+| HDMI endpoint (NVIDIA → AV receiver, 8 ch) | **unconfirmed** — see below |
 
-The last row is the honest gap: attaching an APO to an endpoint requires Administrator, so the
-install script has been written but not run. Everything up to that boundary is tested.
+The HDMI row is honest rather than pessimistic. The plugin is attached to that endpoint and does get
+constructed and initialised for it, but the receiver went into standby before a stream could be
+locked, so the one thing left untested is `[lock]`/`[stats]` at 8 channels. Retest by playing
+something with the receiver awake and reading `apo.log`.

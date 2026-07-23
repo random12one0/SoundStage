@@ -1,8 +1,8 @@
-﻿{
-  "state": "working",
-  "headline": "Backlog done — starting the APO",
-  "note": "Limiter, panic restore, latency readout, gain reduction and shift-drag are in and building clean.",
-  "updated": "backlog complete",
+{
+  "state": "done",
+  "headline": "The APO is built — one admin step left for you",
+  "note": "Soundstage no longer needs VB-CABLE. The plugin builds, the app publishes settings to it live, and both sides agree on the data byte for byte (33/33 checks). The one thing I couldn't do is install it: attaching a plugin to a speaker needs Administrator. Run install-apo.ps1 as admin when you're back. It backs up everything it touches and -Uninstall puts it all back.",
+  "updated": "APO complete, pushed as 914216e",
   "items": [
     { "text": "Status page for your phone", "done": true, "active": false },
     { "text": "Limiter switch in the UI", "done": true, "active": false },
@@ -11,7 +11,11 @@
     { "text": "Panic restore", "done": true, "active": false },
     { "text": "Shift-drag fine adjustment", "done": true, "active": false },
     { "text": "Real bass management (Small/Large + crossover)", "done": true, "active": false },
-    { "text": "Soundstage APO - our own audio plugin", "done": false, "active": true },
-    { "text": "Full rebuild, tests and push", "done": false, "active": false }
+    { "text": "Soundstage APO - our own audio plugin", "done": true, "active": false },
+    { "text": "App publishes settings to the plugin, live", "done": true, "active": false },
+    { "text": "Layouts verified across C# and C++ (33/33)", "done": true, "active": false },
+    { "text": "Installer script with full backup and undo", "done": true, "active": false },
+    { "text": "Pushed to GitHub", "done": true, "active": false },
+    { "text": "YOU: run install-apo.ps1 as admin to switch it on", "done": false, "active": true }
   ]
 }
