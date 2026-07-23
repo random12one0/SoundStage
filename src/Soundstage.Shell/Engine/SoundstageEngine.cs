@@ -22,7 +22,7 @@ public enum BandType
 public sealed class SoundstageEngine : IDisposable
 {
     private const string Lib = "soundstage_engine";
-    private const int ExpectedAbi = 1;
+    private const int ExpectedAbi = 2;
 
     private IntPtr _handle;
     private bool _disposed;
@@ -88,6 +88,14 @@ public sealed class SoundstageEngine : IDisposable
 
     public void SetUpmix(double amount, double centerGain, double lfeGain)
         => ssg_upmix_set(_handle, amount, centerGain, lfeGain);
+
+    /// <summary>The rest of the Ambience page: input diffusion (0..1) and the reverb's band limits.</summary>
+    public void SetReverbTone(double diffusion, double lowCutHz, double highCutHz)
+        => ssg_reverb_set_tone(_handle, diffusion, lowCutHz, highCutHz);
+
+    /// <summary>Per-speaker output trim in dB. <paramref name="channel"/> is 0..7 in 7.1 order
+    /// (FL FR C LFE SL SR SBL SBR) — the calibration faders on the Speakers page.</summary>
+    public void SetChannelTrimDb(int channel, double db) => ssg_set_channel_trim_db(_handle, channel, db);
 
     // ---- meters ----
     public double GainReductionDb => _handle == IntPtr.Zero ? 0.0 : ssg_meter_reduction_db(_handle);
@@ -174,6 +182,13 @@ public sealed class SoundstageEngine : IDisposable
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern void ssg_upmix_set(IntPtr e, double amount, double centerGain, double lfeGain);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_reverb_set_tone(IntPtr e, double diffusion,
+                                                   double lowCutHz, double highCutHz);
+
+    [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
+    private static extern void ssg_set_channel_trim_db(IntPtr e, int ch, double db);
 
     [DllImport(Lib, CallingConvention = CallingConvention.Cdecl)]
     private static extern double ssg_meter_reduction_db(IntPtr e);

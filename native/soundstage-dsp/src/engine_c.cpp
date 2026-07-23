@@ -82,11 +82,23 @@ void ssg_reverb_set(ssg_engine* e, double size, double decay_s, double damping,
     r.setMix(mix);
 }
 
+void ssg_reverb_set_tone(ssg_engine* e, double diffusion, double low_cut_hz, double high_cut_hz) {
+    if (!e) return;
+    auto& r = e->chain.reverb();
+    r.setDiffusion(diffusion);
+    r.setLowCutHz(low_cut_hz);
+    r.setHighCutHz(high_cut_hz);
+}
+
 void ssg_upmix_set(ssg_engine* e, double amount, double center_gain, double lfe_gain) {
     if (!e) return;
     e->chain.setUpmixAmount(amount);
     e->chain.upmix().setCenterGain(center_gain);
     e->chain.upmix().setLfeGain(lfe_gain);
+}
+
+void ssg_set_channel_trim_db(ssg_engine* e, int ch, double db) {
+    if (e) e->chain.setChannelTrimDb(ch, db);
 }
 
 double ssg_meter_reduction_db(ssg_engine* e) { return e ? e->chain.compressorReductionDb() : 0.0; }

@@ -33,6 +33,9 @@ public sealed class EngineAudioHost : IDisposable
     private float[] _outScratch = Array.Empty<float>();
     private byte[] _outBytes = Array.Empty<byte>();
 
+    // The render device's channel count (2, 6 or 8) — what the engine is asked to write per frame.
+    private int _outChannels = 2;
+
     private bool _running;
     private bool _disposed;
 
@@ -93,9 +96,24 @@ public sealed class EngineAudioHost : IDisposable
             int rate = _capture.WaveFormat.SampleRate;
             _engine.Prepare(rate);
 
-            // Process and render stereo float at the capture rate; Windows maps stereo onto the render
-            // device's own channel layout in shared mode.
-            var outFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, 2);
+            // Render in the device's own channel layout so the upmix and the per-speaker trims reach
+            // real speakers. The engine writes 2, 6 or 8 channels; anything else falls back to stereo
+            // and lets Windows do the mapping.
+            _outChannels = 2;
+            try
+            {
+                int deviceChannels = renderDevice.AudioClient.MixFormat.Channels;
+                if (deviceChannels == 6 || deviceChannels == 8)
+                {
+                    _outChannels = deviceChannels;
+                }
+            }
+            catch
+            {
+                // Device wouldn't tell us — stereo is always safe.
+            }
+
+            var outFormat = WaveFormat.CreateIeeeFloatWaveFormat(rate, _outChannels);
             _buffer = new BufferedWaveProvider(outFormat)
             {
                 BufferDuration = TimeSpan.FromMilliseconds(200),
@@ -168,10 +186,11 @@ public sealed class EngineAudioHost : IDisposable
             _inScratch[n * 2 + 1] = r;
         }
 
-        _engine.Process(_inScratch, 2, _outScratch, 2, frames);
+        int outCh = _outChannels;
+        _engine.Process(_inScratch, 2, _outScratch, outCh, frames);
 
-        // Interleaved stereo floats back to bytes, into the render buffer.
-        int outSamples = frames * 2;
+        // Interleaved floats back to bytes, into the render buffer.
+        int outSamples = frames * outCh;
         Span<float> dst = MemoryMarshal.Cast<byte, float>(_outBytes.AsSpan(0, outSamples * 4));
         _outScratch.AsSpan(0, outSamples).CopyTo(dst);
         buffer.AddSamples(_outBytes, 0, outSamples * 4);
@@ -193,12 +212,13 @@ public sealed class EngineAudioHost : IDisposable
             _inScratch = new float[stereo];
         }
 
-        if (_outScratch.Length < stereo)
+        int outSamples = frames * _outChannels;
+        if (_outScratch.Length < outSamples)
         {
-            _outScratch = new float[stereo];
+            _outScratch = new float[outSamples];
         }
 
-        int bytes = stereo * 4;
+        int bytes = outSamples * 4;
         if (_outBytes.Length < bytes)
         {
             _outBytes = new byte[bytes];

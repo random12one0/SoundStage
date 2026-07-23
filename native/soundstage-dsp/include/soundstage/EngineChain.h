@@ -33,6 +33,9 @@ namespace soundstage {
 
 class EngineChain {
 public:
+    /// The widest layout we render (7.1: FL FR C LFE SL SR SBL SBR).
+    static constexpr int kOutChannels = 8;
+
     void prepare(double sampleRate) {
         fs_ = sampleRate;
         eq_.prepare(sampleRate);
@@ -53,6 +56,13 @@ public:
         masterEnable_.reset(sampleRate, enableRamp);  masterEnable_.setCurrentAndTarget(1.0);
         masterGain_.reset(sampleRate, enableRamp);    masterGain_.setCurrentAndTarget(1.0);
         upmixAmount_.reset(sampleRate, 0.05);         upmixAmount_.setCurrentAndTarget(0.7);
+
+        // Per-speaker trims (the calibration faders). Seeded from the dB values the host already set,
+        // so preparing for a new sample rate keeps the user's calibration instead of zeroing it.
+        for (int c = 0; c < kOutChannels; ++c) {
+            channelTrim_[c].reset(sampleRate, enableRamp);
+            channelTrim_[c].setCurrentAndTarget(dbToGain(channelTrimDb_[c]));
+        }
 
         reset();
     }
@@ -78,6 +88,18 @@ public:
     void enableUpmix(bool on)      { upmixOn_ = on; }  // structural (changes channel count), not crossfaded
 
     void setUpmixAmount(double a)  { upmixAmount_.setTarget(a); }
+
+    /// Per-speaker output trim in dB (the calibration faders): channel `c` in 7.1 order
+    /// FL FR C LFE SL SR SBL SBR. Applied last, after the upmix, so it trims the actual speaker.
+    void setChannelTrimDb(int c, double db) {
+        if (c < 0 || c >= kOutChannels) return;
+        channelTrimDb_[c] = db;
+        channelTrim_[c].setTarget(dbToGain(db));
+    }
+
+    double channelTrimDb(int c) const {
+        return (c < 0 || c >= kOutChannels) ? 0.0 : channelTrimDb_[c];
+    }
 
     // ---- direct access to configure each effect (the host drives these) ----
     Equalizer&    eq()         { return eq_; }
@@ -142,22 +164,29 @@ private:
     static inline double clampSafe(double x) { return x < -1.0 ? -1.0 : (x > 1.0 ? 1.0 : x); }
 
     inline void writeOut(double l, double r, double* out, int outChannels) {
+        // Advance every trim once per frame, whatever the channel count, so they all ramp at the same
+        // rate and a device swap can't leave one mid-walk.
+        double trim[kOutChannels];
+        for (int c = 0; c < kOutChannels; ++c) trim[c] = channelTrim_[c].next();
+
         if (outChannels <= 2) {
-            out[0] = clampSafe(l);
-            if (outChannels == 2) out[1] = clampSafe(r);
+            out[0] = clampSafe(l * trim[0]);
+            if (outChannels == 2) out[1] = clampSafe(r * trim[1]);
             return;
         }
         if (upmixOn_) {
-            double up[8] = {0.0};
+            double up[kOutChannels] = {0.0};
             upmix_.process(l, r, up);  // fills the 7.1 order: FL FR C LFE SL SR SBL SBR
-            for (int i = 0; i < outChannels && i < 8; ++i) out[i] = clampSafe(up[i]);
+            for (int i = 0; i < outChannels && i < kOutChannels; ++i) out[i] = clampSafe(up[i] * trim[i]);
         } else {
             // No upmix on a surround device: front L/R carry the signal, the rest stay silent.
             for (int i = 0; i < outChannels; ++i) out[i] = 0.0;
-            out[0] = clampSafe(l);
-            out[1] = clampSafe(r);
+            out[0] = clampSafe(l * trim[0]);
+            out[1] = clampSafe(r * trim[1]);
         }
     }
+
+    static inline double dbToGain(double db) { return std::pow(10.0, db / 20.0); }
 
     double fs_ = 48000.0;
 
@@ -171,6 +200,10 @@ private:
     SmoothedValue eqEnable_, bassEnable_, compEnable_, widthEnable_, reverbEnable_;
     SmoothedValue masterEnable_, masterGain_, upmixAmount_;
     bool upmixOn_ = false;
+
+    // Speaker trims start at unity (0 dB) so an un-calibrated system is untouched.
+    SmoothedValue channelTrim_[kOutChannels];
+    double        channelTrimDb_[kOutChannels] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
 };
 
 }  // namespace soundstage

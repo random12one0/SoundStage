@@ -75,14 +75,21 @@ SSG_API void        ssg_compressor_set(ssg_engine* e, double threshold_db, doubl
 SSG_API void        ssg_width_set(ssg_engine* e, double width);    /* 0..2, 1 = unchanged */
 SSG_API void        ssg_reverb_set(ssg_engine* e, double size, double decay_s, double damping,
                                    double predelay_ms, double width, double mix);
+/* The rest of the Ambience page: input diffusion 0..1, and the send/tail band limits in Hz. */
+SSG_API void        ssg_reverb_set_tone(ssg_engine* e, double diffusion,
+                                        double low_cut_hz, double high_cut_hz);
 SSG_API void        ssg_upmix_set(ssg_engine* e, double amount, double center_gain, double lfe_gain);
+
+/* Per-speaker output trim in dB — the calibration faders. `ch` is 0..7 in 7.1 order:
+ * FL FR C LFE SL SR SBL SBR. Applied after the upmix, so it trims the real speaker. */
+SSG_API void        ssg_set_channel_trim_db(ssg_engine* e, int ch, double db);
 
 /* ---- meters (for the UI) ---- */
 SSG_API double      ssg_meter_reduction_db(ssg_engine* e);
 
 /* ABI/build version, so the app can sanity-check the DLL it loaded. */
 SSG_API int         ssg_abi_version(void);
-#define SSG_ABI_VERSION 1
+#define SSG_ABI_VERSION 2
 
 #ifdef __cplusplus
 }

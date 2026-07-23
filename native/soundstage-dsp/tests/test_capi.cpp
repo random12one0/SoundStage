@@ -77,10 +77,44 @@ int main() {
 
     ssg_destroy(e);
 
+    // Speaker trims: a channel pulled down must actually come out quieter, and the trims must be
+    // independent (trimming the right speaker leaves the left alone).
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+        std::vector<float> flat(frames * 2, 0.0f), trimmed(frames * 2, 0.0f);
+        ssg_process(t, in.data(), 2, flat.data(), 2, frames);
+
+        ssg_set_channel_trim_db(t, 1, -20.0);      // right speaker only
+        for (int block = 0; block < 8; ++block) {  // let the ramp settle
+            ssg_process(t, in.data(), 2, trimmed.data(), 2, frames);
+        }
+
+        double peakL = 0.0, peakR = 0.0, refL = 0.0, refR = 0.0;
+        for (int n = 0; n < frames; ++n) {
+            peakL = std::fmax(peakL, std::fabs((double)trimmed[n * 2]));
+            peakR = std::fmax(peakR, std::fabs((double)trimmed[n * 2 + 1]));
+            refL  = std::fmax(refL,  std::fabs((double)flat[n * 2]));
+            refR  = std::fmax(refR,  std::fabs((double)flat[n * 2 + 1]));
+        }
+        check(std::fabs(peakL - refL) < 1e-5, "trimming one speaker leaves the other untouched");
+        check(peakR < refR * 0.2, "a -20 dB speaker trim actually attenuates that channel");
+
+        ssg_set_channel_trim_db(t, 1, 0.0);
+        for (int block = 0; block < 8; ++block) ssg_process(t, in.data(), 2, trimmed.data(), 2, frames);
+        double backR = 0.0;
+        for (int n = 0; n < frames; ++n) backR = std::fmax(backR, std::fabs((double)trimmed[n * 2 + 1]));
+        check(std::fabs(backR - refR) < 1e-5, "returning a trim to 0 dB restores unity");
+
+        ssg_set_channel_trim_db(t, 99, -6.0);  // out of range: must be ignored, not crash
+        ssg_destroy(t);
+    }
+
     // Null-safety: the ABI must tolerate a null handle without crashing (defensive host calls).
     ssg_prepare(nullptr, 48000.0);
     ssg_process(nullptr, in.data(), 2, out.data(), 2, frames);
     ssg_enable_eq(nullptr, 1);
+    ssg_set_channel_trim_db(nullptr, 0, -3.0);
     ssg_destroy(nullptr);
     check(true, "null handle calls are no-ops (did not crash)");
 

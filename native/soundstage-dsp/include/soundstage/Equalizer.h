@@ -15,7 +15,9 @@ namespace soundstage {
 
 class Equalizer {
 public:
-    static constexpr int kMaxBands = 32;
+    // 31 graphic-EQ slots + the two tone shelves (Warmth/Air) the app parks above them, so a tone
+    // control can never overwrite a band the user set. One spare keeps the layout easy to extend.
+    static constexpr int kMaxBands = 34;
 
     enum class BandType { Peaking, LowShelf, HighShelf, Lowpass, Highpass };
 

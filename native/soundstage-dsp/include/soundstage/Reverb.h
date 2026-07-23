@@ -60,8 +60,23 @@ public:
         d_.push(v);
         return delayed + g_ * v;
     }
+    void setG(double g) { g_ = g < 0.05 ? 0.05 : (g > 0.9 ? 0.9 : g); }
 private:
     DelayLine d_; std::size_t len_ = 1; double g_ = 0.7;
+};
+
+/// One-pole high-pass — the complement of OnePoleLP. Used to keep the low end out of the reverb send
+/// so the tail adds space without turning the bass to mud.
+class OnePoleHP {
+public:
+    void setCutoff(double fs, double hz) {
+        const double x = std::exp(-2.0 * 3.14159265358979323846 * hz / fs);
+        a_ = 1.0 - x; b_ = x;
+    }
+    inline double process(double in) { z_ = a_ * in + b_ * z_; return in - z_; }
+    void reset() { z_ = 0.0; }
+private:
+    double a_ = 1.0, b_ = 0.0, z_ = 0.0;
 };
 
 class Reverb {
@@ -81,6 +96,9 @@ public:
         const double apMs[4] = {5.3, 7.1, 9.7, 12.9};
         for (int i = 0; i < 4; ++i) diff_[i].prepare(static_cast<std::size_t>(apMs[i] * 0.001 * fs_) + 1);
         pre_.prepare(static_cast<std::size_t>(0.2 * fs_) + 4);  // up to 200 ms pre-delay
+        lowCut_.setCutoff(fs_, lowCutHz_);
+        highCutL_.setCutoff(fs_, highCutHz_);
+        highCutR_.setCutoff(fs_, highCutHz_);
         updateDecay();
         reset();
     }
@@ -90,6 +108,9 @@ public:
         for (auto& d : damp_) d.reset();
         for (auto& a : diff_) a.reset();
         pre_.reset();
+        lowCut_.reset();
+        highCutL_.reset();
+        highCutR_.reset();
     }
 
     void setSize(double s01)      { size_ = clamp(s01, 0.05, 1.0); updateDecay(); }   // delay scale
@@ -100,12 +121,30 @@ public:
     void setMix(double wet01)     { mix_ = clamp(wet01, 0.0, 1.0); }
     void setWidth(double w01)     { width_ = clamp(w01, 0.0, 1.0); }
 
+    /// Input diffusion, 0..1: how hard the allpass chain smears the input. Low = you can hear the
+    /// individual early echoes; high = a smooth wash.
+    void setDiffusion(double d01) {
+        const double g = 0.35 + clamp(d01, 0.0, 1.0) * 0.43;   // 0.35..0.78
+        for (auto& a : diff_) a.setG(g);
+    }
+
+    /// Low cut on the reverb send (Hz): keeps bass out of the tail so the low end stays tight.
+    void setLowCutHz(double hz) { lowCutHz_ = clamp(hz, 20.0, 1000.0); lowCut_.setCutoff(fs_, lowCutHz_); }
+
+    /// High cut on the wet output (Hz): rolls the top off the tail so it sits behind the dry signal.
+    void setHighCutHz(double hz) {
+        highCutHz_ = clamp(hz, 1000.0, 20000.0);
+        highCutL_.setCutoff(fs_, highCutHz_);
+        highCutR_.setCutoff(fs_, highCutHz_);
+    }
+
     /// Process one stereo sample in place. Dry signal is preserved and blended per `mix`.
     inline void process(double& left, double& right) {
         const double dryL = left, dryR = right;
 
-        // Mono send into the reverb, through pre-delay + input diffusion.
+        // Mono send into the reverb, through low cut, pre-delay and input diffusion.
         double in = 0.5 * (dryL + dryR);
+        in = lowCut_.process(in);
         pre_.push(in);
         in = preLen_ > 0 ? pre_.tap(preLen_) : in;
         for (auto& a : diff_) in = a.process(in);
@@ -121,6 +160,9 @@ public:
             wetR += ((i >> 1) & 1 ? -s[i] : s[i]);
         }
         wetL *= 0.35; wetR *= 0.35;
+        // High cut on the tail only — the dry signal keeps all of its top end.
+        wetL = highCutL_.process(wetL);
+        wetR = highCutR_.process(wetR);
         // Width: blend toward mono as width→0.
         const double mid = 0.5 * (wetL + wetR), side = 0.5 * (wetL - wetR) * width_;
         wetL = mid + side; wetR = mid - side;
@@ -170,8 +212,11 @@ private:
     std::array<OnePoleLP, N> damp_;
     std::array<Allpass, 4> diff_;
     DelayLine pre_;
+    OnePoleHP lowCut_;
+    OnePoleLP highCutL_, highCutR_;
     std::size_t baseLen_[N] = {0}, len_[N] = {0}, preLen_ = 0;
     double size_ = 0.7, rt60_ = 2.0, dampHz_ = 9000.0, mix_ = 0.3, width_ = 0.8, fbGain_ = 0.8;
+    double lowCutHz_ = 120.0, highCutHz_ = 8000.0;
 };
 
 }  // namespace soundstage

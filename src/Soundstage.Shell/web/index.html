@@ -247,6 +247,28 @@
   .custominput{display:flex;gap:8px;margin-top:10px;}.custominput input{flex:1;max-width:320px;font:inherit;font-size:13px;color:var(--ink);background:#0e1620;border:1px solid #2b3a48;border-radius:10px;padding:9px 13px;}.custominput input:focus{outline:0;border-color:var(--glow);}
   .custominput button{font:inherit;font-size:13px;font-weight:600;color:#08131a;background:var(--glow);border:0;border-radius:10px;padding:9px 16px;cursor:pointer;}
 
+  /* ---- controls you can actually grab ----
+     Every draggable control sets touch-action:none so a drag is never stolen by page panning, and
+     only the grabbable part shows a grab cursor. Dials are turned by their handle the way a real
+     knob is: the face is not a slider. */
+  .radial{touch-action:none;}
+  .radial svg,.vd svg{overflow:visible;}
+  .knob-hit{cursor:grab;}
+  .dragging .knob-hit{cursor:grabbing;}
+  .knob-hub{cursor:pointer;}
+  .vd{width:50px;height:50px;touch-action:none;}
+  .vd svg{width:50px;height:50px;}
+  .fader,.sl,.geqbars,.band{touch-action:none;}
+  .bhandle.dragging,.fhandle.dragging,.sl b.dragging{cursor:grabbing;}
+  .band{cursor:pointer;}
+  .bdb{position:absolute;left:50%;transform:translateX(-50%);top:1px;font-family:ui-monospace,monospace;
+       font-size:9px;color:var(--glow-ink);opacity:0;transition:opacity .12s;pointer-events:none;z-index:4;white-space:nowrap;}
+  .band:hover .bdb,.band.dragging .bdb{opacity:1;}
+  .hzrow.dense span{font-size:7.5px;}
+  .pddmenu a.del{color:#ff98ac;border-top:1px solid var(--line);margin-top:4px;}
+  .out{cursor:pointer;}
+  .rail a,.wb b,.power,.pddbtn,.seg button,.ghost,.btn{-webkit-app-region:no-drag;app-region:no-drag;}
+
   @media (prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
 
@@ -298,11 +320,11 @@
 
         <!-- STATUS (persistent) -->
         <div class="screen" id="statusStrip">
-          <div class="np"><div class="bars"><i></i><i></i><i></i><i></i></div><div><div class="src">Soundstage</div><div class="trk">Ready — press power to start</div></div></div>
-          <span class="fmt"><b>2.0 → 7.1</b> · <b>48</b> kHz</span>
+          <div class="np"><div class="bars" id="npBars"><i></i><i></i><i></i><i></i></div><div><div class="src">Soundstage</div><div class="trk" id="npText">Ready — press power to start</div></div></div>
+          <span class="fmt" id="fmtChip"><b>2.0 → 2.0</b> · <b>48</b> kHz</span>
           <div class="tools">
             <button class="power off" data-power><span class="d"></span> Off</button>
-            <div class="voldial"><span class="lab">Vol</span><svg class="vd" viewBox="0 0 80 80"><circle cx="40" cy="40" r="30" fill="none" stroke="#1a2531" stroke-width="6" stroke-dasharray="141 189" transform="rotate(135 40 40)" stroke-linecap="round"/><circle cx="40" cy="40" r="30" fill="none" stroke="#37e0cf" stroke-width="6" stroke-dasharray="96 189" transform="rotate(135 40 40)" stroke-linecap="round" style="filter:drop-shadow(0 0 4px #37e0cf)"/><circle cx="40" cy="40" r="20" fill="#141d28" stroke="#2a3846"/><line x1="40" y1="40" x2="58" y2="27" stroke="#8ff4ea" stroke-width="3" stroke-linecap="round"/></svg><span class="vn">68</span></div>
+            <div class="voldial"><span class="lab">Vol</span><div class="vd" data-dial="volume"></div><span class="vn" id="volNum">68</span></div>
           </div>
         </div>
 
@@ -312,23 +334,24 @@
             <div class="colL">
               <section class="panel pad eqpanel">
                 <div class="ph"><h3>Equalizer</h3><div class="rt">
-                  <div class="pdd"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a>Flat</a><a class="on">Cinema</a><a>Music</a><a>Podcast</a></div></div>
-                  <div class="pdd"><button class="pddbtn"><span class="pfx">Yours</span> <span class="pn">Late Night</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a class="on">Late Night</a><a>Gaming</a><a class="add">＋ Save current…</a></div></div>
-                  <div class="seg"><button class="on">10</button><button>31</button></div>
+                  <div class="pdd" id="eqPresetDD"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Flat</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
+                  <div class="pdd" id="myPresetDD"><button class="pddbtn"><span class="pfx">Yours</span> <span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
+                  <div class="seg" id="eqMode"><button class="on" data-mode="10">10</button><button data-mode="31">31</button></div>
+                  <button class="ghost" id="eqReset">Flatten</button>
                 </div></div>
-                <div class="geqwrap"><div class="geqbars" data-eq><div class="zeroline"></div><span class="zerolab">0 dB</span></div><div class="hzrow"><span>31</span><span>63</span><span>125</span><span>250</span><span>500</span><span>1k</span><span>2k</span><span>4k</span><span>8k</span><span>16k</span></div></div>
+                <div class="geqwrap"><div class="geqbars" data-eq><div class="zeroline"></div><span class="zerolab">0 dB</span></div><div class="hzrow" id="hzRow"></div></div>
               </section>
-              <section class="panel out"><div class="oi"><svg class="ico"><use href="#i-spk"/></svg></div><div><div class="on-name">Logitech Z906</div><div class="os">Default output · all system audio</div></div><div class="badge">7.1 surround</div><svg class="ico cv" style="width:17px"><use href="#i-chev"/></svg></section>
+              <section class="panel out" id="outRow"><div class="oi"><svg class="ico"><use href="#i-spk"/></svg></div><div><div class="on-name" id="outName">Detecting output…</div><div class="os" id="outSub">Default output · all system audio</div></div><div class="badge" id="outBadge">—</div><svg class="ico cv" style="width:17px"><use href="#i-chev"/></svg></section>
             </div>
             <section class="panel pad fxpanel">
               <div class="ph"><h3>Effects</h3></div>
               <div class="fxgrid">
-                <div class="radial" data-val="62" data-label="Bass"></div>
-                <div class="radial" data-val="40" data-label="Air"></div>
-                <div class="radial off" data-val="30" data-label="Warmth"></div>
-                <div class="radial" data-val="55" data-label="Leveler"></div>
-                <div class="radial" data-val="35" data-label="Ambience"></div>
-                <div class="radial" data-val="45" data-label="Night" data-color="#ffbf6b"></div>
+                <div class="radial" data-dial="fx" data-fx="bass" data-label="Bass"></div>
+                <div class="radial" data-dial="fx" data-fx="air" data-label="Air"></div>
+                <div class="radial" data-dial="fx" data-fx="warmth" data-label="Warmth"></div>
+                <div class="radial" data-dial="fx" data-fx="leveler" data-label="Leveler"></div>
+                <div class="radial" data-dial="fx" data-fx="ambience" data-label="Ambience"></div>
+                <div class="radial" data-dial="fx" data-fx="night" data-label="Night" data-color="#ffbf6b"></div>
               </div>
             </section>
           </div>
@@ -337,44 +360,33 @@
         <!-- ============ SPEAKERS ============ -->
         <div class="page" data-page="speakers">
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Speaker calibration</h3><span class="sub">Logitech Z906 · 7.1 surround</span><div class="rt"><button class="btn" id="testall"><svg><use href="#i-play"/></svg> Test all</button><button class="ghost">Reset</button></div></div>
-            <div class="calib" id="calib">
-              <div class="strip"><div class="cl">FL</div><div class="cn">Front L</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip"><div class="cl">FR</div><div class="cn">Front R</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip"><div class="cl">C</div><div class="cn">Center</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:50%;height:14.7%"></div><div class="fhandle" style="top:64.7%"></div></div><div class="db">−2.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip sub"><div class="cl">LFE</div><div class="cn">Sub</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:28%;height:22%"></div><div class="fhandle" style="top:28%"></div></div><div class="db">+3.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip"><div class="cl">SL</div><div class="cn">Side L</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:50%;height:7.3%"></div><div class="fhandle" style="top:57.3%"></div></div><div class="db">−1.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip"><div class="cl">SR</div><div class="cn">Side R</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="ffill" style="top:50%;height:7.3%"></div><div class="fhandle" style="top:57.3%"></div></div><div class="db">−1.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip"><div class="cl">SBL</div><div class="cn">Back L</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
-              <div class="strip"><div class="cl">SBR</div><div class="cn">Back R</div><div class="fader"><div class="ftrack"></div><div class="fzero"></div><div class="fhandle" style="top:50%"></div></div><div class="db">0.0</div><button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button></div>
+            <div class="ph"><h3 class="big">Speaker calibration</h3><span class="sub" id="calibSub">—</span><div class="rt"><button class="btn" id="testall"><svg><use href="#i-play"/></svg> Test all</button><button class="ghost" id="calibReset">Reset</button></div></div>
+            <div class="calib" id="calib" data-build>
             </div>
           </section>
-          <section class="panel umrow"><div class="umi"><svg class="ico"><use href="#i-wave"/></svg></div><div class="umt"><div class="umn">Upmix stereo to surround</div><div class="umd">Fill your surround speakers when the source is only stereo (2.0).</div></div><div class="sw" data-sw><div class="k"></div></div></section>
+          <section class="panel umrow"><div class="umi"><svg class="ico"><use href="#i-wave"/></svg></div><div class="umt"><div class="umn">Upmix stereo to surround</div><div class="umd">Fill your surround speakers when the source is only stereo (2.0).</div></div><div class="sw" data-sw="upmix"><div class="k"></div></div></section>
         </div>
 
         <!-- ============ AMBIENCE ============ -->
         <div class="page" data-page="ambience">
           <section class="panel pad">
             <div class="ph"><h3 class="big">Ambience</h3><span class="sub">our own reverb — depth &amp; space for your speakers</span><div class="rt">
-              <div class="pdd"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a>Subtle</a><a class="on">Cinema Hall</a><a>Concert</a><a>Studio</a><a>Cathedral</a><a class="add">＋ Save current…</a></div></div>
-              <div class="sw on" data-sw><div class="k"></div></div>
+              <div class="pdd" id="rvPresetDD"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
+              <div class="sw" data-sw="ambience"><div class="k"></div></div>
             </div></div>
             <div class="setgroup">Space</div>
-            <div class="lrow"><span class="ll">Type</span><div class="pdd" style="margin-right:auto"><button class="pddbtn"><span class="pn">Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a>Room</a><a class="on">Hall</a><a>Plate</a><a>Chamber</a><a>Cathedral</a><a>Spring</a></div></div></div>
-            <div class="lrow"><span class="ll">Size</span><div class="sl"><i style="width:60%"></i><b style="left:60%"></b></div><span class="val">60%</span></div>
-            <div class="lrow"><span class="ll">Decay time</span><div class="sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="val">1.8 s</span></div>
-            <div class="lrow"><span class="ll">Pre-delay</span><div class="sl"><i style="width:25%"></i><b style="left:25%"></b></div><span class="val">22 ms</span></div>
+            <div class="lrow"><span class="ll">Type</span><div class="pdd" id="rvTypeDD" style="margin-right:auto"><button class="pddbtn"><span class="pn">Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
+            <div class="lrow"><span class="ll">Size</span><div class="sl" data-rv="size"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Decay time</span><div class="sl" data-rv="decay"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Pre-delay</span><div class="sl" data-rv="predelay"></div><span class="val"></span></div>
             <div class="setgroup">Tone &amp; character</div>
-            <div class="lrow"><span class="ll">Diffusion</span><div class="sl"><i style="width:75%"></i><b style="left:75%"></b></div><span class="val">75%</span></div>
-            <div class="lrow"><span class="ll">Damping</span><div class="sl"><i style="width:40%"></i><b style="left:40%"></b></div><span class="val">40%</span></div>
-            <div class="lrow"><span class="ll">Early reflections</span><div class="sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="val">50%</span></div>
-            <div class="lrow"><span class="ll">Modulation</span><div class="sl"><i style="width:20%"></i><b style="left:20%"></b></div><span class="val">20%</span></div>
-            <div class="lrow"><span class="ll">Low cut</span><div class="sl"><i style="width:30%"></i><b style="left:30%"></b></div><span class="val">120 Hz</span></div>
-            <div class="lrow"><span class="ll">High cut</span><div class="sl"><i style="width:55%"></i><b style="left:55%"></b></div><span class="val">8 kHz</span></div>
-            <div class="setgroup">Surround &amp; mix</div>
-            <div class="lrow"><span class="ll">Surround spread</span><div class="sl"><i style="width:70%"></i><b style="left:70%"></b></div><span class="val">70%</span></div>
-            <div class="lrow"><span class="ll">Width</span><div class="sl"><i style="width:65%"></i><b style="left:65%"></b></div><span class="val">65%</span></div>
-            <div class="lrow"><span class="ll">Mix</span><div class="sl"><i style="width:35%"></i><b style="left:35%"></b></div><span class="val">35%</span></div>
+            <div class="lrow"><span class="ll">Diffusion</span><div class="sl" data-rv="diffusion"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Damping</span><div class="sl" data-rv="damping"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Low cut</span><div class="sl" data-rv="lowcut"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">High cut</span><div class="sl" data-rv="highcut"></div><span class="val"></span></div>
+            <div class="setgroup">Width &amp; mix</div>
+            <div class="lrow"><span class="ll">Width</span><div class="sl" data-rv="width"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Mix</span><div class="sl" data-rv="mix"></div><span class="val"></span></div>
           </section>
           <section class="panel pad" style="padding:13px 17px"><div style="font-size:12px;color:var(--dim)">The sub (LFE) stays dry, so the low end never turns to mud.</div></section>
         </div>
@@ -453,16 +465,13 @@
           <section class="panel pad">
             <div class="ph"><h3 class="big">Settings</h3></div>
             <div class="setgroup">Startup</div>
-            <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
-            <div class="setrow"><div class="st"><div class="stn">Start minimized to tray</div></div><div class="sw" data-sw><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw" data-sw="runAtLogin"><div class="k"></div></div></div>
             <div class="setgroup">Audio</div>
-            <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage plays your processed sound</div></div><div class="pdd"><button class="pddbtn"><span class="pn">Logitech Z906</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a class="on">Logitech Z906 (7.1)</a><a>HDMI TV</a><a>Headphones</a></div></div></div>
-            <div class="setrow"><div class="st"><div class="stn">Auto-switch to headphones</div><div class="std">Use your headphone tuning when they're plugged in</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
-            <div class="setgroup">Updates</div>
-            <div class="setrow"><div class="st"><div class="stn">Version 1.0.0</div><div class="std">You're up to date</div></div><button class="btn"><svg><use href="#i-refresh"/></svg> Check</button></div>
-            <div class="setrow"><div class="st"><div class="stn">Install updates automatically</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage plays your processed sound</div></div><div class="pdd" id="devDD"><button class="pddbtn"><span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Engine</div><div class="std" id="engineStatus">Checking…</div></div><button class="ghost" id="refreshDevices">Rescan devices</button></div>
             <div class="setgroup">Diagnostics</div>
-            <div class="setrow"><div class="st"><div class="stn">Copy diagnostics</div><div class="std">Details to share if something's off</div></div><button class="btn"><svg><use href="#i-file"/></svg> Copy</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Version 1.0.0</div><div class="std">Settings are saved automatically</div></div><button class="btn" id="copyDiag"><svg><use href="#i-file"/></svg> Copy</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Reset everything</div><div class="std">Put every control back to its default</div></div><button class="ghost" id="resetAll">Reset</button></div>
           </section>
         </div>
 
@@ -472,136 +481,1127 @@
 </div>
 
 <script>
-  var chev='<svg><use href="#i-chev"/></svg>';
+/* =====================================================================================
+   Soundstage UI
 
-  /* radial dials (dashboard) */
-  function radial(el){var v=+el.dataset.val,l=el.dataset.label,c=el.dataset.color||'#37e0cf';
-    var C=2*Math.PI*28,track=270/360*C,val=(v/100)*(270/360*C),end=(135+(v/100)*270)*Math.PI/180,hx=(38+28*Math.cos(end)).toFixed(1),hy=(38+28*Math.sin(end)).toFixed(1);
-    el.innerHTML='<svg viewBox="0 0 76 76"><circle cx="38" cy="38" r="28" fill="none" stroke="#12202a" stroke-width="5" stroke-dasharray="'+track.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(135 38 38)" stroke-linecap="round"/><circle cx="38" cy="38" r="28" fill="none" stroke="'+c+'" stroke-width="5" stroke-dasharray="'+val.toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(135 38 38)" stroke-linecap="round" style="filter:drop-shadow(0 0 4px '+c+')"/><circle cx="38" cy="38" r="14" fill="#12202a" stroke="'+c+'" stroke-opacity=".8"/><circle cx="'+hx+'" cy="'+hy+'" r="5" fill="#0d141d" stroke="'+c+'" stroke-width="2.5"/></svg><span class="rl">'+l+'</span><span class="rv">'+v+'%</span>';}
-  document.querySelectorAll('.radial').forEach(radial);
+   One state object drives everything. Controls never hold their own value: they read S,
+   write S, then re-render from S and push the change to the engine. That is what makes a
+   preset, a restored session and a dial drag all end up in exactly the same place.
 
-  /* build EQ bars into every [data-eq] */
-  var eqvals=[43.3,36.7,46.7,53.3,56.7,50,40,33.3,43.3,46.7];
-  document.querySelectorAll('[data-eq]').forEach(function(host){
-    eqvals.forEach(function(top){
-      var band=document.createElement('div');band.className='band';
-      var fill='';if(top<50)fill='<div class="bfill" style="top:'+top+'%;height:'+(50-top)+'%"></div>';else if(top>50)fill='<div class="bfill" style="top:50%;height:'+(top-50)+'%"></div>';
-      band.innerHTML='<div class="btrackline"></div>'+fill+'<div class="bhandle" style="top:'+top+'%"></div>';
-      host.appendChild(band);
-    });
-  });
+   Layout of this file:
+     1. state + defaults          5. dials (turn by the handle)
+     2. bridge to the host        6. EQ
+     3. render helpers            7. sliders, faders, toggles
+     4. engine push               8. presets, pages, wiring
+   ===================================================================================== */
+(function () {
+  'use strict';
 
-  /* page navigation */
-  function setPage(name){
-    document.querySelectorAll('.page').forEach(function(p){p.classList.toggle('show',p.getAttribute('data-page')===name);});
-    var navName=(name==='builder')?'automations':name;
-    document.querySelectorAll('.rail a[data-nav]').forEach(function(a){a.classList.toggle('on',a.getAttribute('data-nav')===navName);});
-    document.getElementById('statusStrip').style.display=(name==='builder')?'none':'flex';
-    if(name==='builder'){showScr('scr-canvas');}
-    var c=document.querySelector('.content');if(c){c.scrollTo({top:0,behavior:'smooth'});}
+  var chev = '<svg><use href="#i-chev"/></svg>';
+  var clamp = function (v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); };
+  var round1 = function (v) { return Math.round(v * 10) / 10; };
+
+  /* ---------- 1. state ---------------------------------------------------------------- */
+
+  /* The graphic EQ's band centres. The host owns the real filter frequencies; these are only
+     for the labels and for sampling preset curves. */
+  var FREQ10 = [31.25, 62.5, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+  var FREQ31 = [20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160, 200, 250, 315, 400, 500, 630,
+                800, 1000, 1250, 1600, 2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000, 20000];
+  var EQ_RANGE = 12;   /* the fader travel, in dB either side of flat */
+
+  var CHANNELS = [
+    { key: 'FL',  name: 'Front L' }, { key: 'FR',  name: 'Front R' },
+    { key: 'C',   name: 'Center'  }, { key: 'LFE', name: 'Sub', sub: true },
+    { key: 'SL',  name: 'Side L'  }, { key: 'SR',  name: 'Side R' },
+    { key: 'SBL', name: 'Back L'  }, { key: 'SBR', name: 'Back R' }
+  ];
+
+  var FX = [
+    { id: 'bass',     label: 'Bass'     },
+    { id: 'air',      label: 'Air'      },
+    { id: 'warmth',   label: 'Warmth'   },
+    { id: 'leveler',  label: 'Leveler'  },
+    { id: 'ambience', label: 'Ambience' },
+    { id: 'night',    label: 'Night'    }
+  ];
+
+  /* Ambience parameters: how each slider maps to a real engine value, and how it reads out. */
+  var RV = {
+    size:      { min: 0.05, max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    decay:     { min: 0.2,  max: 8,     fmt: function (v) { return round1(v) + ' s'; } },
+    predelay:  { min: 0,    max: 200,   fmt: function (v) { return Math.round(v) + ' ms'; } },
+    diffusion: { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    damping:   { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    lowcut:    { min: 20,   max: 1000,  log: true, fmt: hz },
+    highcut:   { min: 1000, max: 20000, log: true, fmt: hz },
+    width:     { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    mix:       { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } }
+  };
+  function hz(v) { return v >= 1000 ? round1(v / 1000) + ' kHz' : Math.round(v) + ' Hz'; }
+
+  function defaults() {
+    return {
+      power: false,
+      volume: 68,
+      eq: { mode: 10, gains10: FREQ10.map(function () { return 0; }),
+                      gains31: FREQ31.map(function () { return 0; }), preset: 'Flat', mine: null },
+      fx: {
+        bass:     { on: false, v: 40 }, air:      { on: false, v: 35 },
+        warmth:   { on: false, v: 30 }, leveler:  { on: false, v: 45 },
+        ambience: { on: false, v: 30 }, night:    { on: false, v: 40 }
+      },
+      rv: { on: false, type: 'Hall', preset: 'Cinema Hall',
+            size: 0.6, decay: 1.8, predelay: 22, diffusion: 0.75,
+            damping: 0.4, lowcut: 120, highcut: 8000, width: 0.65, mix: 0.35 },
+      spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false },
+      settings: { runAtLogin: false, deviceId: null },
+      presets: {}   /* the user's own saved presets, by name */
+    };
   }
-  document.querySelectorAll('.rail a[data-nav]').forEach(function(a){a.addEventListener('click',function(){setPage(a.getAttribute('data-nav'));});});
-  document.getElementById('newAuto').addEventListener('click',function(){resetBuilder();setPage('builder');});
 
-  /* builder internal screens */
-  function showScr(id){document.querySelectorAll('#scr-canvas,#scr-trigger,#scr-actions,#scr-value').forEach(function(s){s.classList.toggle('show',s.id===id);});closeMenus();}
-  var TRIG={app:{t:'t-violet',ic:'i-app',html:'<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="apps">Netflix '+chev+'</span><span class="cfg-word">is playing</span>'},format:{t:'t-cyan',ic:'i-layers',html:'<span class="btitle">When the source is</span><span class="cfg-dd" data-opts="stereo (2.0),5.1,7.1">5.1 '+chev+'</span>'},time:{t:'t-amber',ic:'i-clock',html:'<span class="btitle">At</span><span class="cfg-dd" data-opts="6:00 AM,8:00 AM,6:00 PM,10:00 PM,11:00 PM,12:00 AM">10:00 PM '+chev+'</span><span class="cfg-word">every day</span>'},startup:{t:'t-green',ic:'i-power',html:'<span class="btitle">When Soundstage starts</span>'},device:{t:'t-blue',ic:'i-plug',html:'<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="devices">Headphones '+chev+'</span><span class="cfg-word">connect</span>'}};
-  var ACT={preset:{t:'t-cyan',ic:'i-layers',html:'<span class="btitle">Switch preset to</span><span class="cfg-dd" data-pick-cat="presets">Cinema '+chev+'</span>'},volume:{t:'t-blue',ic:'i-spk',html:'<span class="btitle">Set volume to</span><div class="cfg-sl"><i style="width:60%"></i><b style="left:60%"></b></div><span class="cfg-pct">60%</span>'},fxamount:{t:'t-green',ic:'i-wave',html:'<span class="btitle">Set</span><span class="cfg-dd" data-opts="Ambience,Bass,Air,Warmth,Leveler,Night">Bass '+chev+'</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="cfg-pct">50%</span>'},fxtoggle:{t:'t-green',ic:'i-eq',html:'<span class="btitle">Turn</span><span class="cfg-dd" data-opts="Night mode,Bass,Air,Warmth,Leveler,Ambience">Night mode '+chev+'</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>'},fxalloff:{t:'t-rose',ic:'i-x',html:'<span class="btitle">Turn all effects off</span>'},spklevel:{t:'t-amber',ic:'i-spk',html:'<span class="btitle">Set</span><span class="cfg-dd" data-opts="Front L,Front R,Center,Sub,Side L,Side R,Back L,Back R">Center '+chev+'</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="cfg-pct">−2 dB</span>'},upmix:{t:'t-cyan',ic:'i-wave',html:'<span class="btitle">Upmix stereo to surround</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>'},notify:{t:'t-violet',ic:'i-bell',html:'<span class="btitle">Show a notification</span><input class="cfg-in" placeholder="e.g. Switched to Cinema" />'},wait:{t:'t-blue',ic:'i-clock',html:'<span class="btitle">Wait</span><span class="cfg-dd" data-opts="1 second,2 seconds,5 seconds,10 seconds">2 seconds '+chev+'</span>'},ifcond:{t:'t-amber',ic:'i-branch',html:'<span class="btitle">If</span><span class="cfg-dd" data-opts="the source is 5.1,it\'s after 10 PM,headphones are connected">the source is 5.1 '+chev+'</span><span class="bsub">Steps below run only when this is true</span>'}};
-  var VALUES={apps:{title:'Which app?',detected:'Playing now: <b>Spotify</b>',items:['Netflix','Spotify','YouTube','Disney+','Prime Video','Apple Music','VLC','Twitch','Chrome','A Steam game','Discord call','Zoom','Any game']},devices:{title:'Which device?',detected:'Connected now: <b>Logitech Z906 · 7.1</b>',items:['Headphones','HDMI TV','USB DAC','Bluetooth speaker','Optical / SPDIF','Line out','Any headphones']},presets:{title:'Which preset?',detected:'',items:['Flat','Cinema','Music','Podcast','Late Night (yours)','Gaming (yours)']}};
-  var activeDD=null,trigStack=document.getElementById('trigStack'),actStack=document.getElementById('actStack');
-  function bar(def,h){var el=document.createElement('div');el.className='barrow';el.innerHTML=(h?'<span class="handle">⋮⋮</span>':'')+'<div class="btile '+def.t+'"><svg class="ico"><use href="#'+def.ic+'"/></svg></div><div class="bmain">'+def.html+'</div><div class="brm"><svg><use href="#i-x"/></svg></div>';return el;}
-  function refreshWhen(){var has=trigStack.children.length>0;document.querySelector('#scr-canvas .emptyrow').style.display=has?'none':'flex';document.getElementById('addCond').style.display=has?'flex':'none';}
-  function refreshDo(){document.getElementById('emptyDo').style.display=actStack.children.length?'none':'block';}
-  function addTrigger(k){if(trigStack.children.length){var l=document.createElement('div');l.className='andlabel';l.textContent='AND';trigStack.appendChild(l);}trigStack.appendChild(bar(TRIG[k],false));refreshWhen();}
-  function addAction(k){if(actStack.children.length){var c=document.createElement('div');c.className='conn';actStack.appendChild(c);}actStack.appendChild(bar(ACT[k],true));refreshDo();}
-  function resetBuilder(){trigStack.innerHTML='';actStack.innerHTML='';refreshWhen();refreshDo();}
-  function openValuePicker(cat,dd){activeDD=dd;var v=VALUES[cat];document.getElementById('valTitle').textContent=v.title;var det=document.getElementById('valDetected');det.innerHTML=v.detected||'';det.style.display=v.detected?'block':'none';document.getElementById('valSearch').value='';var list=document.getElementById('valList');list.innerHTML='';v.items.forEach(function(it){var d=document.createElement('div');d.className='vitem';d.textContent=it;list.appendChild(d);});document.getElementById('customInput').style.display='none';document.getElementById('customField').value='';showScr('scr-value');}
-  function setActive(t){if(activeDD)activeDD.innerHTML=t+' '+chev;showScr('scr-canvas');}
+  var S = defaults();
+  var devices = [];
+  var engineOk = false;
+  var ready = false;      /* true once the host's saved state has been applied */
 
-  /* floating dropdown */
-  function closeMenus(){document.querySelectorAll('.ddmenu').forEach(function(m){m.remove();});document.querySelectorAll('.pdd.open').forEach(function(p){p.classList.remove('open');});}
-  function openMenu(dd){closeMenus();var opts=dd.dataset.opts.split(','),cur=dd.textContent.trim();var m=document.createElement('div');m.className='ddmenu';opts.forEach(function(o){var it=document.createElement('div');it.className='ddm-item'+(o===cur?' on':'');it.textContent=o;it.addEventListener('click',function(ev){ev.stopPropagation();dd.innerHTML=o+' '+chev;closeMenus();});m.appendChild(it);});document.body.appendChild(m);var r=dd.getBoundingClientRect();m.style.left=r.left+'px';m.style.top=(r.bottom+5)+'px';m.style.minWidth=r.width+'px';}
+  /* ---------- 2. bridge --------------------------------------------------------------- */
 
-  /* speaker tests */
-  var strips=[].slice.call(document.querySelectorAll('#calib .strip'));
-  function playOne(s){strips.forEach(function(x){x.classList.remove('playing');});s.classList.add('playing');clearTimeout(s._t);s._t=setTimeout(function(){s.classList.remove('playing');},900);}
-  var testAll=document.getElementById('testall');if(testAll)testAll.addEventListener('click',function(){strips.forEach(function(s,i){setTimeout(function(){strips.forEach(function(x){x.classList.remove('playing');});s.classList.add('playing');if(i===strips.length-1)setTimeout(function(){s.classList.remove('playing');},700);},i*650);});});
+  var haveHost = !!(window.chrome && window.chrome.webview);
+  function post(m) { try { if (haveHost) window.chrome.webview.postMessage(m); } catch (e) {} }
+  function send(msg) { post(JSON.stringify(msg)); }
 
-  /* global clicks */
-  document.addEventListener('click',function(e){
-    var op=e.target.closest('[data-open]');if(op){showScr(op.getAttribute('data-open')==='trigger'?'scr-trigger':'scr-actions');return;}
-    var ex=e.target.closest('[data-exit]');if(ex){setPage('automations');return;}
-    var bk=e.target.closest('[data-back]');if(bk){showScr('scr-canvas');return;}
-    var tr=e.target.closest('[data-trig]');if(tr){addTrigger(tr.getAttribute('data-trig'));showScr('scr-canvas');return;}
-    var ac=e.target.closest('[data-act]');if(ac){addAction(ac.getAttribute('data-act'));showScr('scr-canvas');return;}
-    var vi=e.target.closest('.vitem');if(vi){setActive(vi.textContent);return;}
-    var ct=e.target.closest('#customToggle');if(ct){document.getElementById('customInput').style.display='flex';document.getElementById('customField').focus();return;}
-    var cs=e.target.closest('#customSave');if(cs){var cv=document.getElementById('customField').value.trim();if(cv){setActive(cv);}else{showScr('scr-canvas');}return;}
-    var rm=e.target.closest('.brm');if(rm){var row=rm.closest('.barrow');var p=row.previousElementSibling;if(p&&(p.classList.contains('conn')||p.classList.contains('andlabel')))p.remove();else{var n=row.nextElementSibling;if(n&&(n.classList.contains('conn')||n.classList.contains('andlabel')))n.remove();}row.remove();refreshWhen();refreshDo();return;}
-    var t=e.target.closest('.test');if(t){playOne(t.closest('.strip'));return;}
-    var pw=e.target.closest('[data-power]');if(pw){var o=pw.classList.toggle('off');pw.innerHTML='<span class="d"></span> '+(o?'Off':'On');return;}
-    var sw=e.target.closest('[data-sw]');if(sw){var on=sw.classList.toggle('on');var card=sw.closest('.acard');if(card)card.classList.toggle('off',!on);return;}
-    var rad=e.target.closest('.radial');if(rad){return;}  /* dial on/off + drag handled by pointer events */
-    var pb=e.target.closest('.cfg-pills button');if(pb){pb.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});pb.classList.add('on');closeMenus();return;}
-    var dd=e.target.closest('.cfg-dd');if(dd){if(dd.dataset.pickCat){openValuePicker(dd.dataset.pickCat,dd);e.stopPropagation();return;}openMenu(dd);e.stopPropagation();return;}
-    var pbtn=e.target.closest('.pddbtn');if(pbtn){var pdd=pbtn.closest('.pdd');var wo=pdd.classList.contains('open');closeMenus();if(!wo)pdd.classList.add('open');e.stopPropagation();return;}
-    var pi=e.target.closest('.pddmenu a');if(pi&&!pi.classList.contains('add')){var pm=pi.closest('.pdd');pm.querySelectorAll('a').forEach(function(x){x.classList.remove('on');});pi.classList.add('on');var pn=pm.querySelector('.pddbtn .pn');if(pn)pn.textContent=pi.textContent;pm.classList.remove('open');return;}
-    var sg=e.target.closest('.seg button');if(sg){sg.parentNode.querySelectorAll('button').forEach(function(x){x.classList.remove('on');});sg.classList.add('on');return;}
-    var sug=e.target.closest('.sug');if(sug){sug.style.borderStyle='solid';sug.style.borderColor='#37e0cf';return;}
-    closeMenus();
-  });
-  var as=document.getElementById('actSearch');if(as)as.addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('#actList .pitem').forEach(function(it){it.style.display=it.textContent.toLowerCase().indexOf(q)>=0?'':'none';});});
-  var vs=document.getElementById('valSearch');if(vs)vs.addEventListener('input',function(){var q=this.value.toLowerCase();document.querySelectorAll('#valList .vitem').forEach(function(it){it.style.display=it.textContent.toLowerCase().indexOf(q)>=0?'':'none';});});
+  var saveTimer = null;
+  function save() {
+    if (!ready) { return; }
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { send({ t: 'save', state: S }); }, 400);
+  }
 
-  /* ---- engine bridge: send UI control changes to the native engine, receive status back ---- */
-  (function(){
-    function ssg(m){try{if(window.chrome&&window.chrome.webview){window.chrome.webview.postMessage(JSON.stringify(m));}}catch(e){}}
-    var FX={'Bass':'bass','Air':'air','Warmth':'warmth','Leveler':'leveler','Ambience':'ambience','Night':'night'};
-    function emitDial(el){var id=FX[el.dataset.label];if(!id)return;ssg({t:'effect',id:id,on:!el.classList.contains('off'),v:(+el.dataset.val||0)/100});}
+  var toastEl;
+  function toast(msg) {
+    if (!toastEl) { toastEl = document.createElement('div'); toastEl.id = 'toast'; document.body.appendChild(toastEl); }
+    toastEl.textContent = msg;
+    toastEl.classList.add('show');
+    clearTimeout(toastEl._h);
+    toastEl._h = setTimeout(function () { toastEl.classList.remove('show'); }, 6500);
+  }
 
-    /* Power button: runs after the existing handler (which flips the text) and emits the result. */
-    document.addEventListener('click',function(e){
-      var pw=e.target.closest('[data-power]');
-      if(pw){ssg({t:'power',on:!pw.classList.contains('off')});return;}
+  /* ---------- 3. generic drag -------------------------------------------------------- */
+
+  /* One pointer-capture drag helper for every control. `onMove` gets the live pointer event;
+     the element keeps the pointer until release, so the drag survives leaving the element. */
+  function draggable(el, onDown, onMove, onUp) {
+    var id = null;
+    el.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0 && e.pointerType === 'mouse') { return; }
+      id = e.pointerId;
+      try { el.setPointerCapture(id); } catch (_) {}
+      el.classList.add('dragging');
+      if (onDown) { onDown(e); }
+      e.preventDefault();
+      e.stopPropagation();
     });
+    el.addEventListener('pointermove', function (e) {
+      if (id === null || e.pointerId !== id) { return; }
+      onMove(e);
+      e.preventDefault();
+    });
+    function end(e) {
+      if (id === null || e.pointerId !== id) { return; }
+      try { el.releasePointerCapture(id); } catch (_) {}
+      id = null;
+      el.classList.remove('dragging');
+      if (onUp) { onUp(e); }
+    }
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+  }
 
-    /* Dials: drag up/down to adjust the amount, click to toggle on/off — both drive the engine live. */
-    document.querySelectorAll('.radial').forEach(function(el){
-      var startY=0,startVal=0,dragging=false,pid;
-      el.addEventListener('pointerdown',function(e){
-        startY=e.clientY;startVal=+el.dataset.val||0;dragging=false;pid=e.pointerId;
-        try{el.setPointerCapture(pid);}catch(_){}
-        e.preventDefault();
-      });
-      el.addEventListener('pointermove',function(e){
-        if(pid===undefined||e.pointerId!==pid)return;
-        var dy=startY-e.clientY;
-        if(Math.abs(dy)>3)dragging=true;
-        if(dragging){
-          var v=Math.max(0,Math.min(100,Math.round(startVal+dy*0.5)));
-          if(v!==(+el.dataset.val||0)){el.dataset.val=v;el.classList.remove('off');radial(el);emitDial(el);}
+  /* ---------- 4. pushing state at the engine ------------------------------------------ */
+
+  function pushVolume() { send({ t: 'volume', v: S.volume / 100 }); }
+  function pushFx(id) {
+    var f = S.fx[id];
+    send({ t: 'effect', id: id, on: !!f.on, v: f.v / 100 });
+  }
+  function pushEq() {
+    var g = S.eq.mode === 31 ? S.eq.gains31 : S.eq.gains10;
+    send({ t: 'eq', mode: S.eq.mode, gains: g, on: true });
+  }
+  function pushReverb() {
+    send({ t: 'reverb', on: !!S.rv.on, size: S.rv.size, decay: S.rv.decay, damping: S.rv.damping,
+           predelay: S.rv.predelay, width: S.rv.width, mix: S.rv.mix,
+           diffusion: S.rv.diffusion, lowcut: S.rv.lowcut, highcut: S.rv.highcut });
+  }
+  function pushUpmix() { send({ t: 'upmix', on: !!S.spk.upmix, amount: 0.7, center: 1, lfe: 1 }); }
+  function pushTrims() {
+    for (var i = 0; i < 8; i++) { send({ t: 'trim', ch: i, db: S.spk.trims[i] }); }
+  }
+  function pushAll() {
+    send({ t: 'master', on: true });
+    pushVolume();
+    FX.forEach(function (f) { pushFx(f.id); });
+    pushEq();
+    pushReverb();
+    pushUpmix();
+    pushTrims();
+  }
+
+  /* ---------- 5. dials ---------------------------------------------------------------- */
+
+  /* The arc runs 270°, from 135° (lower left) clockwise to 405°/45° (lower right) — the same
+     sweep the design draws. Turning is ABSOLUTE: the handle goes where your pointer is, which
+     is what "grab it and swing it round" means. The dead zone at the bottom snaps to whichever
+     end is nearer, so you can never fall off the scale mid-turn. */
+  var ARC_START = 135, ARC_SWEEP = 270;
+
+  function angleToValue(cx, cy, px, py) {
+    var a = Math.atan2(py - cy, px - cx) * 180 / Math.PI;
+    if (a < 0) { a += 360; }
+    if (a < ARC_START) { a += 360; }            /* now ARC_START .. ARC_START+360 */
+    var t = (a - ARC_START) / ARC_SWEEP;
+    if (t <= 1) { return clamp(t, 0, 1) * 100; }
+    return (a - ARC_START) < (ARC_SWEEP + 45) ? 100 : 0;   /* bottom dead zone */
+  }
+
+  var SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(name, attrs) {
+    var e = document.createElementNS(SVGNS, name);
+    Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+    return e;
+  }
+
+  /* Build a dial's SVG ONCE and keep the nodes. Everything after this only moves attributes:
+     re-creating the SVG on each change would destroy the element holding the pointer capture,
+     and the turn would die after a single pixel of movement. */
+  function buildDial(el, colour, size, r, hubR) {
+    var c = size / 2;
+    var circ = 2 * Math.PI * r;
+    var track = ARC_SWEEP / 360 * circ;
+    var svg = svgEl('svg', { viewBox: '0 0 ' + size + ' ' + size });
+
+    svg.appendChild(svgEl('circle', {
+      cx: c, cy: c, r: r, fill: 'none', stroke: '#12202a', 'stroke-width': 5,
+      'stroke-dasharray': track.toFixed(1) + ' ' + circ.toFixed(1),
+      transform: 'rotate(135 ' + c + ' ' + c + ')', 'stroke-linecap': 'round'
+    }));
+
+    var lit = svgEl('circle', {
+      cx: c, cy: c, r: r, fill: 'none', stroke: colour, 'stroke-width': 5,
+      'stroke-dasharray': '0 ' + circ.toFixed(1),
+      transform: 'rotate(135 ' + c + ' ' + c + ')', 'stroke-linecap': 'round',
+      style: 'filter:drop-shadow(0 0 4px ' + colour + ')'
+    });
+    svg.appendChild(lit);
+
+    var hub = svgEl('circle', {
+      'class': 'knob-hub', cx: c, cy: c, r: hubR, fill: '#12202a', stroke: colour, 'stroke-opacity': '.8'
+    });
+    svg.appendChild(hub);
+
+    var dot = svgEl('circle', { cx: c, cy: c, r: 5, fill: '#0d141d', stroke: colour, 'stroke-width': 2.5 });
+    svg.appendChild(dot);
+
+    /* The grab target — deliberately larger than the dot it sits on, so the handle is easy to
+       catch. This is the only part of the dial that starts a turn. */
+    var hit = svgEl('circle', { 'class': 'knob-hit', cx: c, cy: c, r: 13, fill: 'transparent' });
+    svg.appendChild(hit);
+
+    el.insertBefore(svg, el.firstChild);
+    return { svg: svg, lit: lit, dot: dot, hit: hit, hub: hub, c: c, r: r, circ: circ, track: track };
+  }
+
+  function paintDial(d, value) {
+    d.lit.setAttribute('stroke-dasharray', ((value / 100) * d.track).toFixed(1) + ' ' + d.circ.toFixed(1));
+    var a = (ARC_START + (value / 100) * ARC_SWEEP) * Math.PI / 180;
+    var hx = (d.c + d.r * Math.cos(a)).toFixed(2);
+    var hy = (d.c + d.r * Math.sin(a)).toFixed(2);
+    d.dot.setAttribute('cx', hx); d.dot.setAttribute('cy', hy);
+    d.hit.setAttribute('cx', hx); d.hit.setAttribute('cy', hy);
+  }
+
+  /* Wire a dial once. Only the handle turns it; the hub is the on/off button; the rest of the
+     face is inert on purpose — pressing empty space must never move a value. */
+  function initDial(el, opts) {
+    var d = buildDial(el, opts.colour, opts.size, opts.r, opts.hub);
+    el._dial = d;
+
+    var turning = false;
+    draggable(d.svg, function (e) {
+      turning = (e.target === d.hit);
+      if (!turning) { el.classList.remove('dragging'); }
+    }, function (e) {
+      if (!turning) { return; }
+      var box = d.svg.getBoundingClientRect();
+      opts.set(angleToValue(box.left + box.width / 2, box.top + box.height / 2, e.clientX, e.clientY));
+    }, function () { turning = false; });
+
+    if (opts.toggle) {
+      d.hub.addEventListener('click', function (e) { e.stopPropagation(); opts.toggle(); });
+    }
+
+    /* Wheel over the dial nudges it — the fine adjustment a drag can't give you. */
+    el.addEventListener('wheel', function (e) {
+      opts.set(clamp(opts.get() + (e.deltaY < 0 ? 2 : -2), 0, 100));
+      e.preventDefault();
+    }, { passive: false });
+
+    el.addEventListener('dblclick', function (e) { e.preventDefault(); opts.set(opts.reset); });
+  }
+
+  function initDials() {
+    document.querySelectorAll('[data-dial="fx"]').forEach(function (el) {
+      var id = el.dataset.fx;
+      var label = document.createElement('span');
+      label.className = 'rl';
+      label.textContent = el.dataset.label;
+      var val = document.createElement('span');
+      val.className = 'rv';
+      el.appendChild(label);
+      el.appendChild(val);
+      el._val = val;
+      initDial(el, {
+        colour: el.dataset.color || '#37e0cf', size: 76, r: 28, hub: 14, reset: 50,
+        get: function () { return S.fx[id].v; },
+        set: function (v) {
+          var fx = S.fx[id];
+          if (Math.round(v) === Math.round(fx.v)) { return; }
+          fx.v = v;
+          if (!fx.on) { fx.on = true; }          /* turning a dial turns its effect on */
+          if (id === 'ambience') { S.rv.mix = v / 100; renderReverb(); }
+          renderFxDial(el);
+          pushFx(id);
+          save();
+        },
+        toggle: function () {
+          var fx = S.fx[id];
+          fx.on = !fx.on;
+          if (id === 'ambience') { S.rv.on = fx.on; pushReverb(); renderReverb(); }
+          renderFxDial(el);
+          pushFx(id);
+          save();
         }
       });
-      el.addEventListener('pointerup',function(e){
-        if(pid!==undefined){try{el.releasePointerCapture(pid);}catch(_){}}
-        if(!dragging){el.classList.toggle('off');emitDial(el);}  /* a plain click toggles on/off */
-        dragging=false;pid=undefined;
-      });
     });
 
-    /* toast for status coming back from the app */
-    var toastEl=document.createElement('div');toastEl.id='toast';document.body.appendChild(toastEl);
-    function toast(msg){toastEl.textContent=msg;toastEl.classList.add('show');clearTimeout(toastEl._h);toastEl._h=setTimeout(function(){toastEl.classList.remove('show');},7000);}
-
-    if(window.chrome&&window.chrome.webview){
-      window.chrome.webview.addEventListener('message',function(ev){
-        var m=''+ev.data;
-        if(m==='no-cable'){toast('First set up the free “CABLE” outlet: install VB-CABLE, then pick “CABLE” as your Windows speaker. Then press the power button.');}
-        else if(m==='running'){toast('Soundstage is now processing your sound.');}
-        else if(m==='audio-error'){toast('Couldn’t start audio — check your output device and try again.');}
+    var vol = document.querySelector('[data-dial="volume"]');
+    if (vol) {
+      initDial(vol, {
+        colour: '#37e0cf', size: 80, r: 30, hub: 20, reset: 68,
+        get: function () { return S.volume; },
+        set: function (v) {
+          if (Math.round(v) === Math.round(S.volume)) { return; }
+          S.volume = v;
+          renderVolDial();
+          pushVolume();
+          save();
+        }
       });
-      /* once the bridge is up, sync every dial's starting state to the engine */
-      setTimeout(function(){document.querySelectorAll('.radial').forEach(emitDial);},400);
     }
-  })();
+  }
+
+  function renderFxDial(el) {
+    var f = S.fx[el.dataset.fx];
+    el.classList.toggle('off', !f.on);
+    paintDial(el._dial, f.v);
+    el._val.textContent = Math.round(f.v) + '%';
+  }
+
+  function renderVolDial() {
+    var el = document.querySelector('[data-dial="volume"]');
+    if (!el || !el._dial) { return; }
+    paintDial(el._dial, S.volume);
+    document.getElementById('volNum').textContent = Math.round(S.volume);
+  }
+
+  function renderAllDials() {
+    document.querySelectorAll('[data-dial="fx"]').forEach(renderFxDial);
+    renderVolDial();
+  }
+
+  /* ---------- 6. EQ ------------------------------------------------------------------- */
+
+  function eqFreqs() { return S.eq.mode === 31 ? FREQ31 : FREQ10; }
+  function eqGains() { return S.eq.mode === 31 ? S.eq.gains31 : S.eq.gains10; }
+
+  function gainToTop(db) { return (0.5 - (db / EQ_RANGE) * 0.5) * 100; }   /* % from the top */
+  function topToGain(pct) { return clamp((0.5 - pct / 100) * 2 * EQ_RANGE, -EQ_RANGE, EQ_RANGE); }
+
+  function renderEq() {
+    var host = document.querySelector('[data-eq]');
+    if (!host) { return; }
+    var freqs = eqFreqs(), gains = eqGains();
+
+    /* Rebuild only when the band count changes; otherwise just move what's there, so a drag
+       never fights a DOM rebuild. */
+    if (host.querySelectorAll('.band').length !== freqs.length) {
+      host.querySelectorAll('.band').forEach(function (b) { b.remove(); });
+      freqs.forEach(function (f, i) {
+        var band = document.createElement('div');
+        band.className = 'band';
+        band.dataset.i = i;
+        band.innerHTML = '<div class="btrackline"></div><div class="bfill"></div>' +
+                         '<div class="bdb"></div><div class="bhandle"></div>';
+        host.appendChild(band);
+        bindEqBand(band);
+      });
+
+      var row = document.getElementById('hzRow');
+      row.classList.toggle('dense', freqs.length > 10);
+      row.innerHTML = freqs.map(function (f, i) {
+        /* 31 labels don't fit; show every third. */
+        var show = freqs.length <= 10 || i % 3 === 0;
+        return '<span>' + (show ? hzShort(f) : '') + '</span>';
+      }).join('');
+    }
+
+    host.querySelectorAll('.band').forEach(function (band) {
+      var i = +band.dataset.i;
+      var db = gains[i] || 0;
+      var top = gainToTop(db);
+      var fill = band.querySelector('.bfill');
+      if (Math.abs(db) < 0.05) {
+        fill.style.display = 'none';
+      } else {
+        fill.style.display = '';
+        fill.style.top = Math.min(top, 50) + '%';
+        fill.style.height = Math.abs(50 - top) + '%';
+      }
+      band.querySelector('.bhandle').style.top = top + '%';
+      band.querySelector('.bdb').textContent = (db > 0 ? '+' : '') + round1(db);
+    });
+  }
+
+  function hzShort(f) {
+    if (f >= 1000) { return (f % 1000 === 0 ? f / 1000 : round1(f / 1000)) + 'k'; }
+    return String(f % 1 === 0 ? f : round1(f));
+  }
+
+  function bindEqBand(band) {
+    var handle = band.querySelector('.bhandle');
+    var i = +band.dataset.i;
+
+    function setFromY(clientY) {
+      var box = band.getBoundingClientRect();
+      if (!box.height) { return; }   /* laid out but hidden — a 0-height box would give NaN */
+      var pct = clamp((clientY - box.top) / box.height * 100, 0, 100);
+      var db = topToGain(pct);
+      if (Math.abs(db) < 0.35) { db = 0; }        /* a small detent at flat */
+      eqGains()[i] = db;
+      S.eq.preset = 'Custom';
+      renderEq();
+      renderEqPresetLabel();
+      pushEq();
+      save();
+    }
+
+    /* Grab the handle to drag it. Clicking the column jumps the handle there and keeps
+       dragging — the way a fader behaves everywhere else. */
+    draggable(handle, null, function (e) { setFromY(e.clientY); }, null);
+    draggable(band, function (e) { if (e.target !== handle) { setFromY(e.clientY); } },
+                    function (e) { setFromY(e.clientY); }, null);
+    band.addEventListener('dblclick', function () {
+      eqGains()[i] = 0; renderEq(); pushEq(); save();
+    });
+  }
+
+  function setEqMode(mode) {
+    S.eq.mode = mode === 31 ? 31 : 10;
+    document.querySelectorAll('#eqMode button').forEach(function (b) {
+      b.classList.toggle('on', +b.dataset.mode === S.eq.mode);
+    });
+    renderEq();
+    pushEq();
+    save();
+  }
+
+  /* ---------- 7. sliders, faders, toggles --------------------------------------------- */
+
+  /* Horizontal slider (Ambience page). Reads and writes S.rv[key] through its RV mapping. */
+  function bindSliders() {
+    document.querySelectorAll('.sl[data-rv]').forEach(function (sl) {
+      var key = sl.dataset.rv, spec = RV[key];
+      sl.innerHTML = '<i></i><b></b>';
+      var handle = sl.querySelector('b');
+
+      function setFromX(clientX) {
+        var box = sl.getBoundingClientRect();
+        if (!box.width) { return; }
+        var t = clamp((clientX - box.left) / box.width, 0, 1);
+        S.rv[key] = spec.log
+          ? spec.min * Math.pow(spec.max / spec.min, t)
+          : spec.min + t * (spec.max - spec.min);
+        S.rv.preset = 'Custom';
+        renderReverb();
+        pushReverb();
+        save();
+      }
+
+      draggable(handle, null, function (e) { setFromX(e.clientX); }, null);
+      draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
+                    function (e) { setFromX(e.clientX); }, null);
+    });
+  }
+
+  function renderReverb() {
+    document.querySelectorAll('.sl[data-rv]').forEach(function (sl) {
+      var key = sl.dataset.rv, spec = RV[key], v = S.rv[key];
+      var t = spec.log
+        ? Math.log(v / spec.min) / Math.log(spec.max / spec.min)
+        : (v - spec.min) / (spec.max - spec.min);
+      t = clamp(t, 0, 1) * 100;
+      sl.querySelector('i').style.width = t + '%';
+      sl.querySelector('b').style.left = t + '%';
+      var val = sl.parentNode.querySelector('.val');
+      if (val) { val.textContent = spec.fmt(v); }
+    });
+    setDD('rvTypeDD', S.rv.type);
+    setDD('rvPresetDD', S.rv.preset);
+    syncToggle('ambience', S.rv.on);
+  }
+
+  /* Speaker calibration faders: -12..+12 dB, centre detent at 0. */
+  var TRIM_RANGE = 12;
+
+  function buildSpeakers() {
+    var host = document.getElementById('calib');
+    if (!host) { return; }
+    host.innerHTML = '';
+    CHANNELS.forEach(function (ch, i) {
+      var strip = document.createElement('div');
+      strip.className = 'strip' + (ch.sub ? ' sub' : '');
+      strip.dataset.ch = i;
+      strip.innerHTML =
+        '<div class="cl">' + ch.key + '</div><div class="cn">' + ch.name + '</div>' +
+        '<div class="fader"><div class="ftrack"></div><div class="fzero"></div>' +
+        '<div class="ffill"></div><div class="fhandle"></div></div>' +
+        '<div class="db">0.0</div>' +
+        '<button class="test"><svg class="ico" style="width:13px"><use href="#i-play"/></svg></button>';
+      host.appendChild(strip);
+
+      var fader = strip.querySelector('.fader'), handle = strip.querySelector('.fhandle');
+      function setFromY(clientY) {
+        var box = fader.getBoundingClientRect();
+        if (!box.height) { return; }
+        var pct = clamp((clientY - box.top) / box.height, 0, 1);
+        var db = (0.5 - pct) * 2 * TRIM_RANGE;
+        if (Math.abs(db) < 0.4) { db = 0; }
+        S.spk.trims[i] = db;
+        renderSpeakers();
+        send({ t: 'trim', ch: i, db: db });
+        save();
+      }
+      draggable(handle, null, function (e) { setFromY(e.clientY); }, null);
+      draggable(fader, function (e) { if (e.target !== handle) { setFromY(e.clientY); } },
+                       function (e) { setFromY(e.clientY); }, null);
+      fader.addEventListener('dblclick', function () {
+        S.spk.trims[i] = 0; renderSpeakers(); send({ t: 'trim', ch: i, db: 0 }); save();
+      });
+      strip.querySelector('.test').addEventListener('click', function () { playOne(strip); });
+    });
+    renderSpeakers();
+  }
+
+  function renderSpeakers() {
+    document.querySelectorAll('#calib .strip').forEach(function (strip) {
+      var i = +strip.dataset.ch, db = S.spk.trims[i] || 0;
+      var top = (0.5 - db / (2 * TRIM_RANGE)) * 100;
+      var fill = strip.querySelector('.ffill');
+      if (Math.abs(db) < 0.05) {
+        fill.style.display = 'none';
+      } else {
+        fill.style.display = '';
+        fill.style.top = Math.min(top, 50) + '%';
+        fill.style.height = Math.abs(50 - top) + '%';
+      }
+      strip.querySelector('.fhandle').style.top = top + '%';
+      strip.querySelector('.db').textContent = (db > 0 ? '+' : db < 0 ? '−' : '') + Math.abs(round1(db)).toFixed(1);
+    });
+    syncToggle('upmix', S.spk.upmix);
+  }
+
+  var testTimer = null;
+  function playOne(strip) {
+    document.querySelectorAll('#calib .strip').forEach(function (x) { x.classList.remove('playing'); });
+    strip.classList.add('playing');
+    clearTimeout(strip._t);
+    strip._t = setTimeout(function () { strip.classList.remove('playing'); }, 900);
+  }
+
+  /* Toggles. Each carries a key so its state lives in S rather than in the DOM. */
+  function syncToggle(key, on) {
+    document.querySelectorAll('[data-sw="' + key + '"]').forEach(function (sw) {
+      sw.classList.toggle('on', !!on);
+      var card = sw.closest('.acard');
+      if (card) { card.classList.toggle('off', !on); }
+    });
+  }
+
+  function onToggle(sw) {
+    var key = sw.dataset.sw;
+    var on = !sw.classList.contains('on');
+    if (key === 'upmix')      { S.spk.upmix = on; pushUpmix(); }
+    else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
+    else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
+    else { sw.classList.toggle('on', on); return; }   /* automations: visual only for now */
+    syncToggle(key, on);
+    save();
+  }
+
+  /* ---------- 8. presets --------------------------------------------------------------- */
+
+  /* Preset curves are anchor points in (Hz, dB); each band takes the value interpolated at its
+     own centre frequency, so 10-band and 31-band get the same tonal shape. */
+  var EQ_PRESETS = {
+    'Flat':    [],
+    'Cinema':  [[31, 4], [63, 3.5], [125, 2], [250, 0], [500, -0.5], [1000, 0], [2000, 1], [4000, 1.5], [8000, 2], [16000, 3]],
+    'Music':   [[31, 3], [63, 2.5], [125, 1], [250, 0], [500, -1], [1000, -0.5], [2000, 0.5], [4000, 2], [8000, 3], [16000, 3]],
+    'Podcast': [[31, -6], [63, -4], [125, -1], [250, 0.5], [500, 1], [1000, 2], [2000, 3], [4000, 2.5], [8000, 1], [16000, -1]],
+    'Bass':    [[31, 7], [63, 6], [125, 4], [250, 1.5], [500, 0], [1000, 0], [2000, 0], [4000, 0], [8000, 0.5], [16000, 1]],
+    'Vocal':   [[31, -3], [63, -2], [125, 0], [250, 1], [500, 2], [1000, 2.5], [2000, 2], [4000, 1], [8000, 0], [16000, 0]]
+  };
+
+  function sampleCurve(anchors, f) {
+    if (!anchors.length) { return 0; }
+    if (f <= anchors[0][0]) { return anchors[0][1]; }
+    if (f >= anchors[anchors.length - 1][0]) { return anchors[anchors.length - 1][1]; }
+    for (var i = 1; i < anchors.length; i++) {
+      if (f <= anchors[i][0]) {
+        var a = anchors[i - 1], b = anchors[i];
+        var t = Math.log(f / a[0]) / Math.log(b[0] / a[0]);   /* interpolate in log-frequency */
+        return a[1] + t * (b[1] - a[1]);
+      }
+    }
+    return 0;
+  }
+
+  function applyEqPreset(name) {
+    var anchors = EQ_PRESETS[name] || [];
+    S.eq.gains10 = FREQ10.map(function (f) { return round1(sampleCurve(anchors, f)); });
+    S.eq.gains31 = FREQ31.map(function (f) { return round1(sampleCurve(anchors, f)); });
+    S.eq.preset = name;
+    renderEq();
+    renderEqPresetLabel();
+    pushEq();
+    save();
+  }
+
+  var RV_PRESETS = {
+    'Subtle':      { type: 'Room',      size: 0.35, decay: 0.9, predelay: 12, diffusion: 0.6,  damping: 0.55, lowcut: 180, highcut: 6000,  width: 0.5,  mix: 0.15 },
+    'Cinema Hall': { type: 'Hall',      size: 0.6,  decay: 1.8, predelay: 22, diffusion: 0.75, damping: 0.4,  lowcut: 120, highcut: 8000,  width: 0.65, mix: 0.35 },
+    'Concert':     { type: 'Hall',      size: 0.85, decay: 3.2, predelay: 35, diffusion: 0.85, damping: 0.3,  lowcut: 100, highcut: 9000,  width: 0.8,  mix: 0.4  },
+    'Studio':      { type: 'Plate',     size: 0.4,  decay: 1.2, predelay: 8,  diffusion: 0.9,  damping: 0.25, lowcut: 200, highcut: 12000, width: 0.55, mix: 0.22 },
+    'Cathedral':   { type: 'Cathedral', size: 1.0,  decay: 6.0, predelay: 55, diffusion: 0.9,  damping: 0.2,  lowcut: 90,  highcut: 7000,  width: 0.9,  mix: 0.45 }
+  };
+
+  var RV_TYPES = {
+    'Room':      { size: 0.35, decay: 0.8, diffusion: 0.6,  damping: 0.55 },
+    'Hall':      { size: 0.6,  decay: 1.8, diffusion: 0.75, damping: 0.4  },
+    'Plate':     { size: 0.4,  decay: 1.4, diffusion: 0.9,  damping: 0.25 },
+    'Chamber':   { size: 0.5,  decay: 1.1, diffusion: 0.8,  damping: 0.45 },
+    'Cathedral': { size: 1.0,  decay: 5.5, diffusion: 0.9,  damping: 0.2  },
+    'Spring':    { size: 0.25, decay: 1.6, diffusion: 0.35, damping: 0.6  }
+  };
+
+  function applyRvPreset(name) {
+    var p = RV_PRESETS[name];
+    if (!p) { return; }
+    Object.keys(p).forEach(function (k) { S.rv[k] = p[k]; });
+    S.rv.preset = name;
+    renderReverb();
+    pushReverb();
+    save();
+  }
+
+  function applyRvType(name) {
+    var p = RV_TYPES[name];
+    if (!p) { return; }
+    Object.keys(p).forEach(function (k) { S.rv[k] = p[k]; });
+    S.rv.type = name;
+    S.rv.preset = 'Custom';
+    renderReverb();
+    pushReverb();
+    save();
+  }
+
+  /* "Yours": a full snapshot — EQ curve, every dial, and the ambience settings. */
+  function saveMyPreset(name) {
+    S.presets[name] = {
+      eq: { mode: S.eq.mode, gains10: S.eq.gains10.slice(), gains31: S.eq.gains31.slice() },
+      fx: JSON.parse(JSON.stringify(S.fx)),
+      rv: JSON.parse(JSON.stringify(S.rv))
+    };
+    S.eq.mine = name;
+    renderMyPresets();
+    save();
+    toast('Saved “' + name + '”.');
+  }
+
+  function loadMyPreset(name) {
+    var p = S.presets[name];
+    if (!p) { return; }
+    S.eq.mode = p.eq.mode;
+    S.eq.gains10 = p.eq.gains10.slice();
+    S.eq.gains31 = p.eq.gains31.slice();
+    S.eq.preset = 'Custom';
+    S.eq.mine = name;
+    S.fx = JSON.parse(JSON.stringify(p.fx));
+    S.rv = JSON.parse(JSON.stringify(p.rv));
+    setEqMode(S.eq.mode);
+    renderEverything();
+    pushAll();
+    save();
+    toast('Loaded “' + name + '”.');
+  }
+
+  /* ---------- dropdown menus ---------------------------------------------------------- */
+
+  function fillDD(id, items, current) {
+    var dd = document.getElementById(id);
+    if (!dd) { return; }
+    var menu = dd.querySelector('.pddmenu');
+    menu.innerHTML = items.map(function (it) {
+      var cls = (it.cls ? it.cls + ' ' : '') + (it.label === current ? 'on' : '');
+      return '<a class="' + cls.trim() + '" data-v="' + (it.value === undefined ? it.label : it.value) + '">' +
+             it.label + '</a>';
+    }).join('');
+    setDD(id, current);
+  }
+
+  function setDD(id, label) {
+    var dd = document.getElementById(id);
+    if (!dd) { return; }
+    var pn = dd.querySelector('.pddbtn .pn');
+    if (pn) { pn.textContent = label || '—'; }
+    dd.querySelectorAll('.pddmenu a').forEach(function (a) {
+      a.classList.toggle('on', a.textContent === label);
+    });
+  }
+
+  /* The built-in menus never change, so fill them once. "Yours" is rebuilt whenever the user's
+     own preset list changes, which is why it lives in renderMyPresets instead. */
+  function fillStaticMenus() {
+    fillDD('eqPresetDD', Object.keys(EQ_PRESETS).map(function (n) { return { label: n }; }), S.eq.preset);
+    fillDD('rvPresetDD', Object.keys(RV_PRESETS).map(function (n) { return { label: n }; }), S.rv.preset);
+    fillDD('rvTypeDD', Object.keys(RV_TYPES).map(function (n) { return { label: n }; }), S.rv.type);
+  }
+
+  function renderEqPresetLabel() { setDD('eqPresetDD', S.eq.preset); }
+
+  function renderMyPresets() {
+    var names = Object.keys(S.presets);
+    var items = names.map(function (n) { return { label: n }; });
+    items.push({ label: '＋ Save current…', value: '__save', cls: 'add' });
+    if (names.length) { items.push({ label: '− Delete ' + (S.eq.mine || names[0]), value: '__del', cls: 'del' }); }
+    fillDD('myPresetDD', items, S.eq.mine || '—');
+  }
+
+  function renderDevices() {
+    var sel = devices.filter(function (d) { return d.id === S.settings.deviceId; })[0];
+    if (!sel) { sel = devices.filter(function (d) { return d.isDefault && !d.isCable; })[0]; }
+    if (!sel) { sel = devices.filter(function (d) { return !d.isCable; })[0]; }
+
+    fillDD('devDD', devices.filter(function (d) { return !d.isCable; })
+                           .map(function (d) { return { label: d.name, value: d.id }; }),
+           sel ? sel.name : '—');
+
+    var name = document.getElementById('outName');
+    var badge = document.getElementById('outBadge');
+    var sub = document.getElementById('outSub');
+    if (sel) {
+      name.textContent = sel.name;
+      badge.textContent = layoutName(sel.channels);
+      sub.textContent = (sel.isDefault ? 'Default output' : 'Selected output') + ' · all system audio';
+      var cs = document.getElementById('calibSub');
+      if (cs) { cs.textContent = sel.name + ' · ' + layoutName(sel.channels); }
+      var fmt = document.getElementById('fmtChip');
+      if (fmt) { fmt.innerHTML = '<b>2.0 → ' + layoutShort(sel.channels) + '</b> · <b>48</b> kHz'; }
+    } else {
+      name.textContent = 'No output device found';
+      badge.textContent = '—';
+    }
+  }
+
+  function layoutName(ch) {
+    if (ch >= 8) { return '7.1 surround'; }
+    if (ch >= 6) { return '5.1 surround'; }
+    return 'stereo';
+  }
+  function layoutShort(ch) { return ch >= 8 ? '7.1' : ch >= 6 ? '5.1' : '2.0'; }
+
+  /* ---------- power ------------------------------------------------------------------- */
+
+  function setPower(on) {
+    S.power = on;
+    var pw = document.querySelector('[data-power]');
+    pw.classList.toggle('off', !on);
+    pw.innerHTML = '<span class="d"></span> ' + (on ? 'On' : 'Off');
+    document.getElementById('npText').textContent = on
+      ? 'Processing your sound'
+      : 'Ready — press power to start';
+    document.getElementById('npBars').style.opacity = on ? '1' : '.35';
+    send({ t: 'power', on: on });
+    save();
+  }
+
+  /* ---------- render everything ------------------------------------------------------- */
+
+  function renderEverything() {
+    fillStaticMenus();
+    renderAllDials();
+    renderEq();
+    renderEqPresetLabel();
+    renderMyPresets();
+    renderReverb();
+    renderSpeakers();
+    renderDevices();
+    syncToggle('runAtLogin', S.settings.runAtLogin);
+    document.querySelectorAll('#eqMode button').forEach(function (b) {
+      b.classList.toggle('on', +b.dataset.mode === S.eq.mode);
+    });
+    var pw = document.querySelector('[data-power]');
+    pw.classList.toggle('off', !S.power);
+    pw.innerHTML = '<span class="d"></span> ' + (S.power ? 'On' : 'Off');
+  }
+
+  /* ---------- page navigation --------------------------------------------------------- */
+
+  function setPage(name) {
+    document.querySelectorAll('.page').forEach(function (p) {
+      p.classList.toggle('show', p.getAttribute('data-page') === name);
+    });
+    var navName = (name === 'builder') ? 'automations' : name;
+    document.querySelectorAll('.rail a[data-nav]').forEach(function (a) {
+      a.classList.toggle('on', a.getAttribute('data-nav') === navName);
+    });
+    document.getElementById('statusStrip').style.display = (name === 'builder') ? 'none' : 'flex';
+    if (name === 'builder') { showScr('scr-canvas'); }
+    var c = document.querySelector('.content');
+    if (c) { c.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (name === 'dashboard') { renderEq(); }   /* the EQ needs a laid-out box to measure */
+  }
+
+  /* ---------- automations builder (unchanged shape, still a designer) ------------------ */
+
+  function showScr(id) {
+    document.querySelectorAll('#scr-canvas,#scr-trigger,#scr-actions,#scr-value').forEach(function (s) {
+      s.classList.toggle('show', s.id === id);
+    });
+    closeMenus();
+  }
+
+  var TRIG = {
+    app: { t: 't-violet', ic: 'i-app', html: '<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="apps">Netflix ' + chev + '</span><span class="cfg-word">is playing</span>' },
+    format: { t: 't-cyan', ic: 'i-layers', html: '<span class="btitle">When the source is</span><span class="cfg-dd" data-opts="stereo (2.0),5.1,7.1">5.1 ' + chev + '</span>' },
+    time: { t: 't-amber', ic: 'i-clock', html: '<span class="btitle">At</span><span class="cfg-dd" data-opts="6:00 AM,8:00 AM,6:00 PM,10:00 PM,11:00 PM,12:00 AM">10:00 PM ' + chev + '</span><span class="cfg-word">every day</span>' },
+    startup: { t: 't-green', ic: 'i-power', html: '<span class="btitle">When Soundstage starts</span>' },
+    device: { t: 't-blue', ic: 'i-plug', html: '<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="devices">Headphones ' + chev + '</span><span class="cfg-word">connect</span>' }
+  };
+  var ACT = {
+    preset: { t: 't-cyan', ic: 'i-layers', html: '<span class="btitle">Switch preset to</span><span class="cfg-dd" data-pick-cat="presets">Cinema ' + chev + '</span>' },
+    volume: { t: 't-blue', ic: 'i-spk', html: '<span class="btitle">Set volume to</span><div class="cfg-sl"><i style="width:60%"></i><b style="left:60%"></b></div><span class="cfg-pct">60%</span>' },
+    fxamount: { t: 't-green', ic: 'i-wave', html: '<span class="btitle">Set</span><span class="cfg-dd" data-opts="Ambience,Bass,Air,Warmth,Leveler,Night">Bass ' + chev + '</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="cfg-pct">50%</span>' },
+    fxtoggle: { t: 't-green', ic: 'i-eq', html: '<span class="btitle">Turn</span><span class="cfg-dd" data-opts="Night mode,Bass,Air,Warmth,Leveler,Ambience">Night mode ' + chev + '</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>' },
+    fxalloff: { t: 't-rose', ic: 'i-x', html: '<span class="btitle">Turn all effects off</span>' },
+    spklevel: { t: 't-amber', ic: 'i-spk', html: '<span class="btitle">Set</span><span class="cfg-dd" data-opts="Front L,Front R,Center,Sub,Side L,Side R,Back L,Back R">Center ' + chev + '</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="cfg-pct">−2 dB</span>' },
+    upmix: { t: 't-cyan', ic: 'i-wave', html: '<span class="btitle">Upmix stereo to surround</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>' },
+    notify: { t: 't-violet', ic: 'i-bell', html: '<span class="btitle">Show a notification</span><input class="cfg-in" placeholder="e.g. Switched to Cinema" />' },
+    wait: { t: 't-blue', ic: 'i-clock', html: '<span class="btitle">Wait</span><span class="cfg-dd" data-opts="1 second,2 seconds,5 seconds,10 seconds">2 seconds ' + chev + '</span>' },
+    ifcond: { t: 't-amber', ic: 'i-branch', html: '<span class="btitle">If</span><span class="cfg-dd" data-opts="the source is 5.1,it\'s after 10 PM,headphones are connected">the source is 5.1 ' + chev + '</span><span class="bsub">Steps below run only when this is true</span>' }
+  };
+  var VALUES = {
+    apps: { title: 'Which app?', detected: '', items: ['Netflix', 'Spotify', 'YouTube', 'Disney+', 'Prime Video', 'Apple Music', 'VLC', 'Twitch', 'Chrome', 'A Steam game', 'Discord call', 'Zoom', 'Any game'] },
+    devices: { title: 'Which device?', detected: '', items: ['Headphones', 'HDMI TV', 'USB DAC', 'Bluetooth speaker', 'Optical / SPDIF', 'Line out', 'Any headphones'] },
+    presets: { title: 'Which preset?', detected: '', items: ['Flat', 'Cinema', 'Music', 'Podcast', 'Bass', 'Vocal'] }
+  };
+
+  var activeDD = null;
+  var trigStack = document.getElementById('trigStack');
+  var actStack = document.getElementById('actStack');
+
+  function bar(def, h) {
+    var el = document.createElement('div');
+    el.className = 'barrow';
+    el.innerHTML = (h ? '<span class="handle">⋮⋮</span>' : '') +
+      '<div class="btile ' + def.t + '"><svg class="ico"><use href="#' + def.ic + '"/></svg></div>' +
+      '<div class="bmain">' + def.html + '</div><div class="brm"><svg><use href="#i-x"/></svg></div>';
+    return el;
+  }
+  function refreshWhen() {
+    var has = trigStack.children.length > 0;
+    document.querySelector('#scr-canvas .emptyrow').style.display = has ? 'none' : 'flex';
+    document.getElementById('addCond').style.display = has ? 'flex' : 'none';
+  }
+  function refreshDo() { document.getElementById('emptyDo').style.display = actStack.children.length ? 'none' : 'block'; }
+  function addTrigger(k) {
+    if (trigStack.children.length) {
+      var l = document.createElement('div'); l.className = 'andlabel'; l.textContent = 'AND'; trigStack.appendChild(l);
+    }
+    trigStack.appendChild(bar(TRIG[k], false)); refreshWhen();
+  }
+  function addAction(k) {
+    if (actStack.children.length) {
+      var c = document.createElement('div'); c.className = 'conn'; actStack.appendChild(c);
+    }
+    actStack.appendChild(bar(ACT[k], true)); refreshDo();
+  }
+  function resetBuilder() { trigStack.innerHTML = ''; actStack.innerHTML = ''; refreshWhen(); refreshDo(); }
+  function openValuePicker(cat, dd) {
+    activeDD = dd;
+    var v = VALUES[cat];
+    document.getElementById('valTitle').textContent = v.title;
+    var det = document.getElementById('valDetected');
+    det.innerHTML = v.detected || ''; det.style.display = v.detected ? 'block' : 'none';
+    document.getElementById('valSearch').value = '';
+    var list = document.getElementById('valList'); list.innerHTML = '';
+    v.items.forEach(function (it) {
+      var d = document.createElement('div'); d.className = 'vitem'; d.textContent = it; list.appendChild(d);
+    });
+    document.getElementById('customInput').style.display = 'none';
+    document.getElementById('customField').value = '';
+    showScr('scr-value');
+  }
+  function setActive(t) { if (activeDD) { activeDD.innerHTML = t + ' ' + chev; } showScr('scr-canvas'); }
+
+  function closeMenus() {
+    document.querySelectorAll('.ddmenu').forEach(function (m) { m.remove(); });
+    document.querySelectorAll('.pdd.open').forEach(function (p) { p.classList.remove('open'); });
+  }
+  function openMenu(dd) {
+    closeMenus();
+    var opts = dd.dataset.opts.split(','), cur = dd.textContent.trim();
+    var m = document.createElement('div'); m.className = 'ddmenu';
+    opts.forEach(function (o) {
+      var it = document.createElement('div');
+      it.className = 'ddm-item' + (o === cur ? ' on' : '');
+      it.textContent = o;
+      it.addEventListener('click', function (ev) { ev.stopPropagation(); dd.innerHTML = o + ' ' + chev; closeMenus(); });
+      m.appendChild(it);
+    });
+    document.body.appendChild(m);
+    var r = dd.getBoundingClientRect();
+    m.style.left = r.left + 'px'; m.style.top = (r.bottom + 5) + 'px'; m.style.minWidth = r.width + 'px';
+  }
+
+  /* ---------- global click routing ---------------------------------------------------- */
+
+  document.addEventListener('click', function (e) {
+    var op = e.target.closest('[data-open]');
+    if (op) { showScr(op.getAttribute('data-open') === 'trigger' ? 'scr-trigger' : 'scr-actions'); return; }
+    var ex = e.target.closest('[data-exit]'); if (ex) { setPage('automations'); return; }
+    var bk = e.target.closest('[data-back]'); if (bk) { showScr('scr-canvas'); return; }
+    var tr = e.target.closest('[data-trig]'); if (tr) { addTrigger(tr.getAttribute('data-trig')); showScr('scr-canvas'); return; }
+    var ac = e.target.closest('[data-act]'); if (ac) { addAction(ac.getAttribute('data-act')); showScr('scr-canvas'); return; }
+    var vi = e.target.closest('.vitem'); if (vi) { setActive(vi.textContent); return; }
+    var ct = e.target.closest('#customToggle');
+    if (ct) { document.getElementById('customInput').style.display = 'flex'; document.getElementById('customField').focus(); return; }
+    var cs = e.target.closest('#customSave');
+    if (cs) {
+      var cv = document.getElementById('customField').value.trim();
+      if (cv) { setActive(cv); } else { showScr('scr-canvas'); }
+      return;
+    }
+    var rm = e.target.closest('.brm');
+    if (rm) {
+      var row = rm.closest('.barrow'), p = row.previousElementSibling;
+      if (p && (p.classList.contains('conn') || p.classList.contains('andlabel'))) { p.remove(); }
+      else {
+        var n = row.nextElementSibling;
+        if (n && (n.classList.contains('conn') || n.classList.contains('andlabel'))) { n.remove(); }
+      }
+      row.remove(); refreshWhen(); refreshDo(); return;
+    }
+
+    var pw = e.target.closest('[data-power]'); if (pw) { setPower(pw.classList.contains('off')); return; }
+    var sw = e.target.closest('[data-sw]'); if (sw) { onToggle(sw); return; }
+
+    var sg = e.target.closest('#eqMode button'); if (sg) { setEqMode(+sg.dataset.mode); return; }
+    if (e.target.closest('#eqReset')) { applyEqPreset('Flat'); return; }
+    if (e.target.closest('#calibReset')) {
+      S.spk.trims = [0, 0, 0, 0, 0, 0, 0, 0]; renderSpeakers(); pushTrims(); save(); return;
+    }
+    if (e.target.closest('#refreshDevices')) { send({ t: 'devices' }); return; }
+    if (e.target.closest('#resetAll')) {
+      var keep = S.presets;
+      S = defaults(); S.presets = keep;
+      renderEverything(); pushAll(); setPower(false); save();
+      toast('Everything is back to its defaults.');
+      return;
+    }
+    if (e.target.closest('#copyDiag')) {
+      var diag = 'Soundstage 1.0.0\nengine: ' + (engineOk ? 'loaded' : 'NOT LOADED') +
+                 '\ndevices: ' + devices.map(function (d) { return d.name + ' (' + d.channels + 'ch)'; }).join(', ') +
+                 '\nstate: ' + JSON.stringify(S);
+      try { navigator.clipboard.writeText(diag); toast('Diagnostics copied to the clipboard.'); }
+      catch (_) { toast('Could not reach the clipboard.'); }
+      return;
+    }
+    if (e.target.closest('#testall')) {
+      var strips = [].slice.call(document.querySelectorAll('#calib .strip'));
+      strips.forEach(function (s, i) {
+        setTimeout(function () { playOne(s); }, i * 650);
+      });
+      return;
+    }
+    if (e.target.closest('#outRow')) { setPage('settings'); return; }
+
+    var pb = e.target.closest('.cfg-pills button');
+    if (pb) { pb.parentNode.querySelectorAll('button').forEach(function (x) { x.classList.remove('on'); }); pb.classList.add('on'); closeMenus(); return; }
+    var dd = e.target.closest('.cfg-dd');
+    if (dd) {
+      if (dd.dataset.pickCat) { openValuePicker(dd.dataset.pickCat, dd); e.stopPropagation(); return; }
+      openMenu(dd); e.stopPropagation(); return;
+    }
+
+    var pbtn = e.target.closest('.pddbtn');
+    if (pbtn) {
+      var pdd = pbtn.closest('.pdd'), wasOpen = pdd.classList.contains('open');
+      closeMenus();
+      if (!wasOpen) { pdd.classList.add('open'); }
+      e.stopPropagation();
+      return;
+    }
+
+    var pi = e.target.closest('.pddmenu a');
+    if (pi) {
+      var owner = pi.closest('.pdd');
+      var v = pi.dataset.v !== undefined ? pi.dataset.v : pi.textContent;
+      owner.classList.remove('open');
+      if (owner.id === 'eqPresetDD')      { applyEqPreset(pi.textContent); }
+      else if (owner.id === 'rvPresetDD') { applyRvPreset(pi.textContent); }
+      else if (owner.id === 'rvTypeDD')   { applyRvType(pi.textContent); }
+      else if (owner.id === 'devDD')      { S.settings.deviceId = v; send({ t: 'device', id: v }); renderDevices(); save(); }
+      else if (owner.id === 'myPresetDD') {
+        if (v === '__save') {
+          var nm = prompt('Name this preset:', 'My preset');
+          if (nm && nm.trim()) { saveMyPreset(nm.trim()); }
+        } else if (v === '__del') {
+          var target = S.eq.mine || Object.keys(S.presets)[0];
+          if (target && S.presets[target]) {
+            delete S.presets[target];
+            S.eq.mine = Object.keys(S.presets)[0] || null;
+            renderMyPresets(); save();
+            toast('Deleted “' + target + '”.');
+          }
+        } else { loadMyPreset(pi.textContent); }
+      } else {
+        owner.querySelectorAll('a').forEach(function (x) { x.classList.remove('on'); });
+        pi.classList.add('on');
+        var pn = owner.querySelector('.pddbtn .pn');
+        if (pn) { pn.textContent = pi.textContent; }
+      }
+      return;
+    }
+
+    var sug = e.target.closest('.sug');
+    if (sug) { sug.style.borderStyle = 'solid'; sug.style.borderColor = '#37e0cf'; return; }
+    closeMenus();
+  });
+
+  document.querySelectorAll('.rail a[data-nav]').forEach(function (a) {
+    a.addEventListener('click', function () { setPage(a.getAttribute('data-nav')); });
+  });
+  var newAuto = document.getElementById('newAuto');
+  if (newAuto) { newAuto.addEventListener('click', function () { resetBuilder(); setPage('builder'); }); }
+
+  var as = document.getElementById('actSearch');
+  if (as) {
+    as.addEventListener('input', function () {
+      var q = this.value.toLowerCase();
+      document.querySelectorAll('#actList .pitem').forEach(function (it) {
+        it.style.display = it.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+      });
+    });
+  }
+  var vs = document.getElementById('valSearch');
+  if (vs) {
+    vs.addEventListener('input', function () {
+      var q = this.value.toLowerCase();
+      document.querySelectorAll('#valList .vitem').forEach(function (it) {
+        it.style.display = it.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
+      });
+    });
+  }
+
+  /* Fall back to a host-driven window drag when the runtime has no non-client regions. */
+  var dragMode = 'native';
+  document.querySelector('.tb').addEventListener('pointerdown', function (e) {
+    if (dragMode === 'native') { return; }
+    if (e.target.closest('.wb')) { return; }
+    post('drag');
+  });
+
+  /* ---------- messages from the host --------------------------------------------------- */
+
+  if (haveHost) {
+    window.chrome.webview.addEventListener('message', function (ev) {
+      var m = '' + ev.data;
+      if (m.charAt(0) === '{') {
+        var msg;
+        try { msg = JSON.parse(m); } catch (_) { return; }
+        if (msg.t === 'init') {
+          if (msg.state) {
+            try {
+              var loaded = JSON.parse(msg.state);
+              /* Merge over the defaults so a state file from an older build still opens. */
+              S = Object.assign(defaults(), loaded);
+              S.eq = Object.assign(defaults().eq, loaded.eq || {});
+              S.fx = Object.assign(defaults().fx, loaded.fx || {});
+              S.rv = Object.assign(defaults().rv, loaded.rv || {});
+              S.spk = Object.assign(defaults().spk, loaded.spk || {});
+              S.settings = Object.assign(defaults().settings, loaded.settings || {});
+              S.presets = loaded.presets || {};
+            } catch (_) { S = defaults(); }
+          }
+          S.power = false;                       /* audio never auto-starts */
+          S.settings.runAtLogin = !!msg.runAtLogin;
+          engineOk = !!msg.engine;
+          dragMode = msg.dragMode || 'native';
+          var es = document.getElementById('engineStatus');
+          if (es) { es.textContent = engineOk ? 'Native engine loaded' : 'Native engine NOT loaded — controls will not affect sound'; }
+          ready = true;
+          renderEverything();
+          pushAll();
+          if (!engineOk) { toast('The audio engine did not load, so the controls will not change your sound.'); }
+          return;
+        }
+        if (msg.t === 'devices') {
+          devices = msg.items || [];
+          renderDevices();
+          return;
+        }
+        return;
+      }
+      if (m === 'no-cable') {
+        toast('First set up the free “CABLE” outlet: install VB-CABLE, then pick “CABLE” as your Windows speaker. Then press the power button.');
+        setPower(false);
+      } else if (m === 'running') {
+        toast('Soundstage is now processing your sound.');
+      } else if (m === 'audio-error') {
+        toast('Couldn’t start audio — check your output device and try again.');
+        setPower(false);
+      }
+    });
+  }
+
+  /* ---------- boot -------------------------------------------------------------------- */
+
+  initDials();
+  bindSliders();
+  buildSpeakers();
+  renderEverything();
+  refreshWhen();
+  refreshDo();
+  setPage('dashboard');
+
+  if (haveHost) {
+    post('ready');
+  } else {
+    ready = true;   /* opened straight in a browser: everything still works, minus the engine */
+  }
+
+  /* The EQ measures its own box, so re-layout after a resize. */
+  window.addEventListener('resize', function () { renderEq(); renderSpeakers(); renderReverb(); });
+})();
 </script>
