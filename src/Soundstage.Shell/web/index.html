@@ -15,7 +15,11 @@
   .tb{display:flex;align-items:center;height:42px;padding:0 8px 0 16px;gap:10px;background:linear-gradient(#182230,#131b26);border-bottom:1px solid #0c1118;}
   .tb .name{font-weight:600;font-size:13px;letter-spacing:.04em;display:flex;align-items:center;gap:9px;color:#d6dee6;}
   .tb .name .lg{width:17px;height:17px;color:var(--glow);filter:drop-shadow(0 0 5px #37e0cf88);}
-  .tb .wb{margin-left:auto;display:flex;}.tb .wb b{width:42px;height:42px;display:grid;place-items:center;color:#7f8a96;}.tb .wb b svg{width:11px;height:11px;}
+  .tb .wb{margin-left:auto;display:flex;height:42px;}
+  .tb .wb b{width:46px;height:42px;display:grid;place-items:center;color:#c2ccd2;cursor:default;transition:background .12s,color .12s;}
+  .tb .wb b svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
+  .tb .wb b:hover{background:#ffffff18;}
+  .tb .wb b:last-child:hover{background:#e5484d;color:#fff;}
   .shell{display:grid;grid-template-columns:64px 1fr;background:var(--bg);flex:1;min-height:0;}
   .rail{background:linear-gradient(#141c27,#111823);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:12px 0;gap:5px;}
   .rail a{width:42px;height:42px;border-radius:11px;display:grid;place-items:center;color:#6a7885;cursor:pointer;transition:.16s;position:relative;}
@@ -449,18 +453,14 @@
             <div class="setgroup">Startup</div>
             <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
             <div class="setrow"><div class="st"><div class="stn">Start minimized to tray</div></div><div class="sw" data-sw><div class="k"></div></div></div>
-            <div class="setgroup">Audio engine</div>
-            <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage applies its processing</div></div><div class="pdd"><button class="pddbtn"><span class="pn">Logitech Z906</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a class="on">Logitech Z906 (7.1)</a><a>HDMI TV</a><a>Headphones</a></div></div></div>
-            <div class="setrow"><div class="st"><div class="stn">Equalizer APO</div><div class="std">The system component Soundstage drives</div></div><span class="statusok">Installed ✓</span></div>
-            <div class="setgroup">Headphones</div>
-            <div class="setrow"><div class="st"><div class="stn">Auto-switch to headphone profile</div><div class="std">When headphones are plugged in</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
-            <div class="setrow"><div class="st"><div class="stn">AutoEq profile</div><div class="std">Match your exact headphone model</div></div><button class="btn">Import…</button></div>
+            <div class="setgroup">Audio</div>
+            <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage plays your processed sound</div></div><div class="pdd"><button class="pddbtn"><span class="pn">Logitech Z906</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"><a class="on">Logitech Z906 (7.1)</a><a>HDMI TV</a><a>Headphones</a></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Auto-switch to headphones</div><div class="std">Use your headphone tuning when they're plugged in</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
             <div class="setgroup">Updates</div>
             <div class="setrow"><div class="st"><div class="stn">Version 1.0.0</div><div class="std">You're up to date</div></div><button class="btn"><svg><use href="#i-refresh"/></svg> Check</button></div>
             <div class="setrow"><div class="st"><div class="stn">Install updates automatically</div></div><div class="sw on" data-sw><div class="k"></div></div></div>
             <div class="setgroup">Diagnostics</div>
-            <div class="setrow"><div class="st"><div class="stn">Copy my config</div><div class="std">For troubleshooting</div></div><button class="btn"><svg><use href="#i-file"/></svg> Copy</button></div>
-            <div class="setrow"><div class="st"><div class="stn">Run Atmos test</div><div class="std">Check surround is passing through</div></div><button class="btn"><svg><use href="#i-play"/></svg> Run</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Copy diagnostics</div><div class="std">Details to share if something's off</div></div><button class="btn"><svg><use href="#i-file"/></svg> Copy</button></div>
           </section>
         </div>
 
@@ -496,7 +496,7 @@
     document.querySelectorAll('.rail a[data-nav]').forEach(function(a){a.classList.toggle('on',a.getAttribute('data-nav')===navName);});
     document.getElementById('statusStrip').style.display=(name==='builder')?'none':'flex';
     if(name==='builder'){showScr('scr-canvas');}
-    window.scrollTo({top:0,behavior:'smooth'});
+    var c=document.querySelector('.content');if(c){c.scrollTo({top:0,behavior:'smooth'});}
   }
   document.querySelectorAll('.rail a[data-nav]').forEach(function(a){a.addEventListener('click',function(){setPage(a.getAttribute('data-nav'));});});
   document.getElementById('newAuto').addEventListener('click',function(){resetBuilder();setPage('builder');});
