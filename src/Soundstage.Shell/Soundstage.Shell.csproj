@@ -26,17 +26,19 @@
        P/Invoke in SoundstageEngine resolves at runtime: soundstage_engine.dll on Windows (MSVC in
        CI), lib*.so/.dylib elsewhere. Verified on the Linux build host. -->
   <PropertyGroup>
-    <NativeEngineDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)..\..\native\soundstage-dsp'))</NativeEngineDir>
-    <NativeEngineBuildDir>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)obj\native-engine'))</NativeEngineBuildDir>
+    <!-- GetFullPath returns NO trailing separator; NormalizeDirectory would add one, and a trailing
+         backslash before a closing quote escapes the quote on Windows (breaks the cmake command). -->
+    <NativeEngineDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\native\soundstage-dsp'))</NativeEngineDir>
+    <NativeEngineBuildDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)obj\native-engine'))</NativeEngineBuildDir>
   </PropertyGroup>
 
   <Target Name="BuildNativeEngine">
     <Exec Command="cmake -S &quot;$(NativeEngineDir)&quot; -B &quot;$(NativeEngineBuildDir)&quot; -DCMAKE_BUILD_TYPE=Release" />
     <Exec Command="cmake --build &quot;$(NativeEngineBuildDir)&quot; --config Release --target soundstage_engine" />
     <ItemGroup>
-      <NativeEngineArtifact Include="$(NativeEngineBuildDir)**\soundstage_engine.dll" />
-      <NativeEngineArtifact Include="$(NativeEngineBuildDir)**\libsoundstage_engine.so" />
-      <NativeEngineArtifact Include="$(NativeEngineBuildDir)**\libsoundstage_engine.dylib" />
+      <NativeEngineArtifact Include="$(NativeEngineBuildDir)\**\soundstage_engine.dll" />
+      <NativeEngineArtifact Include="$(NativeEngineBuildDir)\**\libsoundstage_engine.so" />
+      <NativeEngineArtifact Include="$(NativeEngineBuildDir)\**\libsoundstage_engine.dylib" />
     </ItemGroup>
   </Target>
 
