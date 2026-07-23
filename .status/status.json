@@ -1,20 +1,20 @@
 {
   "state": "done",
-  "headline": "The plugin works — no more VB-CABLE",
-  "note": "Soundstage now runs inside Windows' own audio engine. It's installed on your Realtek output and proven by measurement: asked for -20 dB, measured -20.00 dB at the plugin's own output. Three separate Windows requirements had to be found before it would load at all, and audiodg crashed a few times on the way. Your AV receiver is attached too, but it went into standby before I could confirm 8-channel — play something through it and it should just work.",
-  "updated": "APO working and pushed, plus plugin mode in the UI and per-speaker meters",
+  "headline": "v1.1.0 installed — and the confusion is fixed",
+  "note": "You weren't doing anything wrong. Three things misled you: the app was fighting its own plugin for your speakers, the EQ preset was shaping your sound with nothing on screen saying so, and switched-off effects displayed '96%' as if they were on and cranked. All three are fixed and measured. Flat now reads -0.22 dB at both 60 Hz and 1 kHz, which is just your volume dial at 99.",
+  "updated": "v1.1.0 released and installed",
   "items": [
-    { "text": "Soundstage APO - our own audio plugin", "done": true, "active": false },
-    { "text": "Found the hidden second registration Windows requires", "done": true, "active": false },
-    { "text": "COM aggregation - the engine demands it", "done": true, "active": false },
-    { "text": "IAudioSystemEffects3 - refusing it crashed all audio", "done": true, "active": false },
-    { "text": "Loads inside audiodg and locks the stream", "done": true, "active": false },
-    { "text": "Measured: 0 / -20 / -6 dB asked, 0.00 / -20.00 / -6.00 got", "done": true, "active": false },
-    { "text": "Bypass verified clean (+0.00 dB)", "done": true, "active": false },
-    { "text": "Plugin mode in Settings, with install and undo", "done": true, "active": false },
+    { "text": "Plugin runs inside Windows - no VB-CABLE", "done": true, "active": false },
+    { "text": "App no longer fights the plugin for the device", "done": true, "active": false },
+    { "text": "Routing controls hidden in plugin mode (nothing to route)", "done": true, "active": false },
+    { "text": "EQ chip in the header - names the preset, click to flatten", "done": true, "active": false },
+    { "text": "Off effects read 'Off', not '96%'", "done": true, "active": false },
+    { "text": "'Turn off' no longer uninstalls - Remove is separate, two presses", "done": true, "active": false },
+    { "text": "The room view is the Speakers page, faders all kept", "done": true, "active": false },
     { "text": "Level meter on every speaker fader", "done": true, "active": false },
-    { "text": "Visual direction mockups - sent as an artifact", "done": true, "active": false },
-    { "text": "Everything pushed to GitHub", "done": true, "active": false },
-    { "text": "Left for you: play something on the AV receiver to confirm 8ch", "done": false, "active": true }
+    { "text": "Installer ships the plugin, shortcut points somewhere real", "done": true, "active": false },
+    { "text": "v1.1.0 released; update check verified end to end", "done": true, "active": false },
+    { "text": "Measured: Bass on +7.60 dB vs off +3.70 dB at 60 Hz", "done": true, "active": false },
+    { "text": "Left for you: play the AV receiver awake to confirm 8ch", "done": false, "active": true }
   ]
 }
