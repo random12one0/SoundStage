@@ -37,9 +37,28 @@ Built and ran on the user's Windows machine for the first time — native engine
 **Working:** window drag (needed `IsNonClientRegionSupportEnabled`; the CSS alone did nothing) ·
 dials turn by grabbing the handle and swinging it round the arc, hub click toggles, wheel nudges ·
 EQ band handles drag, 10/31-band modes, preset curves (Flat/Cinema/Music/Podcast/Bass/Vocal) ·
-user presets save/load/delete · volume dial · speaker calibration faders · Ambience page sliders ·
-upmix toggle · real device enumeration · launch-at-login · state persisted to
-`%APPDATA%/Soundstage/state.json` and restored on launch.
+user presets save/load/delete · volume dial · speaker calibration faders · speaker test bursts ·
+Ambience page sliders + presets · upmix toggle · real device enumeration and switching ·
+launch-at-login · level meter · state persisted to `%APPDATA%/Soundstage/state.json` and restored.
+
+### Verified against real audio, not just the UI
+A probe plays a known multi-tone signal into the CABLE outlet and loopback-captures the speakers,
+so every claim below is a measurement (baseline = flat EQ, all effects off):
+
+| control | measured | expected |
+|---|---|---|
+| Bass 96% | +4.0 dB @ 60 Hz, rest unmoved | low-band lift only |
+| Warmth 96% | +7.6 dB @ 60 Hz, +2.3 @ 250 Hz | 200 Hz low shelf |
+| Air 96% | +5.6 dB @ 12 kHz, +0.1 @ 4 kHz | 10 kHz high shelf |
+| Night 95% | −11.4 dB flat | −12 × 0.95 |
+| Leveler 50% | +1.6 dB | ~2 dB makeup |
+| Volume 66 → 8 | −37.3 dB | −37.2 dB (square law) |
+| EQ band 62.5 Hz +8.9 | +8.2 dB @ 60 Hz | bell at 62.5, Q 1.41 |
+| FL trim −5.9 | −5.9 dB, left channel only | per-speaker trim |
+| Music preset, 31-band | matches the designed curve | log-frequency sampling |
+
+**This is how the `prepare()` bug was caught** — the UI looked right while Air did literally
+nothing. Re-run the probe after touching the DSP; a control that looks wired is not evidence.
 
 **Still a mockup:** the Automations page. The builder screens work as a designer, but nothing an
 automation says actually fires — no trigger engine behind it. Now-playing text is honest
