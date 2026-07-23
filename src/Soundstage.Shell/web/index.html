@@ -1561,7 +1561,14 @@
       }
 
       /* The outlet is the ceiling. If it's stereo, a 5.1 film is already flattened before it
-         reaches us — worth saying out loud, because nothing in this app can undo it. */
+         reaches us — worth saying out loud, because nothing in this app can undo it.
+         Read it from the current device list rather than only from the last time audio started,
+         so changing the setting in Windows updates this without restarting the app. */
+      var cable = devices.filter(function (d) {
+        return S.settings.outletId ? d.id === S.settings.outletId : d.isCable;
+      })[0];
+      if (cable) { outletChannels = cable.channels; }
+
       var ob = document.getElementById('outletBanner');
       if (ob) {
         var stereoOutlet = outletChannels > 0 && outletChannels <= 2;
@@ -1764,12 +1771,17 @@
   /* Poll every few seconds. Cheap, and it means an automation reacts within a few seconds of you
      hitting play rather than needing you to click anything. */
   function startAutomationLoop() {
+    var tick = 0;
     setInterval(function () {
       var needsSessions = (S.autos || []).some(function (a) {
         return a.on && (a.when || []).some(function (w) { return w.k === 'app'; });
       });
       if (needsSessions) { send({ t: 'sessions' }); }   /* reply drives tickAutomations */
       else { tickAutomations(); }
+
+      /* Re-read the devices now and then: people change their speaker configuration in Windows
+         while this is open, and the app shouldn't keep reporting what was true at launch. */
+      if (++tick % 5 === 0) { send({ t: 'devices' }); }
     }, 4000);
   }
 
