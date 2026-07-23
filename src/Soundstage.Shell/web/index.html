@@ -272,6 +272,11 @@
   .sl::before{content:"";position:absolute;left:0;right:0;top:-10px;bottom:-10px;}
   .fader::before{content:"";position:absolute;left:-6px;right:-6px;top:0;bottom:0;}
   .band{cursor:pointer;}
+  /* The EQ response curve, behind the handles. */
+  .eqcurve{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;overflow:visible;}
+  .eqline{fill:none;stroke:var(--glow);stroke-width:1.1;vector-effect:non-scaling-stroke;
+          stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px #37e0cf66);}
+  .eqfill{fill:#37e0cf1f;stroke:none;}
   .bdb{position:absolute;left:50%;transform:translateX(-50%);top:1px;font-family:ui-monospace,monospace;
        font-size:9px;color:var(--glow-ink);opacity:0;transition:opacity .12s;pointer-events:none;z-index:4;white-space:nowrap;}
   .band:hover .bdb,.band.dragging .bdb{opacity:1;}
@@ -338,6 +343,29 @@
   #setup .scheck.warn{background:#2a2016;border:1px solid #6b5324;color:#f0cf9a;}
   #setup .srow{display:flex;align-items:center;gap:9px;}
   #setup .srow .sp{flex:1;}
+
+  /* ---- opening animation ----
+     A couple of seconds of the mark drawing itself while the engine loads and the devices are
+     enumerated — which is time the app spends waiting anyway. It fades out on its own. */
+  #splash{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;
+          background:radial-gradient(70% 55% at 50% 45%,#16222f 0%,#0b1119 70%);
+          transition:opacity .5s ease,visibility .5s;}
+  #splash.done{opacity:0;visibility:hidden;pointer-events:none;}
+  #splash .mark{display:flex;flex-direction:column;align-items:center;gap:18px;}
+  #splash svg{width:120px;height:64px;overflow:visible;}
+  #splash .wave{fill:none;stroke:var(--glow);stroke-width:3.2;stroke-linecap:round;
+                filter:drop-shadow(0 0 10px #37e0cfaa);
+                stroke-dasharray:var(--len);stroke-dashoffset:var(--len);
+                animation:draw 1.25s cubic-bezier(.6,.05,.3,1) forwards;}
+  @keyframes draw{to{stroke-dashoffset:0;}}
+  #splash .name{font-size:15px;font-weight:600;letter-spacing:.34em;text-transform:uppercase;
+                color:#c8d4dd;opacity:0;animation:nameIn .7s ease .75s forwards;}
+  #splash .sub{font-size:11.5px;letter-spacing:.05em;color:var(--faint);opacity:0;
+               animation:nameIn .7s ease 1.0s forwards;}
+  @keyframes nameIn{to{opacity:1;}}
+  #splash .ring{position:absolute;width:230px;height:230px;border-radius:50%;
+                border:1px solid #37e0cf30;opacity:0;animation:ringOut 1.6s ease .5s forwards;}
+  @keyframes ringOut{0%{transform:scale(.55);opacity:.75}100%{transform:scale(1.5);opacity:0}}
 
   /* volume read-out for the keyboard keys */
   #volOverlay{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(8px);
@@ -648,6 +676,16 @@
   </div>
 </div></div>
 
+<div id="splash">
+  <span class="ring"></span>
+  <div class="mark">
+    <svg viewBox="0 0 120 64"><path class="wave" id="splashWave"
+      d="M4 32 C 16 32, 16 6, 28 6 S 40 58, 52 58 S 64 10, 76 10 S 88 50, 100 50 S 112 32, 116 32"/></svg>
+    <div class="name">Soundstage</div>
+    <div class="sub" id="splashSub">Starting the engine…</div>
+  </div>
+</div>
+
 <!-- Volume read-out for the keyboard keys, since you'll usually press those with the window hidden -->
 <div id="volOverlay"><svg class="ico" style="width:20px"><use href="#i-spk"/></svg>
   <div class="vo-bar"><i class="vo-f"></i></div><span class="vo-n">0</span></div>
@@ -726,7 +764,7 @@
 
   /* Help text for everything else that isn't obvious on sight. */
   var HELP = {
-    power:   'Starts and stops processing. Your apps play into the outlet device, Soundstage processes that, and sends it to your speakers.',
+    power:   'A/B switch. On, you hear Soundstage. Bypassed, you hear the original untouched — the sound keeps playing either way. Flip it to judge whether an effect is actually helping.',
     volume:  'Soundstage\'s own output level, on top of the Windows volume.',
     eq:      'Shapes the tone across the frequency range. Drag a handle up to boost that band, down to cut it. Double-click a band to reset it.',
     eqmode:  '10 bands is quick and broad. 31 bands is one-third-octave — finer control, for fixing a specific problem frequency.',
@@ -857,6 +895,51 @@
     document.getElementById('modalCancel').addEventListener('click', close);
     input.addEventListener('keydown', key);
   }
+
+  /* ---------- undo -------------------------------------------------------------------- */
+
+  /* A shallow history of the whole state. Cheap (the object is small), and it means undo works the
+     same for a dial, a preset, a fader and a reset — anything that changes settings. */
+  var history = [], future = [], restoring = false;
+
+  function snapshot(label) {
+    if (restoring) { return; }
+    history.push({ label: label || 'change', state: JSON.stringify(S) });
+    if (history.length > 40) { history.shift(); }
+    future.length = 0;
+  }
+
+  function applySnapshot(entry) {
+    restoring = true;
+    try {
+      S = JSON.parse(entry.state);
+      renderEverything();
+      pushAll();
+    } catch (e) { /* a corrupt entry is not worth crashing over */ }
+    restoring = false;
+    save();
+  }
+
+  function undo() {
+    if (!history.length) { toast('Nothing to undo.'); return; }
+    future.push({ label: 'redo', state: JSON.stringify(S) });
+    applySnapshot(history.pop());
+    toast('Undone.');
+  }
+
+  function redo() {
+    if (!future.length) { toast('Nothing to redo.'); return; }
+    history.push({ label: 'undo', state: JSON.stringify(S) });
+    applySnapshot(future.pop());
+    toast('Redone.');
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (!(e.ctrlKey || e.metaKey)) { return; }
+    var k = (e.key || '').toLowerCase();
+    if (k === 'z' && !e.shiftKey) { undo(); e.preventDefault(); }
+    else if (k === 'y' || (k === 'z' && e.shiftKey)) { redo(); e.preventDefault(); }
+  });
 
   var toastEl;
   function toast(msg) {
@@ -1005,6 +1088,42 @@
     d.hit.setAttribute('cx', hx); d.hit.setAttribute('cy', hy);
   }
 
+  /* Type an exact value. Click the read-out under any dial and enter a number — the first thing
+     anyone precise reaches for, and impossible with a knob alone. */
+  function bindTypeToEdit(readout, get, set, suffix) {
+    readout.style.cursor = 'text';
+    readout.title = 'Click to type an exact value';
+    readout.addEventListener('click', function (e) {
+      e.stopPropagation();
+      if (readout.querySelector('input')) { return; }
+
+      var input = document.createElement('input');
+      input.type = 'text';
+      input.value = String(Math.round(get()));
+      input.setAttribute('style',
+        'width:44px;font:inherit;text-align:center;color:var(--glow-ink);background:#0b1119;' +
+        'border:1px solid var(--glow);border-radius:6px;padding:1px 3px;');
+      var previous = readout.textContent;
+      readout.textContent = '';
+      readout.appendChild(input);
+      input.focus();
+      input.select();
+
+      function finish(commit) {
+        var v = parseFloat(input.value);
+        readout.textContent = previous;
+        if (commit && !isNaN(v)) { snapshot('type'); set(v); }
+      }
+      input.addEventListener('keydown', function (ev) {
+        ev.stopPropagation();
+        if (ev.key === 'Enter') { finish(true); }
+        else if (ev.key === 'Escape') { finish(false); }
+      });
+      input.addEventListener('blur', function () { finish(true); });
+      input.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    });
+  }
+
   /* Wire a dial once. Only the handle turns it; the hub is the on/off button; the rest of the
      face is inert on purpose — pressing empty space must never move a value. */
   function initDial(el, opts) {
@@ -1020,6 +1139,7 @@
     var onHelp = false;
     draggable(el, function (e) {
       onHelp = !!(e.target.closest && e.target.closest('.qm'));   /* the ? is not a switch */
+      snapshot('dial');
       turning = (e.target === d.hit);
       moved = false;
       downX = e.clientX;
@@ -1055,6 +1175,14 @@
       el.appendChild(val);
       el._val = val;
 
+      bindTypeToEdit(val, function () { return S.fx[id].v; }, function (v) {
+        S.fx[id].v = clamp(v, 0, 100);
+        S.fx[id].on = true;
+        renderFxDial(el);
+        pushFx(id);
+        save();
+      });
+
       var spec = FX.filter(function (f) { return f.id === id; })[0];
       if (spec && spec.help) {
         var help = document.createElement('span');
@@ -1085,6 +1213,16 @@
         }
       });
     });
+
+    var volNum = document.getElementById('volNum');
+    if (volNum) {
+      bindTypeToEdit(volNum, function () { return S.volume; }, function (v) {
+        S.volume = clamp(v, 0, 100);
+        renderVolDial();
+        pushVolume();
+        save();
+      });
+    }
 
     var vol = document.querySelector('[data-dial="volume"]');
     if (vol) {
@@ -1138,6 +1276,7 @@
        never fights a DOM rebuild. */
     if (host.querySelectorAll('.band').length !== freqs.length) {
       host.querySelectorAll('.band').forEach(function (b) { b.remove(); });
+      ensureCurveLayer(host);
       freqs.forEach(function (f, i) {
         var band = document.createElement('div');
         band.className = 'band';
@@ -1172,6 +1311,60 @@
       band.querySelector('.bhandle').style.top = top + '%';
       band.querySelector('.bdb').textContent = (db > 0 ? '+' : '') + round1(db);
     });
+
+    drawEqCurve(host, gains);
+  }
+
+  /* The curve through the band handles.
+     Ten dots don't tell you what the EQ is doing — the shape between them does, and that shape is
+     what you actually hear. Drawn as a smooth line with a soft fill down to the zero line, so a
+     glance says "scooped mids" or "lifted top" without reading any numbers. */
+  function ensureCurveLayer(host) {
+    if (host.querySelector('.eqcurve')) { return; }
+    var svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'eqcurve');
+    svg.setAttribute('preserveAspectRatio', 'none');
+    var fill = document.createElementNS(SVGNS, 'path');
+    fill.setAttribute('class', 'eqfill');
+    var line = document.createElementNS(SVGNS, 'path');
+    line.setAttribute('class', 'eqline');
+    svg.appendChild(fill);
+    svg.appendChild(line);
+    host.insertBefore(svg, host.firstChild);
+  }
+
+  function drawEqCurve(host, gains) {
+    var svg = host.querySelector('.eqcurve');
+    if (!svg) { return; }
+    var n = gains.length;
+    if (n < 2) { return; }
+
+    /* Work in a 0..100 box on both axes and let the SVG stretch — no need to re-measure on resize. */
+    svg.setAttribute('viewBox', '0 0 100 100');
+    var pts = [];
+    for (var i = 0; i < n; i++) {
+      pts.push([((i + 0.5) / n) * 100, clamp(gainToTop(gains[i] || 0), 0, 100)]);
+    }
+
+    /* Catmull-Rom through the points, converted to cubic béziers: passes through every handle
+       instead of merely near it, which matters when the handle is the thing you dragged. */
+    var d = 'M' + pts[0][0].toFixed(2) + ',' + pts[0][1].toFixed(2);
+    for (var j = 0; j < n - 1; j++) {
+      var p0 = pts[j > 0 ? j - 1 : 0];
+      var p1 = pts[j];
+      var p2 = pts[j + 1];
+      var p3 = pts[j + 2 < n ? j + 2 : n - 1];
+      var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += 'C' + c1x.toFixed(2) + ',' + c1y.toFixed(2) + ' ' +
+                 c2x.toFixed(2) + ',' + c2y.toFixed(2) + ' ' +
+                 p2[0].toFixed(2) + ',' + p2[1].toFixed(2);
+    }
+
+    svg.querySelector('.eqline').setAttribute('d', d);
+    /* Fill back along the zero line so boosts and cuts read as opposite shapes. */
+    svg.querySelector('.eqfill').setAttribute('d',
+      d + 'L' + pts[n - 1][0].toFixed(2) + ',50 L' + pts[0][0].toFixed(2) + ',50 Z');
   }
 
   function hzShort(f) {
@@ -1198,9 +1391,13 @@
     }
 
     /* Grab the handle to drag it. Clicking the column jumps the handle there and keeps
-       dragging — the way a fader behaves everywhere else. */
-    draggable(handle, null, function (e) { setFromY(e.clientY); }, null);
-    draggable(band, function (e) { if (e.target !== handle) { setFromY(e.clientY); } },
+       dragging — the way a fader behaves everywhere else. One snapshot per gesture, not per pixel. */
+    draggable(handle, function () { snapshot('eq band'); },
+                      function (e) { setFromY(e.clientY); }, null);
+    draggable(band, function (e) {
+                      snapshot('eq band');
+                      if (e.target !== handle) { setFromY(e.clientY); }
+                    },
                     function (e) { setFromY(e.clientY); }, null);
     band.addEventListener('dblclick', function () {
       eqGains()[i] = 0; renderEq(); pushEq(); save();
@@ -1419,6 +1616,7 @@
   }
 
   function applyEqPreset(name) {
+    snapshot('preset ' + name);
     var anchors = EQ_PRESETS[name] || [];
     S.eq.gains10 = FREQ10.map(function (f) { return round1(sampleCurve(anchors, f)); });
     S.eq.gains31 = FREQ31.map(function (f) { return round1(sampleCurve(anchors, f)); });
@@ -2041,27 +2239,31 @@
      otherwise the app making the sound, otherwise just that audio is flowing. */
   var nowPlaying = null;
   var liveSound = false;
+  var audioRunning = false;   /* is the audio path actually open (independent of bypass) */
 
   function renderNowPlaying() {
     var el = document.getElementById('npText');
     var src = document.querySelector('.screen .np .src');
     if (!el) { return; }
 
-    if (!S.power) {
-      el.textContent = 'Ready — press power to start';
+    if (!audioRunning) {
+      el.textContent = 'Not in the audio path yet — finish setup';
       if (src) { src.innerHTML = 'Soundstage' + qm(HELP.power); }
       return;
     }
 
     if (!liveSound) {
-      el.textContent = 'Running — no sound arriving yet';
+      el.textContent = 'Ready — nothing playing yet';
       if (src) { src.innerHTML = 'Soundstage' + qm(HELP.power); }
       return;
     }
 
+    /* Bypassed still means sound is flowing — say what you're hearing, not that nothing happens. */
+    var suffix = S.power ? '' : '  ·  bypassed';
+
     var np = nowPlaying;
     if (np && np.playing && np.title) {
-      el.textContent = np.artist ? np.title + ' — ' + np.artist : np.title;
+      el.textContent = (np.artist ? np.title + ' — ' + np.artist : np.title) + suffix;
       if (src) { src.textContent = np.app || 'Now playing'; }
       el.title = np.title + (np.artist ? ' — ' + np.artist : '');
       return;
@@ -2070,30 +2272,38 @@
     /* No media session (plenty of games never register one) — name the app if we can see it. */
     var loud = sessions.filter(function (s) { return s.active; })[0];
     if (loud) {
-      el.textContent = 'Processing ' + (loud.title || loud.process);
+      el.textContent = (loud.title || loud.process) + suffix;
       if (src) { src.textContent = 'Now playing'; }
       return;
     }
 
-    el.textContent = 'Processing your sound';
+    el.textContent = (S.power ? 'Processing your sound' : 'Passing your sound through untouched');
     if (src) { src.innerHTML = 'Soundstage' + qm(HELP.power); }
   }
 
   /* ---------- power ------------------------------------------------------------------- */
 
+  /* On/Off is an A/B bypass, not a stop button.
+     The audio path stays open either way — everything on the PC is routed through the outlet, so
+     closing it would mean silence, not "unprocessed". What this switches is whether you're hearing
+     Soundstage or the original signal, which is the only way to judge whether an effect is helping. */
   function setPower(on) {
     S.power = on;
     var pw = document.querySelector('[data-power]');
     pw.classList.toggle('off', !on);
-    pw.innerHTML = '<span class="d"></span> ' + (on ? 'On' : 'Off');
-    document.getElementById('npText').textContent = on
-      ? 'Processing your sound'
-      : 'Ready — press power to start';
-    document.getElementById('npBars').style.opacity = on ? '1' : '.35';
+    pw.innerHTML = '<span class="d"></span> ' + (on ? 'On' : 'Bypassed');
+    document.getElementById('npBars').style.opacity = on ? '1' : '.5';
     send({ t: 'power', on: on });
-    send({ t: 'powerstate', on: on });   /* the tray and the volume keys follow the power state */
+    send({ t: 'powerstate', on: on });   /* the tray and the volume keys follow this */
     renderNowPlaying();
     save();
+  }
+
+  /* Open the audio path itself. Done once the routing is known to work, and kept open — the bypass
+     switch above is what the user reaches for, not this. */
+  function engageAudio() {
+    send({ t: 'engage', on: true });
+    send({ t: 'power', on: S.power });
   }
 
   /* A volume key came through. Windows' own slider can't reach us, so these drive Soundstage. */
@@ -2178,7 +2388,7 @@
     });
     var pw = document.querySelector('[data-power]');
     pw.classList.toggle('off', !S.power);
-    pw.innerHTML = '<span class="d"></span> ' + (S.power ? 'On' : 'Off');
+    pw.innerHTML = '<span class="d"></span> ' + (S.power ? 'On' : 'Bypassed');
   }
 
   /* ---------- page navigation --------------------------------------------------------- */
@@ -2479,7 +2689,7 @@
     if (e.target.closest('#setupBack')) { if (setupIndex > 0) { setupIndex--; renderSetup(); } return; }
     if (e.target.closest('#setupNext')) {
       if (setupIndex < SETUP.length - 1) { setupIndex++; send({ t: 'devices' }); renderSetup(); }
-      else { closeSetup(); toast('Setup finished — press the power button to start.'); }
+      else { closeSetup(); engageAudio(); toast('Setup finished — Soundstage is in your audio path.'); }
       return;
     }
     if (e.target.closest('#setupSkip')) {
@@ -2490,6 +2700,7 @@
       return;
     }
     if (e.target.closest('#resetAll')) {
+      snapshot('reset');
       var keep = S.presets;
       S = defaults(); S.presets = keep;
       renderEverything(); pushAll(); setPower(false); save();
@@ -2649,7 +2860,9 @@
               S.presets = loaded.presets || {};
             } catch (_) { S = defaults(); }
           }
-          S.power = false;                       /* audio never auto-starts */
+          /* Whether the effects are engaged is remembered; whether we're in the audio path is not a
+             user choice once setup is done — with everything routed through the outlet, staying out
+             of the path just means silence. */
           S.settings.runAtLogin = !!msg.runAtLogin;
           engineOk = !!msg.engine;
           dragMode = msg.dragMode || 'native';
@@ -2667,9 +2880,15 @@
           if (S.settings.outletId) { send({ t: 'outlet', id: S.settings.outletId }); }
           if (!engineOk) { toast('The audio engine did not load, so the controls will not change your sound.'); }
 
-          /* First run walks you through the routing; after that we just check for updates. */
+          /* First run walks you through the routing; after that, open the audio path straight away
+             so the app is doing its job without anyone having to press anything. */
           setTimeout(function () {
-            if (!S.settings.setupDone) { openSetup(0); } else { maybeAutoCheck(); }
+            if (!S.settings.setupDone) {
+              openSetup(0);
+            } else {
+              engageAudio();
+              maybeAutoCheck();
+            }
           }, 700);
 
           runStartupAutomations();
@@ -2703,13 +2922,16 @@
         if (msg.t === 'running') {
           liveIn = msg.inChannels || 2;
           outletChannels = msg.outletChannels || 2;
+          audioRunning = true;
           renderDevices();
-          toast('Soundstage is processing your sound — ' + msg.output + ' · ' + msg.format + '.');
+          renderNowPlaying();
+          toast('In the audio path — ' + msg.output + ' · ' + msg.format + '.');
           return;
         }
         if (msg.t === 'audio-error') {
-          toast('Couldn’t start audio. ' + (msg.detail || 'Check your output device and try again.'));
-          setPower(false);
+          audioRunning = false;
+          renderNowPlaying();
+          toast('Couldn’t open the audio path. ' + (msg.detail || 'Check your output device.'));
           return;
         }
         return;
@@ -2731,6 +2953,27 @@
   }
 
   /* ---------- boot -------------------------------------------------------------------- */
+
+  /* Seed the draw animation with the path's real length, so it traces at an even speed whatever
+     the shape is, then dismiss once the app is actually ready to be used. */
+  (function () {
+    var wave = document.getElementById('splashWave');
+    var splash = document.getElementById('splash');
+    if (!wave || !splash) { return; }
+    try {
+      var len = wave.getTotalLength();
+      wave.style.setProperty('--len', len.toFixed(1));
+    } catch (e) {
+      splash.classList.add('done');
+      return;
+    }
+    /* Long enough to read, short enough not to be in the way. */
+    setTimeout(function () {
+      var sub = document.getElementById('splashSub');
+      if (sub) { sub.textContent = engineOk ? 'Ready' : 'Starting the engine…'; }
+    }, 1500);
+    setTimeout(function () { splash.classList.add('done'); }, 2100);
+  })();
 
   initDials();
   bindSliders();

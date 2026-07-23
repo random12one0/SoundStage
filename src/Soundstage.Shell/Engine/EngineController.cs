@@ -187,11 +187,18 @@ public sealed class EngineController : IDisposable
             {
                 case "power":
                     {
+                        // This is an A/B bypass, not a stop button. Audio keeps flowing either way;
+                        // what changes is whether you're hearing Soundstage or the original. Stopping
+                        // the path would mean silence, since everything is routed through the outlet.
                         bool on = Bool(root, "on");
-                        _engine.SetEnabled(on);   // master follows the power switch
-                        if (on) { StartProcessing(); } else { StopProcessing(); }
+                        StartProcessing();        // idempotent — keeps the path open
+                        _engine.SetEnabled(on);
                     }
 
+                    break;
+                case "engage":
+                    // Actually open or release the audio path. Separate from bypass on purpose.
+                    if (Bool(root, "on")) { StartProcessing(); } else { StopProcessing(); }
                     break;
                 case "master":
                     _engine.SetEnabled(Bool(root, "on"));
