@@ -474,6 +474,29 @@ public sealed class EngineController : IDisposable
             return;
         }
 
+        // Plugin mode replaces this whole path, and the two must never run at once.
+        //
+        // With the plugin installed, our DSP already runs inside Windows' audio engine on the way to
+        // the speakers. If the app ALSO opened a capture-and-replay path it would fight for the same
+        // device: apps get "can't play right now", the test tone finds the device busy, and the
+        // channel count we report describes a stream nobody is listening to. Every symptom of that
+        // clash looks like a broken app rather than two copies of Soundstage competing.
+        //
+        // So when the plugin is live, the app is a control panel and nothing more.
+        if (ApoStatus.AttachedDevices().Count > 0)
+        {
+            _notify?.Invoke(JsonSerializer.Serialize(new
+            {
+                t = "running",
+                mode = "plugin",
+                output = "Wherever Windows is playing",
+                format = "Processed inside Windows",
+                channels = 0,
+                inChannels = 0,
+            }));
+            return;
+        }
+
         try
         {
             MMDevice? cable = null;

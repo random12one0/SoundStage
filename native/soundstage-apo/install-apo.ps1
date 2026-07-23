@@ -209,8 +209,40 @@ $target = Select-Endpoint
 Write-Host ""
 Write-Host "Installing Soundstage onto: $($target.Name)   [$($target.Id)]"
 
-Copy-Item $src $dst -Force
-Write-Host "  copied the plugin to System32"
+# Only copy when the file is actually different. Attaching a SECOND device would otherwise fail:
+# audiodg already has the DLL loaded from the first one and holds it open, so the copy is refused -
+# even though the bytes are identical and there is nothing to do.
+$needCopy = $true
+if (Test-Path $dst) {
+    try {
+        $a = (Get-FileHash $src -Algorithm SHA256).Hash
+        $b = (Get-FileHash $dst -Algorithm SHA256).Hash
+        if ($a -eq $b) { $needCopy = $false }
+    } catch { }
+}
+
+if (-not $needCopy) {
+    Write-Host "  plugin already in System32 and up to date"
+} else {
+    $copied = $false
+    try {
+        Copy-Item $src $dst -Force
+        $copied = $true
+    } catch {
+        # Held open by the audio engine. Stopping the service makes it let go; the endpoint work
+        # below still needs to happen either way.
+        Write-Host "  plugin is in use - stopping the audio service to replace it"
+        Stop-Service Audiosrv -Force
+        Start-Sleep -Seconds 2
+        foreach ($i in 1..8) {
+            try { Copy-Item $src $dst -Force; $copied = $true; break } catch { Start-Sleep -Seconds 2 }
+        }
+        Start-Service Audiosrv
+        Start-Sleep -Seconds 2
+    }
+    if (-not $copied) { throw "Could not replace $dst - reboot and run this again." }
+    Write-Host "  copied the plugin to System32"
+}
 
 # audiodg.exe runs stripped of privileges. It must be able to read the DLL, and System32's own
 # permissions already allow that - but a file copied out of a user profile can arrive carrying
