@@ -84,8 +84,56 @@ public sealed class TrayIcon : IDisposable
         }
     }
 
-    /// <summary>The waveform mark from the title bar, drawn small.</summary>
+    /// <summary>
+    /// The app icon when it's available, tinted grey while idle so the tray shows at a glance whether
+    /// sound is being processed. Falls back to drawing the mark if the resource is missing.
+    /// </summary>
     private static Icon BuildIcon(bool lit)
+    {
+        try
+        {
+            using System.IO.Stream? s = typeof(TrayIcon).Assembly
+                .GetManifestResourceStream("Soundstage.Shell.soundstage.ico");
+            if (s is not null)
+            {
+                using var full = new Icon(s, 32, 32);
+                if (lit)
+                {
+                    return (Icon)full.Clone();
+                }
+
+                // Idle: desaturate so "running" is obvious without reading the tooltip.
+                using Bitmap src = full.ToBitmap();
+                using var dim = new Bitmap(src.Width, src.Height);
+                using (var g = Graphics.FromImage(dim))
+                {
+                    var grey = new System.Drawing.Imaging.ColorMatrix(new[]
+                    {
+                        new[] { 0.30f, 0.30f, 0.30f, 0f, 0f },
+                        new[] { 0.59f, 0.59f, 0.59f, 0f, 0f },
+                        new[] { 0.11f, 0.11f, 0.11f, 0f, 0f },
+                        new[] { 0f, 0f, 0f, 0.75f, 0f },
+                        new[] { 0f, 0f, 0f, 0f, 1f },
+                    });
+                    using var attrs = new System.Drawing.Imaging.ImageAttributes();
+                    attrs.SetColorMatrix(grey);
+                    g.DrawImage(src, new Rectangle(0, 0, src.Width, src.Height),
+                                0, 0, src.Width, src.Height, GraphicsUnit.Pixel, attrs);
+                }
+
+                return Icon.FromHandle(dim.GetHicon());
+            }
+        }
+        catch
+        {
+            // Fall through to the drawn mark.
+        }
+
+        return DrawFallbackIcon(lit);
+    }
+
+    /// <summary>The waveform mark, drawn small — used if the icon resource isn't there.</summary>
+    private static Icon DrawFallbackIcon(bool lit)
     {
         using var bmp = new Bitmap(32, 32);
         using (var g = Graphics.FromImage(bmp))

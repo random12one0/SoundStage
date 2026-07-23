@@ -240,6 +240,7 @@ public sealed class EngineAudioHost : IDisposable
             }
 
             LastError = null;
+            TearDown();   // never leave a previous endpoint holding the old device
             _capture = new WasapiLoopbackCapture(captureDevice);
             int rate = _capture.WaveFormat.SampleRate;
             _engine.Prepare(rate);
@@ -290,15 +291,39 @@ public sealed class EngineAudioHost : IDisposable
     {
         lock (_sync)
         {
-            if (!_running)
-            {
-                return;
-            }
-
-            _running = false;
-            try { _capture?.StopRecording(); } catch { /* tearing down */ }
-            try { _output?.Stop(); } catch { /* tearing down */ }
+            TearDown();
         }
+    }
+
+    /// <summary>
+    /// Fully release the audio path — stop AND dispose both endpoints.
+    ///
+    /// Stopping without disposing was a real bug: switching output device calls stop-then-start, and
+    /// Start() overwrites these fields, so the previous WasapiOut stayed alive holding the old
+    /// device. Sound carried on going to the speakers you'd just switched away from, while test
+    /// tones (which open their own output) correctly went to the new one.
+    /// </summary>
+    private void TearDown()
+    {
+        _running = false;
+
+        if (_capture is not null)
+        {
+            _capture.DataAvailable -= OnData;
+            _capture.RecordingStopped -= OnRecordingStopped;
+            try { _capture.StopRecording(); } catch { /* tearing down */ }
+            try { _capture.Dispose(); } catch { /* tearing down */ }
+            _capture = null;
+        }
+
+        if (_output is not null)
+        {
+            try { _output.Stop(); } catch { /* tearing down */ }
+            try { _output.Dispose(); } catch { /* tearing down */ }
+            _output = null;
+        }
+
+        _buffer = null;
     }
 
     private void OnData(object? sender, WaveInEventArgs e)
@@ -504,18 +529,9 @@ public sealed class EngineAudioHost : IDisposable
         }
 
         _disposed = true;
-        Stop();
-
-        if (_capture is not null)
+        lock (_sync)
         {
-            _capture.DataAvailable -= OnData;
-            _capture.RecordingStopped -= OnRecordingStopped;
-            try { _capture.Dispose(); } catch { /* ignore */ }
-            _capture = null;
+            TearDown();
         }
-
-        try { _output?.Dispose(); } catch { /* ignore */ }
-        _output = null;
-        _buffer = null;
     }
 }

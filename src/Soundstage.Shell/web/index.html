@@ -339,6 +339,17 @@
   #setup .srow{display:flex;align-items:center;gap:9px;}
   #setup .srow .sp{flex:1;}
 
+  /* volume read-out for the keyboard keys */
+  #volOverlay{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(8px);
+              display:flex;align-items:center;gap:12px;z-index:9996;
+              background:#0e1922ee;border:1px solid #2b5a57;border-radius:14px;padding:12px 18px;
+              box-shadow:0 18px 50px rgba(0,0,0,.55);color:var(--glow);
+              opacity:0;pointer-events:none;transition:opacity .16s,transform .16s;}
+  #volOverlay.show{opacity:1;transform:translateX(-50%) translateY(0);}
+  #volOverlay .vo-bar{width:150px;height:6px;border-radius:4px;background:#0b1119;overflow:hidden;}
+  #volOverlay .vo-f{display:block;height:100%;background:linear-gradient(90deg,#1a9d92,#37e0cf);}
+  #volOverlay .vo-n{font-family:ui-monospace,monospace;font-size:13px;color:var(--ink);min-width:38px;text-align:right;}
+
   /* ---- explain-yourself icons ----
      Every control that isn't self-evident carries one. Someone opening this for the first time
      should never have to guess what "Leveler" means. */
@@ -595,6 +606,7 @@
             <div class="setgroup">Startup</div>
             <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw" data-sw="runAtLogin"><div class="k"></div></div></div>
             <div class="setrow"><div class="st"><div class="stn">Keep running in the tray when closed</div><div class="std">Closing the window leaves your sound processed. Quit from the tray icon to stop.</div></div><div class="sw" data-sw="closeToTray"><div class="k"></div></div></div>
+            <div class="setrow"><div class="st"><div class="stn">Volume keys control Soundstage</div><div class="std">Your keyboard's volume keys drive this app while it's processing. Windows' own slider can't reach the audio once it's routed through the outlet.</div></div><div class="sw" data-sw="volumeKeys"><div class="k"></div></div></div>
 
             <div class="setgroup">Audio</div>
             <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage plays your processed sound</div></div><div class="pdd" id="devDD"><button class="pddbtn"><span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
@@ -635,6 +647,10 @@
     <button class="btn" id="setupNext">Next</button>
   </div>
 </div></div>
+
+<!-- Volume read-out for the keyboard keys, since you'll usually press those with the window hidden -->
+<div id="volOverlay"><svg class="ico" style="width:20px"><use href="#i-spk"/></svg>
+  <div class="vo-bar"><i class="vo-f"></i></div><span class="vo-n">0</span></div>
 
 <div id="modal"><div class="box">
   <h4 id="modalTitle">Name this preset</h4>
@@ -765,8 +781,10 @@
       spk: { trims: [0, 0, 0, 0, 0, 0, 0, 0], upmix: false, subfeed: false },
       settings: {
         runAtLogin: false, closeToTray: true, exclusive: false, autoUpdate: true,
+        volumeKeys: true,
         deviceId: null, outletId: null, latency: 40, setupDone: false, lastCheck: 0
       },
+      muted: false, volumeBeforeMute: 60,
       presets: {},  /* the user's own saved presets, by name */
       autos: seedAutomations()
     };
@@ -1351,6 +1369,11 @@
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
     else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
     else if (key === 'autoUpdate') { S.settings.autoUpdate = on; }
+    else if (key === 'volumeKeys') {
+      S.settings.volumeKeys = on;
+      send({ t: 'volumekeys', on: on });
+      if (on) { toast('Your volume keys now control Soundstage while it’s running.'); }
+    }
     else if (key === 'exclusive') {
       S.settings.exclusive = on;
       send({ t: 'exclusive', on: on });
@@ -1608,7 +1631,7 @@
   /* ---------- settings rendering -------------------------------------------------------- */
 
   function renderSettings() {
-    ['runAtLogin', 'closeToTray', 'exclusive', 'autoUpdate'].forEach(function (k) {
+    ['runAtLogin', 'closeToTray', 'exclusive', 'autoUpdate', 'volumeKeys'].forEach(function (k) {
       syncToggle(k, S.settings[k]);
     });
 
@@ -2010,9 +2033,50 @@
     for (var i = 0; i < kids.length; i++) {
       kids[i].style.height = Math.max(8, lastLevel * shape[i] * 100) + '%';
     }
-    document.getElementById('npText').textContent = out > 0.0005
-      ? 'Processing your sound'
-      : 'Running — no sound arriving yet';
+    liveSound = out > 0.0005;
+    renderNowPlaying();
+  }
+
+  /* The status line, in order of how much it actually tells you: the track if Windows knows it,
+     otherwise the app making the sound, otherwise just that audio is flowing. */
+  var nowPlaying = null;
+  var liveSound = false;
+
+  function renderNowPlaying() {
+    var el = document.getElementById('npText');
+    var src = document.querySelector('.screen .np .src');
+    if (!el) { return; }
+
+    if (!S.power) {
+      el.textContent = 'Ready — press power to start';
+      if (src) { src.innerHTML = 'Soundstage' + qm(HELP.power); }
+      return;
+    }
+
+    if (!liveSound) {
+      el.textContent = 'Running — no sound arriving yet';
+      if (src) { src.innerHTML = 'Soundstage' + qm(HELP.power); }
+      return;
+    }
+
+    var np = nowPlaying;
+    if (np && np.playing && np.title) {
+      el.textContent = np.artist ? np.title + ' — ' + np.artist : np.title;
+      if (src) { src.textContent = np.app || 'Now playing'; }
+      el.title = np.title + (np.artist ? ' — ' + np.artist : '');
+      return;
+    }
+
+    /* No media session (plenty of games never register one) — name the app if we can see it. */
+    var loud = sessions.filter(function (s) { return s.active; })[0];
+    if (loud) {
+      el.textContent = 'Processing ' + (loud.title || loud.process);
+      if (src) { src.textContent = 'Now playing'; }
+      return;
+    }
+
+    el.textContent = 'Processing your sound';
+    if (src) { src.innerHTML = 'Soundstage' + qm(HELP.power); }
   }
 
   /* ---------- power ------------------------------------------------------------------- */
@@ -2027,7 +2091,37 @@
       : 'Ready — press power to start';
     document.getElementById('npBars').style.opacity = on ? '1' : '.35';
     send({ t: 'power', on: on });
+    send({ t: 'powerstate', on: on });   /* the tray and the volume keys follow the power state */
+    renderNowPlaying();
     save();
+  }
+
+  /* A volume key came through. Windows' own slider can't reach us, so these drive Soundstage. */
+  function nudgeVolume(delta) {
+    if (delta === 0) {
+      S.muted = !S.muted;
+      S.volumeBeforeMute = S.muted ? S.volume : S.volumeBeforeMute;
+      S.volume = S.muted ? 0 : (S.volumeBeforeMute || 60);
+    } else {
+      S.muted = false;
+      S.volume = clamp(S.volume + (delta * 4), 0, 100);
+    }
+    renderVolDial();
+    pushVolume();
+    showVolumeOverlay();
+    save();
+  }
+
+  /* A brief read-out, because you'll usually be pressing these with the window hidden. */
+  var volOverlayTimer = null;
+  function showVolumeOverlay() {
+    var el = document.getElementById('volOverlay');
+    if (!el) { return; }
+    el.querySelector('.vo-n').textContent = S.muted ? 'Muted' : Math.round(S.volume);
+    el.querySelector('.vo-f').style.width = (S.muted ? 0 : S.volume) + '%';
+    el.classList.add('show');
+    clearTimeout(volOverlayTimer);
+    volOverlayTimer = setTimeout(function () { el.classList.remove('show'); }, 1200);
   }
 
   /* ---------- render everything ------------------------------------------------------- */
@@ -2567,6 +2661,7 @@
           renderEverything();
           pushAll();
           send({ t: 'tray', closeToTray: S.settings.closeToTray });
+          send({ t: 'volumekeys', on: S.settings.volumeKeys !== false });
           send({ t: 'exclusive', on: S.settings.exclusive });
           send({ t: 'latency', ms: S.settings.latency });
           if (S.settings.outletId) { send({ t: 'outlet', id: S.settings.outletId }); }
@@ -2602,6 +2697,8 @@
           return;
         }
         if (msg.t === 'sessions') { sessions = msg.items || []; tickAutomations(); return; }
+        if (msg.t === 'nowplaying') { nowPlaying = msg; renderNowPlaying(); return; }
+        if (msg.t === 'volumekey') { nudgeVolume(msg.delta || 0); return; }
         if (msg.t === 'tray-power') { setPower(!!msg.on); return; }
         if (msg.t === 'running') {
           liveIn = msg.inChannels || 2;

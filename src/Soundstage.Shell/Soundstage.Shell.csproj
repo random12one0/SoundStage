@@ -2,15 +2,29 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- The Windows 10 flavour gives us GlobalSystemMediaTransportControls, which is how the app
+         can say "playing <song>" instead of just "processing your sound". -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
     <UseWPF>true</UseWPF>
     <!-- Only for NotifyIcon: Windows still has no first-class WPF tray API. -->
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Soundstage.Shell</RootNamespace>
     <AssemblyName>Soundstage</AssemblyName>
     <Version>1.0.0</Version>
-    <ApplicationIcon></ApplicationIcon>
+    <ApplicationIcon>..\..\assets\soundstage.ico</ApplicationIcon>
+    <AssemblyTitle>Soundstage</AssemblyTitle>
+    <Product>Soundstage</Product>
+    <Company>Soundstage</Company>
+    <Description>Applies your own audio effects to everything playing on the PC.</Description>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Shipped alongside so the tray can use the real icon rather than drawing its own. -->
+    <EmbeddedResource Include="..\..\assets\soundstage.ico">
+      <LogicalName>Soundstage.Shell.soundstage.ico</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
 
   <ItemGroup>
     <!-- WebView2 hosts our approved HTML/CSS/JS UI as a native window. -->

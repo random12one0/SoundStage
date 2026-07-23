@@ -50,6 +50,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private VolumeKeys? _volumeKeys;
+    private bool _volumeKeysWanted = true;
+    private bool _powerOn;
+
+    /// <summary>
+    /// Claim the keyboard's volume keys. They're dead controls otherwise — the Windows slider adjusts
+    /// the outlet endpoint, and a virtual cable's loopback is taken before that volume applies.
+    /// </summary>
+    private void SetUpVolumeKeys()
+    {
+        if (_volumeKeys is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            _volumeKeys = new VolumeKeys(this);
+            _volumeKeys.Pressed += delta => NotifyUi(
+                "{\"t\":\"volumekey\",\"delta\":" + delta.ToString(System.Globalization.CultureInfo.InvariantCulture) + "}");
+        }
+        catch
+        {
+            _volumeKeys = null;   // no hotkeys available; the in-app dial still works
+        }
+    }
+
     private void HideToTray()
     {
         Hide();
@@ -156,6 +183,7 @@ public partial class MainWindow : Window
             case "ready":
                 SendInitialState();
                 StartLevelMeter();
+                SetUpVolumeKeys();
                 break;
         }
     }
@@ -264,9 +292,23 @@ public partial class MainWindow : Window
                     return true;
 
                 case "powerstate":
-                    _tray?.SetPower(doc.RootElement.TryGetProperty("on", out JsonElement p) &&
-                                    p.ValueKind == JsonValueKind.True);
-                    return false;   // the engine wants to see this one too
+                    {
+                        bool on = doc.RootElement.TryGetProperty("on", out JsonElement p) &&
+                                  p.ValueKind == JsonValueKind.True;
+                        _powerOn = on;
+                        _tray?.SetPower(on);
+
+                        // Only hold the volume keys while we're actually in the audio path; hand
+                        // them back to Windows the moment we're not.
+                        if (_volumeKeys is not null && _volumeKeysWanted) { _volumeKeys.Enabled = on; }
+                        return false;   // the engine wants to see this one too
+                    }
+
+                case "volumekeys":
+                    _volumeKeysWanted = doc.RootElement.TryGetProperty("on", out JsonElement vk) &&
+                                        vk.ValueKind != JsonValueKind.False;
+                    if (_volumeKeys is not null) { _volumeKeys.Enabled = _volumeKeysWanted && _powerOn; }
+                    return true;
             }
         }
 
@@ -336,6 +378,7 @@ public partial class MainWindow : Window
             }
 
             _meterWasLive = true;
+            PollNowPlaying();
             (float inPeak, float outPeak) = _controller.Levels;
             (int inCh, int outCh) = _controller.ActiveLayouts;
             NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
@@ -347,6 +390,44 @@ public partial class MainWindow : Window
 
     private System.Windows.Threading.DispatcherTimer? _meterTimer;
     private bool _meterWasLive;
+
+    // Now-playing is polled far more slowly than the meter — track changes are a human-speed event,
+    // and the media-session API is not free.
+    private int _nowPlayingTick;
+    private string _lastNowPlaying = "";
+    private bool _nowPlayingBusy;
+
+    private void PollNowPlaying()
+    {
+        if (++_nowPlayingTick < 12 || _nowPlayingBusy)   // ~1s at an 80 ms meter tick
+        {
+            return;
+        }
+
+        _nowPlayingTick = 0;
+        _nowPlayingBusy = true;
+
+        _ = Task.Run(async () =>
+        {
+            Audio.NowPlaying.Track? track = await Audio.NowPlaying.CurrentAsync();
+            string payload = JsonSerializer.Serialize(new
+            {
+                t = "nowplaying",
+                title = track?.Title ?? "",
+                artist = track?.Artist ?? "",
+                app = track?.App ?? "",
+                playing = track?.Playing ?? false,
+            });
+
+            if (payload != _lastNowPlaying)
+            {
+                _lastNowPlaying = payload;
+                NotifyUi(payload);
+            }
+
+            _nowPlayingBusy = false;
+        });
+    }
 
     protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
     {
@@ -365,6 +446,7 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _meterTimer?.Stop();
+        _volumeKeys?.Dispose();
         _tray?.Dispose();
         _controller.Dispose();
         base.OnClosed(e);
