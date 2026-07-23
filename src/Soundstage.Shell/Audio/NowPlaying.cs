@@ -115,11 +115,18 @@ public static class NowPlaying
         if (bang > 0) { id = id[..bang]; }
         int underscore = id.IndexOf('_');
         if (underscore > 0) { id = id[..underscore]; }
+
+        // Desktop apps come through as an exe name or a full path to one. Strip the .exe FIRST —
+        // before splitting on '.' for a namespace — or the extension's own dot gets mistaken for a
+        // namespace separator and the whole name collapses to "exe" (which is why Spotify desktop
+        // was showing up as "EXE").
+        int slash = id.LastIndexOfAny(new[] { '\\', '/' });
+        if (slash >= 0 && slash < id.Length - 1) { id = id[(slash + 1)..]; }
+        if (id.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) { id = id[..^4]; }
+
+        // Only now treat a remaining dot as a reverse-DNS namespace and take the last segment.
         int dot = id.LastIndexOf('.');
         if (dot > 0 && dot < id.Length - 1) { id = id[(dot + 1)..]; }
-
-        // Desktop apps come through as an exe name.
-        if (id.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) { id = id[..^4]; }
 
         return Pretty(id);
     }

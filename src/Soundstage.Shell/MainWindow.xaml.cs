@@ -366,8 +366,35 @@ public partial class MainWindow : Window
         };
         _meterTimer.Tick += (_, _) =>
         {
+            // Now-playing (the song title) comes from Windows' media session, not from our audio
+            // path, so it must be polled whichever mode we're in — otherwise plugin mode shows
+            // "nothing playing" while Spotify is clearly running.
+            PollNowPlaying();
+
             if (!_controller.IsRunning)
             {
+                // The app isn't capturing — but the PLUGIN might be doing the work. Ask it for live
+                // meters. This is what keeps the level and per-speaker meters alive in plugin mode.
+                var pm = _controller.PollPluginMeters();
+                if (pm is { } m)
+                {
+                    _meterWasLive = true;
+                    var chJson2 = new System.Text.StringBuilder("[");
+                    for (int c = 0; c < m.Channels.Count; c++)
+                    {
+                        if (c > 0) { chJson2.Append(','); }
+                        chJson2.Append(m.Channels[c].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+                    }
+
+                    chJson2.Append(']');
+
+                    NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                        $"{{\"t\":\"level\",\"in\":{m.Out:0.####},\"out\":{m.Out:0.####}," +
+                        $"\"inCh\":{(m.ChannelCount > 2 ? 2 : m.ChannelCount)},\"outCh\":{m.ChannelCount}," +
+                        $"\"ch\":{chJson2},\"live\":true,\"plugin\":true}}"));
+                    return;
+                }
+
                 if (_meterWasLive)
                 {
                     _meterWasLive = false;
@@ -378,7 +405,6 @@ public partial class MainWindow : Window
             }
 
             _meterWasLive = true;
-            PollNowPlaying();
             (float inPeak, float outPeak) = _controller.Levels;
             (int inCh, int outCh) = _controller.ActiveLayouts;
             (int latency, double levelerDb, double limiterDb) = _controller.Meters;

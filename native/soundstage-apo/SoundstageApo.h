@@ -81,6 +81,27 @@ struct SoundstageSharedState {
     SoundstageSettings    settings;
 };
 
+/// Telemetry the plugin publishes BACK to the app, so the app can meter what is actually going to
+/// each speaker even though it is no longer in the audio path itself. This is the reverse direction
+/// of the settings block: plugin writes, app reads.
+///
+/// `heartbeat` advances every time the plugin processes a buffer — the app watches it to know audio
+/// is really flowing (this is what makes "playing" vs "nothing playing" honest in plugin mode). The
+/// per-channel peaks are POST-processing, so the surrounds an upmix fills actually show up.
+///
+/// No seqlock here: every field is a single 32-bit value, torn reads are impossible on the writes
+/// that matter, and a metering number that is one frame stale is invisible. Simplicity beats
+/// ceremony for a display-only side channel.
+struct SoundstageTelemetry {
+    unsigned heartbeat;      // ++ per processed buffer; stalls when nothing plays
+    unsigned channels;       // width the plugin is currently running at
+    unsigned sampleRate;
+    unsigned _pad;
+    float    channelPeak[8]; // 0..1 linear, post-processing, decayed like a meter
+    float    inPeak;         // overall input peak, 0..1
+    float    outPeak;        // overall output peak, 0..1
+};
+
 /// Where the shared block lives.
 ///
 /// This is a file on disk rather than a named shared-memory object, and that choice is deliberate.
@@ -97,6 +118,10 @@ struct SoundstageSharedState {
 /// Where the plugin reports what it is doing. See SoundstageApo::Log for why this is necessary at
 /// all — audiodg.exe cannot be debugged or inspected from outside, so the plugin must narrate.
 #define SOUNDSTAGE_LOG_PATH L"C:\\ProgramData\\Soundstage\\apo.log"
+
+/// Where the plugin publishes its live meter telemetry for the app to read. The app creates this
+/// file (granting write to all, like the log) so audiodg's restricted token can map it read-write.
+#define SOUNDSTAGE_TELEMETRY_PATH L"C:\\ProgramData\\Soundstage\\engine-telemetry.bin"
 
 /// Append a diagnostic line. Setup/teardown paths only — never the real-time path.
 void SoundstageLog(const char* fmt, ...);
@@ -229,6 +254,16 @@ private:
 
     HANDLE  sharedFile_ = nullptr;
     HANDLE  sharedMapping_ = nullptr;
+
+    // Telemetry back-channel (plugin writes, app reads). Mapped read-write, set up off the real-time
+    // path; the actual writes in APOProcess are plain stores to this mapped page — no syscall.
+    void OpenTelemetry();
+    void CloseTelemetry();
+    HANDLE sharedFile_tel_ = nullptr;
+    HANDLE sharedMapping_tel_ = nullptr;
+    SoundstageTelemetry* telemetry_ = nullptr;
+    float telChannelPeak_[8] = {0};
+    UINT32 telDecim_ = 0;
     SoundstageSharedState* shared_ = nullptr;
     unsigned lastSequence_ = 0xFFFFFFFFu;
 };

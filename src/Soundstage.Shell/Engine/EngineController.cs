@@ -57,6 +57,7 @@ public sealed class EngineController : IDisposable
 
     private readonly SoundstageEngine? _engine;
     private readonly ApoBridge? _bridge;
+    private readonly ApoTelemetry? _telemetry;
     private readonly EngineAudioHost? _host;
     private readonly Action<string>? _notify;
     private bool _disposed;
@@ -94,6 +95,10 @@ public sealed class EngineController : IDisposable
             // nothing ever reads the file — so this is unconditional rather than gated on a setting.
             _bridge = new ApoBridge();
             _engine.AttachBridge(_bridge);
+
+            // Read the plugin's live meters back, so the app can show levels and now-playing even
+            // when the plugin (not the app) is in the audio path.
+            _telemetry = new ApoTelemetry();
 
             _engine.EnableEq(true);              // the cascade always runs; flat bands are an identity
             _engine.SetEqBandCount(TotalEqBands);
@@ -689,6 +694,21 @@ public sealed class EngineController : IDisposable
     public IReadOnlyList<float> ChannelLevels =>
         _host?.OutputChannelPeaks ?? (IReadOnlyList<float>)Array.Empty<float>();
 
+    /// <summary>
+    /// Poll the plugin's live meters. Returns null when the plugin isn't actively passing audio;
+    /// otherwise the per-speaker levels, overall level and channel count it is currently driving.
+    /// This is how the app meters and detects playback when the plugin, not the app, holds the path.
+    /// </summary>
+    public (IReadOnlyList<float> Channels, float Out, int ChannelCount)? PollPluginMeters()
+    {
+        if (_telemetry is null || !_telemetry.Poll())
+        {
+            return null;
+        }
+
+        return (_telemetry.ChannelPeaks, _telemetry.OutPeak, _telemetry.Channels);
+    }
+
     /// <summary>The layouts actually in use right now — what the content is, and what we're sending
     /// to the speakers. Not the device's channel count, which says nothing about either.</summary>
     public (int In, int Out) ActiveLayouts
@@ -774,5 +794,6 @@ public sealed class EngineController : IDisposable
         _host?.Dispose();
         _engine?.Dispose();
         _bridge?.Dispose();
+        _telemetry?.Dispose();
     }
 }

@@ -104,6 +104,7 @@ SoundstageApo::SoundstageApo(IUnknown* outer) : refs_(1) {
 }
 
 SoundstageApo::~SoundstageApo() {
+    CloseTelemetry();
     CloseSharedState();
     g_dllRefs.fetch_sub(1, std::memory_order_relaxed);
 }
@@ -303,6 +304,7 @@ STDMETHODIMP SoundstageApo::LockForProcess(UINT32 u32NumInputConnections,
 
     chain_.prepare(static_cast<double>(sampleRate_));
     OpenSharedState();
+    OpenTelemetry();   // set up the meter back-channel here, off the real-time path
     SyncSettings();
 
     locked_ = true;
@@ -327,6 +329,15 @@ STDMETHODIMP SoundstageApo::UnlockForProcess() {
     peakOut_ = 0.0f;
     surroundHoldFrames_ = 0;
 
+    // Zero the meters so the app doesn't show a stale bar frozen on a speaker after the stream ends.
+    if (telemetry_) {
+        for (int c = 0; c < 8; ++c) { telemetry_->channelPeak[c] = 0.0f; }
+        telemetry_->outPeak = 0.0f;
+    }
+    for (int c = 0; c < 8; ++c) { telChannelPeak_[c] = 0.0f; }
+    telDecim_ = 0;
+
+    CloseTelemetry();
     chain_.reset();
     return S_OK;
 }
@@ -457,6 +468,40 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
     }
     framesProcessed_ += frames;
 
+    // Publish live per-speaker levels back to the app. This is what lets the app meter each speaker
+    // even though it is no longer in the audio path — and because it is measured on `dst`, AFTER the
+    // upmix, the surrounds an upmix fills actually register.
+    //
+    // Everything here is real-time safe: a per-channel max over this buffer (plain arithmetic), a
+    // decayed peak held in a member, and — only about 20 times a second — a handful of plain stores
+    // into an already-mapped page. No allocation, no lock, no syscall.
+    if (telemetry_) {
+        for (UINT32 c = 0; c < ch && c < 8; ++c) {
+            float blockPk = 0.0f;
+            for (UINT32 nf = 0; nf < frames; ++nf) {
+                const float a = std::fabs(dst[static_cast<size_t>(nf) * ch + c]);
+                if (a > blockPk) { blockPk = a; }
+            }
+            // Decay so it reads like a meter rather than flickering, matching the app's own meters.
+            telChannelPeak_[c] = blockPk > telChannelPeak_[c] ? blockPk : telChannelPeak_[c] * 0.8f;
+        }
+
+        // Push to the shared page every ~48 ms (a bit over a screen frame); no need to write on every
+        // 10 ms buffer, and fewer writes means less chance of the app reading mid-update.
+        telDecim_ += frames;
+        if (telDecim_ >= sampleRate_ / 20) {
+            telDecim_ = 0;
+            telemetry_->channels = ch;
+            telemetry_->sampleRate = sampleRate_;
+            for (int c = 0; c < 8; ++c) {
+                telemetry_->channelPeak[c] = (static_cast<UINT32>(c) < ch) ? telChannelPeak_[c] : 0.0f;
+            }
+            telemetry_->outPeak = peakOut_;
+            // Heartbeat LAST, so the app can treat a change in it as "the rest is fresh".
+            ++telemetry_->heartbeat;
+        }
+    }
+
     out->u32ValidFrameCount = frames;
     out->u32BufferFlags = BUFFER_VALID;
 }
@@ -547,6 +592,35 @@ void SoundstageApo::CloseSharedState() {
     if (shared_) { UnmapViewOfFile(shared_); shared_ = nullptr; }
     if (sharedMapping_) { CloseHandle(sharedMapping_); sharedMapping_ = nullptr; }
     if (sharedFile_) { CloseHandle(sharedFile_); sharedFile_ = nullptr; }
+}
+
+void SoundstageApo::OpenTelemetry() {
+    if (telemetry_) { return; }
+
+    // Read-WRITE, because we publish into it. The app creates the file at a fixed size with a
+    // permissive ACL; if it hasn't (plugin installed, app never run), the open fails and we simply
+    // never report telemetry — harmless.
+    sharedFile_tel_ = CreateFileW(SOUNDSTAGE_TELEMETRY_PATH, GENERIC_READ | GENERIC_WRITE,
+                                  FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                  nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (sharedFile_tel_ == INVALID_HANDLE_VALUE) { sharedFile_tel_ = nullptr; return; }
+
+    sharedMapping_tel_ = CreateFileMappingW(sharedFile_tel_, nullptr, PAGE_READWRITE, 0,
+                                            sizeof(SoundstageTelemetry), nullptr);
+    if (!sharedMapping_tel_) { CloseTelemetry(); return; }
+
+    telemetry_ = static_cast<SoundstageTelemetry*>(
+        MapViewOfFile(sharedMapping_tel_, FILE_MAP_WRITE, 0, 0, sizeof(SoundstageTelemetry)));
+    if (!telemetry_) { CloseTelemetry(); return; }
+
+    telemetry_->channels = channels_;
+    telemetry_->sampleRate = sampleRate_;
+}
+
+void SoundstageApo::CloseTelemetry() {
+    if (telemetry_) { UnmapViewOfFile(telemetry_); telemetry_ = nullptr; }
+    if (sharedMapping_tel_) { CloseHandle(sharedMapping_tel_); sharedMapping_tel_ = nullptr; }
+    if (sharedFile_tel_) { CloseHandle(sharedFile_tel_); sharedFile_tel_ = nullptr; }
 }
 
 void SoundstageApo::SyncSettings() {
