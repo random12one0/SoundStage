@@ -41,12 +41,22 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -o publish
 
-      - name: Create GitHub Release
+      - name: List publish output (diagnostic)
+        shell: pwsh
+        run: Get-ChildItem publish -Recurse | Select-Object Name,Length | Format-Table -AutoSize
+
+      - name: Package + create GitHub Release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version || github.ref_name }}
         run: |
+          # Bundle the .exe with the engine DLL (if it wasn't self-extracted into the .exe), so the
+          # download always contains everything the app needs to actually process audio.
+          $files = @("publish/Soundstage.exe")
+          if (Test-Path "publish/soundstage_engine.dll") { $files += "publish/soundstage_engine.dll" }
+          Compress-Archive -Path $files -DestinationPath "Soundstage-win-x64.zip" -Force
+
           $notes = @"
           ## Soundstage $env:VERSION — it processes your audio now
 
@@ -56,7 +66,7 @@ jobs:
           Soundstage needs a small free "outlet" to catch your PC's sound so it can process it:
           1. Install **VB-CABLE** (free): https://vb-audio.com/Cable/ — download, run the installer as admin, reboot if it asks.
           2. Open Windows **Sound settings** and set **"CABLE Input"** as your default output (playback) device.
-          3. Download **Soundstage.exe** below and run it. (If Windows shows "unknown publisher," click *More info -> Run anyway*. If it asks for the free **WebView2** runtime, that's a Microsoft component already on most Win10/11 PCs.)
+          3. Download **Soundstage-win-x64.zip** below, **unzip it** (right-click -> Extract All), and run **Soundstage.exe** from the extracted folder. (If Windows shows "unknown publisher," click *More info -> Run anyway*. If it asks for the free **WebView2** runtime, that's a Microsoft component already on most Win10/11 PCs.)
 
           ### Use it
           - Press the **power button** (top-right — "Off" turns to "On"). Your sound now flows: your apps -> CABLE -> Soundstage engine -> your speakers.
@@ -69,7 +79,7 @@ jobs:
           This is a first working build — expect rough edges, and tell me what you hit. Requires 64-bit Windows 10/11.
           "@
           gh release create "$env:VERSION" `
-            "publish/Soundstage.exe#Soundstage.exe (portable, no install needed)" `
+            "Soundstage-win-x64.zip#Soundstage-win-x64.zip (unzip, then run Soundstage.exe)" `
             --target "${{ github.sha }}" `
             --title "Soundstage $env:VERSION" `
             --prerelease `
