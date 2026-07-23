@@ -108,6 +108,7 @@ public partial class MainWindow : Window
                 break;
             case "ready":
                 SendInitialState();
+                StartLevelMeter();
                 break;
         }
     }
@@ -162,8 +163,48 @@ public partial class MainWindow : Window
         _controller.SendDeviceList();
     }
 
+    /// <summary>
+    /// Feed the status strip's level meter. This is the one honest answer to "is it actually doing
+    /// anything?" — the bars only move when real audio is flowing through the engine.
+    /// </summary>
+    private void StartLevelMeter()
+    {
+        if (_meterTimer is not null)
+        {
+            return;
+        }
+
+        _meterTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(80),
+        };
+        _meterTimer.Tick += (_, _) =>
+        {
+            if (!_controller.IsRunning)
+            {
+                if (_meterWasLive)
+                {
+                    _meterWasLive = false;
+                    NotifyUi("{\"t\":\"level\",\"in\":0,\"out\":0,\"live\":false}");
+                }
+
+                return;
+            }
+
+            _meterWasLive = true;
+            (float inPeak, float outPeak) = _controller.Levels;
+            NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                $"{{\"t\":\"level\",\"in\":{inPeak:0.####},\"out\":{outPeak:0.####},\"live\":true}}"));
+        };
+        _meterTimer.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer? _meterTimer;
+    private bool _meterWasLive;
+
     protected override void OnClosed(EventArgs e)
     {
+        _meterTimer?.Stop();
         _controller.Dispose();
         base.OnClosed(e);
     }

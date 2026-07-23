@@ -268,6 +268,23 @@
   .pddmenu a.del{color:#ff98ac;border-top:1px solid var(--line);margin-top:4px;}
   .out{cursor:pointer;}
   .rail a,.wb b,.power,.pddbtn,.seg button,.ghost,.btn{-webkit-app-region:no-drag;app-region:no-drag;}
+  /* While real audio is flowing the bars are a meter, not decoration — stop the idle animation
+     so the heights we set are what you see. */
+  .bars.live i{animation:none;transition:height .08s linear;}
+
+  /* Our own prompt. The browser's window.prompt works, but it renders a "This page says" chrome
+     dialog in the middle of a native-looking app, which gives the game away. */
+  #modal{position:fixed;inset:0;z-index:9998;background:#060a0fbb;backdrop-filter:blur(3px);
+         display:none;align-items:center;justify-content:center;}
+  #modal.show{display:flex;animation:fade .16s ease both;}
+  #modal .box{width:min(380px,86vw);background:var(--surf);border:1px solid var(--line);border-radius:16px;
+              box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 1px 0 var(--soft-line);padding:20px;}
+  #modal h4{margin:0 0 4px;font-size:15px;font-weight:680;color:var(--ink);}
+  #modal p{margin:0 0 14px;font-size:12px;color:var(--dim);}
+  #modal input{width:100%;font:inherit;font-size:13.5px;color:var(--ink);background:#0e1620;
+               border:1px solid #2b3a48;border-radius:10px;padding:10px 12px;}
+  #modal input:focus{outline:0;border-color:var(--glow);}
+  #modal .row{display:flex;gap:9px;justify-content:flex-end;margin-top:16px;}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;}}
 </style>
@@ -480,6 +497,13 @@
   </div>
 </div>
 
+<div id="modal"><div class="box">
+  <h4 id="modalTitle">Name this preset</h4>
+  <p id="modalHint">It saves your EQ curve, every effect dial and the ambience settings.</p>
+  <input id="modalInput" maxlength="40" />
+  <div class="row"><button class="ghost" id="modalCancel">Cancel</button><button class="btn" id="modalOk">Save</button></div>
+</div></div>
+
 <script>
 /* =====================================================================================
    Soundstage UI
@@ -576,6 +600,39 @@
     if (!ready) { return; }
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () { send({ t: 'save', state: S }); }, 400);
+  }
+
+  /* Ask for a bit of text without the browser's own dialog. Calls back with the trimmed string, or
+     not at all if the user backs out. */
+  function askName(title, hint, initial, done) {
+    var modal = document.getElementById('modal');
+    var input = document.getElementById('modalInput');
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalHint').textContent = hint;
+    input.value = initial || '';
+    modal.classList.add('show');
+    setTimeout(function () { input.focus(); input.select(); }, 30);
+
+    function close() {
+      modal.classList.remove('show');
+      document.getElementById('modalOk').removeEventListener('click', ok);
+      document.getElementById('modalCancel').removeEventListener('click', close);
+      input.removeEventListener('keydown', key);
+    }
+    function ok() {
+      var v = input.value.trim();
+      close();
+      if (v) { done(v); }
+    }
+    function key(e) {
+      if (e.key === 'Enter') { ok(); }
+      else if (e.key === 'Escape') { close(); }
+      e.stopPropagation();
+    }
+
+    document.getElementById('modalOk').addEventListener('click', ok);
+    document.getElementById('modalCancel').addEventListener('click', close);
+    input.addEventListener('keydown', key);
   }
 
   var toastEl;
@@ -727,27 +784,35 @@
     var d = buildDial(el, opts.colour, opts.size, opts.r, opts.hub);
     el._dial = d;
 
-    var turning = false;
+    /* The hub's on/off has to be driven from pointerup, not a click listener: the drag helper calls
+       preventDefault on pointerdown (so a turn never selects text or starts a native drag), and that
+       also suppresses the compatibility click event — which is why toggling used to need two presses.
+       A press that lands on the hub and doesn't travel is a toggle. */
+    var turning = false, onHub = false, moved = false, downX = 0, downY = 0;
+
     draggable(d.svg, function (e) {
       turning = (e.target === d.hit);
+      onHub = (e.target === d.hub);
+      moved = false;
+      downX = e.clientX;
+      downY = e.clientY;
       if (!turning) { el.classList.remove('dragging'); }
     }, function (e) {
+      if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) { moved = true; }
       if (!turning) { return; }
       var box = d.svg.getBoundingClientRect();
       opts.set(angleToValue(box.left + box.width / 2, box.top + box.height / 2, e.clientX, e.clientY));
-    }, function () { turning = false; });
-
-    if (opts.toggle) {
-      d.hub.addEventListener('click', function (e) { e.stopPropagation(); opts.toggle(); });
-    }
+    }, function () {
+      if (onHub && !moved && opts.toggle) { opts.toggle(); }
+      turning = false;
+      onHub = false;
+    });
 
     /* Wheel over the dial nudges it — the fine adjustment a drag can't give you. */
     el.addEventListener('wheel', function (e) {
       opts.set(clamp(opts.get() + (e.deltaY < 0 ? 2 : -2), 0, 100));
       e.preventDefault();
     }, { passive: false });
-
-    el.addEventListener('dblclick', function (e) { e.preventDefault(); opts.set(opts.reset); });
   }
 
   function initDials() {
@@ -998,7 +1063,7 @@
       fader.addEventListener('dblclick', function () {
         S.spk.trims[i] = 0; renderSpeakers(); send({ t: 'trim', ch: i, db: 0 }); save();
       });
-      strip.querySelector('.test').addEventListener('click', function () { playOne(strip); });
+      strip.querySelector('.test').addEventListener('click', function () { playOne(strip, i); });
     });
     renderSpeakers();
   }
@@ -1021,12 +1086,14 @@
     syncToggle('upmix', S.spk.upmix);
   }
 
-  var testTimer = null;
-  function playOne(strip) {
+  /* Light the strip AND play a real burst out of that speaker — the button is a calibration tool,
+     not an animation. The burst carries the channel's own trim so you hear what you just set. */
+  function playOne(strip, ch) {
     document.querySelectorAll('#calib .strip').forEach(function (x) { x.classList.remove('playing'); });
     strip.classList.add('playing');
     clearTimeout(strip._t);
-    strip._t = setTimeout(function () { strip.classList.remove('playing'); }, 900);
+    strip._t = setTimeout(function () { strip.classList.remove('playing'); }, 800);
+    send({ t: 'speakertest', ch: ch, db: S.spk.trims[ch] || 0 });
   }
 
   /* Toggles. Each carries a key so its state lives in S rather than in the DOM. */
@@ -1044,7 +1111,13 @@
     if (key === 'upmix')      { S.spk.upmix = on; pushUpmix(); }
     else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
-    else { sw.classList.toggle('on', on); return; }   /* automations: visual only for now */
+    else {
+      /* Automations: the card's enable is still presentation only — nothing fires yet. */
+      sw.classList.toggle('on', on);
+      var card = sw.closest('.acard');
+      if (card) { card.classList.toggle('off', !on); }
+      return;
+    }
     syncToggle(key, on);
     save();
   }
@@ -1229,6 +1302,39 @@
     return 'stereo';
   }
   function layoutShort(ch) { return ch >= 8 ? '7.1' : ch >= 6 ? '5.1' : '2.0'; }
+
+  /* ---------- level meter -------------------------------------------------------------- */
+
+  /* The four bars in the status strip are the real output level while audio is flowing. When
+     nothing is running they go back to their idle animation, so the strip never implies sound is
+     moving when it isn't. */
+  var lastLevel = 0;
+  function showLevel(msg) {
+    var bars = document.getElementById('npBars');
+    if (!bars) { return; }
+    var kids = bars.children;
+    if (!msg.live) {
+      bars.classList.remove('live');
+      for (var j = 0; j < kids.length; j++) { kids[j].style.height = ''; }
+      document.getElementById('npText').textContent = S.power
+        ? 'Waiting for sound…'
+        : 'Ready — press power to start';
+      return;
+    }
+    bars.classList.add('live');
+    /* dBFS-ish curve: a linear peak looks dead until it is almost clipping. */
+    var out = +msg.out || 0;
+    var db = out > 0.0001 ? 20 * Math.log(out) / Math.LN10 : -60;
+    var t = clamp((db + 54) / 54, 0, 1);
+    lastLevel = Math.max(t, lastLevel * 0.7);
+    var shape = [0.72, 1, 0.84, 0.6];
+    for (var i = 0; i < kids.length; i++) {
+      kids[i].style.height = Math.max(8, lastLevel * shape[i] * 100) + '%';
+    }
+    document.getElementById('npText').textContent = out > 0.0005
+      ? 'Processing your sound'
+      : 'Running — no sound arriving yet';
+  }
 
   /* ---------- power ------------------------------------------------------------------- */
 
@@ -1440,7 +1546,7 @@
     if (e.target.closest('#testall')) {
       var strips = [].slice.call(document.querySelectorAll('#calib .strip'));
       strips.forEach(function (s, i) {
-        setTimeout(function () { playOne(s); }, i * 650);
+        setTimeout(function () { playOne(s, i); }, i * 900);   /* one burst at a time */
       });
       return;
     }
@@ -1474,8 +1580,9 @@
       else if (owner.id === 'devDD')      { S.settings.deviceId = v; send({ t: 'device', id: v }); renderDevices(); save(); }
       else if (owner.id === 'myPresetDD') {
         if (v === '__save') {
-          var nm = prompt('Name this preset:', 'My preset');
-          if (nm && nm.trim()) { saveMyPreset(nm.trim()); }
+          askName('Name this preset',
+                  'It saves your EQ curve, every effect dial and the ambience settings.',
+                  S.eq.mine || 'My preset', saveMyPreset);
         } else if (v === '__del') {
           var target = S.eq.mine || Object.keys(S.presets)[0];
           if (target && S.presets[target]) {
@@ -1571,6 +1678,7 @@
           renderDevices();
           return;
         }
+        if (msg.t === 'level') { showLevel(msg); return; }
         return;
       }
       if (m === 'no-cable') {
@@ -1578,6 +1686,10 @@
         setPower(false);
       } else if (m === 'running') {
         toast('Soundstage is now processing your sound.');
+      } else if (m === 'no-speaker') {
+        toast('Your output device doesn’t have that speaker — it’s ' +
+              (devices.filter(function (d) { return d.id === S.settings.deviceId; })[0] || { channels: 2 }).channels +
+              '-channel, so only the speakers it actually has will play.');
       } else if (m === 'audio-error') {
         toast('Couldn’t start audio — check your output device and try again.');
         setPower(false);

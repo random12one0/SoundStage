@@ -110,6 +110,77 @@ int main() {
         ssg_destroy(t);
     }
 
+    // The tone shelves live in slots above the graphic bands (the app parks Warmth at 31 and Air at
+    // 32). Those high slots must actually process, and must not disturb the graphic bands below them.
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+        ssg_enable_eq(t, 1);
+        ssg_eq_set_num_bands(t, 33);
+        for (int i = 0; i < 31; ++i) ssg_eq_set_band(t, i, SSG_BAND_PEAKING, 1000.0, 0.0, 1.0);
+
+        // A 12 kHz tone, which a 10 kHz high shelf should lift.
+        std::vector<float> hi(frames * 2), outFlat(frames * 2, 0.0f), outAir(frames * 2, 0.0f);
+        for (int n = 0; n < frames; ++n) {
+            const float s = 0.2f * std::sin(2.0f * 3.14159265f * 12000.0f * n / 48000.0f);
+            hi[n * 2] = s; hi[n * 2 + 1] = s;
+        }
+
+        for (int b = 0; b < 8; ++b) ssg_process(t, hi.data(), 2, outFlat.data(), 2, frames);
+        double flatPeak = 0.0;
+        for (int i = 0; i < frames * 2; ++i) flatPeak = std::fmax(flatPeak, std::fabs((double)outFlat[i]));
+
+        ssg_eq_set_band(t, 32, SSG_BAND_HIGH_SHELF, 10000.0, 8.0, 0.707);
+        for (int b = 0; b < 8; ++b) ssg_process(t, hi.data(), 2, outAir.data(), 2, frames);
+        double airPeak = 0.0;
+        for (int i = 0; i < frames * 2; ++i) airPeak = std::fmax(airPeak, std::fabs((double)outAir[i]));
+
+        check(airPeak > flatPeak * 1.5, "the Air slot (band 32) actually boosts a 12 kHz tone");
+
+        ssg_destroy(t);
+    }
+
+    // prepare() must not throw away settings. It runs when the audio path opens and on every device
+    // or sample-rate change, so if it reset the enables it would silently switch off whatever the
+    // user had turned on — the EQ section used to die the instant audio started.
+    {
+        ssg_engine* t = ssg_create();
+        ssg_prepare(t, 48000.0);
+        ssg_enable_eq(t, 1);
+        ssg_eq_set_num_bands(t, 33);
+        for (int i = 0; i < 31; ++i) ssg_eq_set_band(t, i, SSG_BAND_PEAKING, 1000.0, 0.0, 1.0);
+        ssg_eq_set_band(t, 32, SSG_BAND_HIGH_SHELF, 10000.0, 8.0, 0.707);
+
+        std::vector<float> hi(frames * 2), before(frames * 2, 0.0f), after(frames * 2, 0.0f);
+        for (int n = 0; n < frames; ++n) {
+            const float s = 0.2f * std::sin(2.0f * 3.14159265f * 12000.0f * n / 48000.0f);
+            hi[n * 2] = s; hi[n * 2 + 1] = s;
+        }
+
+        for (int b = 0; b < 8; ++b) ssg_process(t, hi.data(), 2, before.data(), 2, frames);
+        double peakBefore = 0.0;
+        for (int i = 0; i < frames * 2; ++i) peakBefore = std::fmax(peakBefore, std::fabs((double)before[i]));
+
+        ssg_prepare(t, 48000.0);   // e.g. the audio device opening
+        for (int b = 0; b < 8; ++b) ssg_process(t, hi.data(), 2, after.data(), 2, frames);
+        double peakAfter = 0.0;
+        for (int i = 0; i < frames * 2; ++i) peakAfter = std::fmax(peakAfter, std::fabs((double)after[i]));
+
+        check(std::fabs(peakAfter - peakBefore) < 0.02,
+              "prepare() keeps the EQ enabled instead of silently bypassing it");
+
+        // Same for the master gain, which prepare() also used to reset to unity.
+        ssg_set_output_gain_db(t, -20.0);
+        for (int b = 0; b < 8; ++b) ssg_process(t, hi.data(), 2, after.data(), 2, frames);
+        ssg_prepare(t, 48000.0);
+        for (int b = 0; b < 8; ++b) ssg_process(t, hi.data(), 2, after.data(), 2, frames);
+        double quiet = 0.0;
+        for (int i = 0; i < frames * 2; ++i) quiet = std::fmax(quiet, std::fabs((double)after[i]));
+        check(quiet < peakBefore * 0.3, "prepare() keeps the output gain the host set");
+
+        ssg_destroy(t);
+    }
+
     // Null-safety: the ABI must tolerate a null handle without crashing (defensive host calls).
     ssg_prepare(nullptr, 48000.0);
     ssg_process(nullptr, in.data(), 2, out.data(), 2, frames);

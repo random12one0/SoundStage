@@ -132,6 +132,9 @@ public sealed class EngineController : IDisposable
                 case "startup":
                     Startup.SetRunAtLogin(Bool(root, "on"));
                     return;
+                case "speakertest":
+                    PlaySpeakerTest((int)Num(root, "ch", -1), Num(root, "db", 0.0));
+                    return;
             }
 
             if (_engine is null)
@@ -215,9 +218,11 @@ public sealed class EngineController : IDisposable
                 _engine.SetCompressor(-10.0 - v * 20.0, 1.5 + v * 3.0, 6.0, v * 4.0, 15.0, 150.0);
                 break;
             case "warmth":
+                _engine.EnableEq(true);   // the tone shelves live in the EQ cascade — it must be live
                 _engine.SetEqBand(WarmthSlot, BandType.LowShelf, 200.0, on ? v * 8.0 : 0.0, 0.707);
                 break;
             case "air":
+                _engine.EnableEq(true);
                 _engine.SetEqBand(AirSlot, BandType.HighShelf, 10000.0, on ? v * 8.0 : 0.0, 0.707);
                 break;
             case "night":
@@ -303,6 +308,9 @@ public sealed class EngineController : IDisposable
         {
             return;
         }
+
+        _engine.EnableEq(true);
+        _engine.SetEqBandCount(TotalEqBands);
 
         double[] freqs = mode == 31 ? Bands31 : Bands10;
         double q = mode == 31 ? Q31 : Q10;
@@ -409,6 +417,57 @@ public sealed class EngineController : IDisposable
 
     public void StopProcessing() => _host?.Stop();
 
+    private readonly SpeakerTest _speakerTest = new();
+
+    /// <summary>Play a calibration burst out of one speaker on the current output device.</summary>
+    private void PlaySpeakerTest(int channel, double trimDb)
+    {
+        try
+        {
+            using var mm = new MMDeviceEnumerator();
+            MMDevice? target = null;
+
+            if (_renderDeviceId is not null)
+            {
+                foreach (MMDevice d in mm.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+                {
+                    if (string.Equals(d.ID, _renderDeviceId, StringComparison.Ordinal)) { target = d; break; }
+                }
+            }
+
+            if (target is null)
+            {
+                MMDevice def = mm.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia);
+                if (!IsCable(def.FriendlyName))
+                {
+                    target = def;
+                }
+                else
+                {
+                    foreach (MMDevice d in mm.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active))
+                    {
+                        if (!IsCable(d.FriendlyName)) { target = d; break; }
+                    }
+                }
+            }
+
+            if (target is not null && !_speakerTest.Play(target, channel, trimDb))
+            {
+                // The device has no such speaker — tell the UI rather than flashing a button at nothing.
+                _notify?.Invoke("no-speaker");
+            }
+        }
+        catch
+        {
+            _notify?.Invoke("audio-error");
+        }
+    }
+
+    public bool IsRunning => _host?.IsRunning == true;
+
+    /// <summary>Current input/output peaks (0..1) for the UI meter.</summary>
+    public (float In, float Out) Levels => _host is null ? (0f, 0f) : (_host.InputPeak, _host.OutputPeak);
+
     /// <summary>Send the real playback devices to the UI, so the output row and the settings picker
     /// show what's actually on this machine instead of a hard-coded name.</summary>
     public void SendDeviceList()
@@ -463,6 +522,7 @@ public sealed class EngineController : IDisposable
         }
 
         _disposed = true;
+        _speakerTest.Dispose();
         _host?.Dispose();
         _engine?.Dispose();
     }

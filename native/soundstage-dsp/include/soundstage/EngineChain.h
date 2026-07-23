@@ -44,18 +44,23 @@ public:
         reverb_.prepare(sampleRate);
         upmix_.prepare(sampleRate, Upmix::Surround7_1);  // prepare the widest layout; 5.1 is its first 6 ch
 
-        // 20 ms enable ramps: inaudible, and long enough that nothing clicks. All effects start OFF, so
+        // 20 ms enable ramps: inaudible, and long enough that nothing clicks. Effects start OFF, so
         // the chain is transparent out of the box (master on, every effect bypassed -> output = input).
+        //
+        // Every value here is re-seeded from the state the host has already set, NOT from a constant.
+        // prepare() runs when audio starts and on every device or sample-rate change; if it reset
+        // these it would silently switch off whatever the user had turned on — which is exactly the
+        // bug where the EQ section died the moment the audio path opened.
         const double enableRamp = 0.02;
-        eqEnable_.reset(sampleRate, enableRamp);      eqEnable_.setCurrentAndTarget(0.0);
-        bassEnable_.reset(sampleRate, enableRamp);    bassEnable_.setCurrentAndTarget(0.0);
-        compEnable_.reset(sampleRate, enableRamp);    compEnable_.setCurrentAndTarget(0.0);
-        widthEnable_.reset(sampleRate, enableRamp);   widthEnable_.setCurrentAndTarget(0.0);
-        reverbEnable_.reset(sampleRate, enableRamp);  reverbEnable_.setCurrentAndTarget(0.0);
+        eqEnable_.reset(sampleRate, enableRamp);      eqEnable_.setCurrentAndTarget(eqOn_ ? 1.0 : 0.0);
+        bassEnable_.reset(sampleRate, enableRamp);    bassEnable_.setCurrentAndTarget(bassOn_ ? 1.0 : 0.0);
+        compEnable_.reset(sampleRate, enableRamp);    compEnable_.setCurrentAndTarget(compOn_ ? 1.0 : 0.0);
+        widthEnable_.reset(sampleRate, enableRamp);   widthEnable_.setCurrentAndTarget(widthOn_ ? 1.0 : 0.0);
+        reverbEnable_.reset(sampleRate, enableRamp);  reverbEnable_.setCurrentAndTarget(reverbOn_ ? 1.0 : 0.0);
 
-        masterEnable_.reset(sampleRate, enableRamp);  masterEnable_.setCurrentAndTarget(1.0);
-        masterGain_.reset(sampleRate, enableRamp);    masterGain_.setCurrentAndTarget(1.0);
-        upmixAmount_.reset(sampleRate, 0.05);         upmixAmount_.setCurrentAndTarget(0.7);
+        masterEnable_.reset(sampleRate, enableRamp);  masterEnable_.setCurrentAndTarget(masterOn_ ? 1.0 : 0.0);
+        masterGain_.reset(sampleRate, enableRamp);    masterGain_.setCurrentAndTarget(masterGainLin_);
+        upmixAmount_.reset(sampleRate, 0.05);         upmixAmount_.setCurrentAndTarget(upmixAmountValue_);
 
         // Per-speaker trims (the calibration faders). Seeded from the dB values the host already set,
         // so preparing for a new sample rate keeps the user's calibration instead of zeroing it.
@@ -76,18 +81,24 @@ public:
     }
 
     // ---- master controls ----
-    void setEnabled(bool on)        { masterEnable_.setTarget(on ? 1.0 : 0.0); }
-    void setOutputGainDb(double db) { masterGain_.setTarget(std::pow(10.0, db / 20.0)); }
+    // Each setter remembers the value as well as ramping to it, so prepare() can restore it.
+    void setEnabled(bool on)        { masterOn_ = on; masterEnable_.setTarget(on ? 1.0 : 0.0); }
+    void setOutputGainDb(double db) { masterGainLin_ = std::pow(10.0, db / 20.0); masterGain_.setTarget(masterGainLin_); }
 
     // ---- per-effect on/off (each ramps, pop-free) ----
-    void enableEq(bool on)         { eqEnable_.setTarget(on ? 1.0 : 0.0); }
-    void enableBass(bool on)       { bassEnable_.setTarget(on ? 1.0 : 0.0); }
-    void enableCompressor(bool on) { compEnable_.setTarget(on ? 1.0 : 0.0); }
-    void enableWidth(bool on)      { widthEnable_.setTarget(on ? 1.0 : 0.0); }
-    void enableReverb(bool on)     { reverbEnable_.setTarget(on ? 1.0 : 0.0); }
+    void enableEq(bool on)         { eqOn_ = on;     eqEnable_.setTarget(on ? 1.0 : 0.0); }
+    void enableBass(bool on)       { bassOn_ = on;   bassEnable_.setTarget(on ? 1.0 : 0.0); }
+    void enableCompressor(bool on) { compOn_ = on;   compEnable_.setTarget(on ? 1.0 : 0.0); }
+    void enableWidth(bool on)      { widthOn_ = on;  widthEnable_.setTarget(on ? 1.0 : 0.0); }
+    void enableReverb(bool on)     { reverbOn_ = on; reverbEnable_.setTarget(on ? 1.0 : 0.0); }
     void enableUpmix(bool on)      { upmixOn_ = on; }  // structural (changes channel count), not crossfaded
 
-    void setUpmixAmount(double a)  { upmixAmount_.setTarget(a); }
+    void setUpmixAmount(double a)  { upmixAmountValue_ = a; upmixAmount_.setTarget(a); }
+
+    // ---- what the host asked for (survives prepare) ----
+    bool eqEnabled() const     { return eqOn_; }
+    bool bassEnabled() const   { return bassOn_; }
+    bool reverbEnabled() const { return reverbOn_; }
 
     /// Per-speaker output trim in dB (the calibration faders): channel `c` in 7.1 order
     /// FL FR C LFE SL SR SBL SBR. Applied last, after the upmix, so it trims the actual speaker.
@@ -200,6 +211,13 @@ private:
     SmoothedValue eqEnable_, bassEnable_, compEnable_, widthEnable_, reverbEnable_;
     SmoothedValue masterEnable_, masterGain_, upmixAmount_;
     bool upmixOn_ = false;
+
+    // The authoritative settings — what the host asked for, independent of where a ramp happens to
+    // be. prepare() re-seeds every smoothed value from these.
+    bool   eqOn_ = false, bassOn_ = false, compOn_ = false, widthOn_ = false, reverbOn_ = false;
+    bool   masterOn_ = true;
+    double masterGainLin_ = 1.0;
+    double upmixAmountValue_ = 0.7;
 
     // Speaker trims start at unity (0 dB) so an un-calibrated system is untouched.
     SmoothedValue channelTrim_[kOutChannels];

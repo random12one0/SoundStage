@@ -36,6 +36,17 @@ public sealed class EngineAudioHost : IDisposable
     // The render device's channel count (2, 6 or 8) — what the engine is asked to write per frame.
     private int _outChannels = 2;
 
+    // Peak levels for the UI meter, written on the audio thread and read on the UI thread. Plain
+    // fields: a torn read of a float meter is harmless, and a lock on the audio path is not.
+    private volatile float _inPeak;
+    private volatile float _outPeak;
+
+    /// <summary>Loudest input sample since the last block, 0..1 — what arrived from the outlet.</summary>
+    public float InputPeak => _inPeak;
+
+    /// <summary>Loudest output sample since the last block, 0..1 — what went to the speakers.</summary>
+    public float OutputPeak => _outPeak;
+
     private bool _running;
     private bool _disposed;
 
@@ -178,12 +189,15 @@ public sealed class EngineAudioHost : IDisposable
 
         // De-interleave the captured frame to stereo (first two channels; mono is duplicated).
         ReadOnlySpan<float> src = MemoryMarshal.Cast<byte, float>(e.Buffer.AsSpan(0, frames * channels * 4));
+        float inPeak = 0f;
         for (int n = 0; n < frames; n++)
         {
             float l = src[n * channels];
             float r = channels >= 2 ? src[n * channels + 1] : l;
             _inScratch[n * 2] = l;
             _inScratch[n * 2 + 1] = r;
+            float m = Math.Max(Math.Abs(l), Math.Abs(r));
+            if (m > inPeak) { inPeak = m; }
         }
 
         int outCh = _outChannels;
@@ -191,6 +205,18 @@ public sealed class EngineAudioHost : IDisposable
 
         // Interleaved floats back to bytes, into the render buffer.
         int outSamples = frames * outCh;
+        float outPeak = 0f;
+        for (int i = 0; i < outSamples; i++)
+        {
+            float m = Math.Abs(_outScratch[i]);
+            if (m > outPeak) { outPeak = m; }
+        }
+
+        // Decay the meter rather than snapping to each block's peak, so it reads like a meter
+        // instead of flickering.
+        _inPeak = Math.Max(inPeak, _inPeak * 0.75f);
+        _outPeak = Math.Max(outPeak, _outPeak * 0.75f);
+
         Span<float> dst = MemoryMarshal.Cast<byte, float>(_outBytes.AsSpan(0, outSamples * 4));
         _outScratch.AsSpan(0, outSamples).CopyTo(dst);
         buffer.AddSamples(_outBytes, 0, outSamples * 4);
