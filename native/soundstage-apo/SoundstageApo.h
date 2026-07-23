@@ -206,6 +206,9 @@ private:
     soundstage::EngineChain chain_;
     bool   locked_ = false;
     UINT32 channels_ = 2;
+    /// The channel count the engine most recently offered during format negotiation. Answered to
+    /// GetInputChannelCount until a stream is locked — see IsInputFormatSupported for why.
+    UINT32 negotiatedChannels_ = 2;
     UINT32 sampleRate_ = 48000;
     UINT32 maxFrames_ = 0;
 

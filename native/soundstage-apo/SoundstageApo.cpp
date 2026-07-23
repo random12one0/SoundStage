@@ -213,9 +213,23 @@ STDMETHODIMP SoundstageApo::IsInputFormatSupported(IAudioMediaType* /*pOppositeF
     // Float32 only, in any channel count the engine handles. Refusing rather than adapting keeps the
     // real-time path free of format conversion.
     const WAVEFORMATEX* fmt = FormatOf(pRequestedInputFormat);
-    if (!IsFloat32(fmt)) { return APOERR_FORMAT_NOT_SUPPORTED; }
-    if (fmt->nChannels < 1 || fmt->nChannels > 8) { return APOERR_FORMAT_NOT_SUPPORTED; }
+    if (!IsFloat32(fmt) || fmt->nChannels < 1 || fmt->nChannels > 8) {
+        SoundstageLog("[format] refused: tag=%u bits=%u ch=%u rate=%lu",
+                      fmt ? fmt->wFormatTag : 0, fmt ? fmt->wBitsPerSample : 0,
+                      fmt ? fmt->nChannels : 0,
+                      fmt ? static_cast<unsigned long>(fmt->nSamplesPerSec) : 0UL);
+        return APOERR_FORMAT_NOT_SUPPORTED;
+    }
 
+    // Remember what the engine offered. This is the only chance we get: Windows asks
+    // GetInputChannelCount BEFORE it ever calls LockForProcess, and answering with a stale default
+    // is enough for it to decide we are the wrong shape for this endpoint and skip us entirely.
+    // That is why the plugin ran on a stereo output but never locked a stream on a 5.1 receiver —
+    // it kept saying "2" while the endpoint was asking about six.
+    negotiatedChannels_ = fmt->nChannels;
+
+    SoundstageLog("[format] accepted: %u ch @ %lu Hz",
+                  fmt->nChannels, static_cast<unsigned long>(fmt->nSamplesPerSec));
     return S_OK;
 }
 
@@ -230,7 +244,9 @@ STDMETHODIMP SoundstageApo::IsOutputFormatSupported(IAudioMediaType* pOppositeFo
 
 STDMETHODIMP SoundstageApo::GetInputChannelCount(UINT32* pu32ChannelCount) {
     if (!pu32ChannelCount) { return E_POINTER; }
-    *pu32ChannelCount = channels_;
+    // Once locked, the real count. Before that, whatever the engine last asked us about — never a
+    // hardcoded guess, which is what stopped this plugin working on anything but stereo.
+    *pu32ChannelCount = locked_ ? channels_ : negotiatedChannels_;
     return S_OK;
 }
 

@@ -3587,8 +3587,12 @@
         return;
       }
       if (m === 'no-cable') {
-        toast('First set up the free “CABLE” outlet: install VB-CABLE, then pick “CABLE” as your Windows speaker. Then press the power button.');
+        /* The old route needed a virtual cable. Plugin mode replaced it, and telling someone to go
+           install third-party software is the wrong answer now — the plugin is built in and is the
+           supported way to do this. Point them at it instead. */
+        toast('Soundstage isn’t in your audio path yet. Open Settings → Plugin mode → Install to run it inside Windows.');
         setPower(false);
+        setTimeout(function () { setPage('settings'); }, 900);
       } else if (m === 'running') {
         toast('Soundstage is now processing your sound.');
       } else if (m === 'no-speaker') {
