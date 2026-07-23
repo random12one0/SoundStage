@@ -179,6 +179,19 @@ public sealed class EngineController : IDisposable
                 case "openfolder":
                     OpenStateFolder();
                     return;
+                case "apostatus":
+                    SendApoStatus();
+                    return;
+                case "apoinstall":
+                    // The UAC prompt is asynchronous and the service restart takes a few seconds, so
+                    // there is nothing useful to report back straight away. The UI re-asks.
+                    ApoStatus.RunInstaller(uninstall: false,
+                                           deviceMatch: root.TryGetProperty("device", out JsonElement dm)
+                                               ? dm.GetString() : null);
+                    return;
+                case "apouninstall":
+                    ApoStatus.RunInstaller(uninstall: true);
+                    return;
             }
 
             if (_engine is null)
@@ -649,6 +662,10 @@ public sealed class EngineController : IDisposable
     /// <summary>Current input/output peaks (0..1) for the UI meter.</summary>
     public (float In, float Out) Levels => _host is null ? (0f, 0f) : (_host.InputPeak, _host.OutputPeak);
 
+    /// <summary>Per-speaker output levels for the meters drawn into the calibration faders.</summary>
+    public IReadOnlyList<float> ChannelLevels =>
+        _host?.OutputChannelPeaks ?? (IReadOnlyList<float>)Array.Empty<float>();
+
     /// <summary>The layouts actually in use right now — what the content is, and what we're sending
     /// to the speakers. Not the device's channel count, which says nothing about either.</summary>
     public (int In, int Out) ActiveLayouts
@@ -663,6 +680,31 @@ public sealed class EngineController : IDisposable
 
     /// <summary>Send the real playback devices to the UI, so the output row and the settings picker
     /// show what's actually on this machine instead of a hard-coded name.</summary>
+    /// <summary>
+    /// Tell the UI whether the plugin is running, and on what. Deliberately reports three separate
+    /// facts rather than one boolean: registered, attached to a device, and actually seen processing.
+    /// A user whose plugin is registered but never loaded needs to know that is where it stopped.
+    /// </summary>
+    public void SendApoStatus()
+    {
+        try
+        {
+            var attached = ApoStatus.AttachedDevices();
+            _notify?.Invoke(JsonSerializer.Serialize(new
+            {
+                t = "apostatus",
+                registered = ApoStatus.IsRegistered(),
+                devices = attached,
+                active = attached.Count > 0,
+                lastActivity = ApoStatus.LastActivity(),
+            }));
+        }
+        catch
+        {
+            // Status is a nicety; never let it break the message loop.
+        }
+    }
+
     public void SendDeviceList()
     {
         try

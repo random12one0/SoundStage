@@ -382,9 +382,22 @@ public partial class MainWindow : Window
             (float inPeak, float outPeak) = _controller.Levels;
             (int inCh, int outCh) = _controller.ActiveLayouts;
             (int latency, double levelerDb, double limiterDb) = _controller.Meters;
+            // Per-speaker levels ride along on the meter tick rather than getting their own timer —
+            // it's eight small numbers, and they should move in step with the main meter.
+            var chLevels = _controller.ChannelLevels;
+            var chJson = new System.Text.StringBuilder("[");
+            for (int c = 0; c < chLevels.Count; c++)
+            {
+                if (c > 0) { chJson.Append(','); }
+                chJson.Append(chLevels[c].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            chJson.Append(']');
+
             NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
                 $"{{\"t\":\"level\",\"in\":{inPeak:0.####},\"out\":{outPeak:0.####}," +
                 $"\"inCh\":{inCh},\"outCh\":{outCh},\"latency\":{latency}," +
+                $"\"ch\":{chJson}," +
                 $"\"leveler\":{levelerDb:0.##},\"limiter\":{limiterDb:0.##},\"live\":true}}"));
         };
         _meterTimer.Start();

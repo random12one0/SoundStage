@@ -26,6 +26,18 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- Ship the audio plugin and its installer beside the app. install-apo.ps1 looks for the DLL in
+       its own directory, so the two must land together or "Turn on plugin mode" can't work. The DLL
+       is conditional because it comes from a separate MSVC build (native/soundstage-apo/build.ps1)
+       that isn't part of the managed build. -->
+  <ItemGroup>
+    <None Include="..\..\native\soundstage-apo\install-apo.ps1"
+          Link="install-apo.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\native\soundstage-apo\SoundstageApo.dll"
+          Link="SoundstageApo.dll" CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('..\..\native\soundstage-apo\SoundstageApo.dll')" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- WebView2 hosts our approved HTML/CSS/JS UI as a native window. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2592.51" />

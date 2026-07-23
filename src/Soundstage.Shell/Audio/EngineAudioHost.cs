@@ -79,6 +79,7 @@ public sealed class EngineAudioHost : IDisposable
     private const float ActiveFloor = 0.0004f;   // ≈ -68 dBFS, below anything audible
     private const long HoldMs = 4000;
 
+    private readonly float[] _outChPeak = new float[8];
     private readonly long[] _inLastActive = new long[8];
     private readonly long[] _outLastActive = new long[8];
 
@@ -203,6 +204,13 @@ public sealed class EngineAudioHost : IDisposable
 
     /// <summary>Loudest output sample since the last block, 0..1 — what went to the speakers.</summary>
     public float OutputPeak => _outPeak;
+
+    /// <summary>
+    /// Output level per speaker, 0..1, in Windows channel order (FL FR C LFE BL BR SL SR). Feeds the
+    /// meters drawn into the calibration faders, so you can see which speaker is actually moving
+    /// while you set its trim.
+    /// </summary>
+    public IReadOnlyList<float> OutputChannelPeaks => _outChPeak;
 
     private bool _running;
     private bool _disposed;
@@ -455,6 +463,15 @@ public sealed class EngineAudioHost : IDisposable
         // instead of flickering.
         _inPeak = Math.Max(inPeak, _inPeak * 0.75f);
         _outPeak = Math.Max(outPeak, _outPeak * 0.75f);
+
+        // Same decay per channel, so each speaker's meter behaves like the main one. Written under no
+        // lock: the reader is the UI poll, and a meter that reads one block stale is not a problem
+        // worth a lock on the audio thread.
+        for (int c = 0; c < 8; c++)
+        {
+            float now = c < outCh ? outChPeak[c] : 0f;
+            _outChPeak[c] = Math.Max(now, _outChPeak[c] * 0.75f);
+        }
 
         // Pack into whatever the device agreed to. Exclusive mode often means integer PCM — NVIDIA's
         // HDMI endpoint takes 16-bit only — so the engine's floats get converted here.

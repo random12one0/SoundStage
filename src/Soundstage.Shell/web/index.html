@@ -133,6 +133,15 @@
   .strip .cn{font-size:9px;letter-spacing:.04em;color:var(--faint);text-transform:uppercase;margin-top:-6px;}
   .fader{position:relative;height:150px;width:100%;}
   .ftrack{position:absolute;left:50%;top:0;bottom:0;width:5px;transform:translateX(-50%);background:#0e1822;border-radius:4px;}
+  /* Live level for this speaker, sitting alongside the trim it belongs to. Set the trim and watch
+     the speaker respond in the same place, instead of looking somewhere else to see if it worked.
+     Its own track is always drawn, so a silent speaker reads as "silent" and not as "missing". */
+  .fmeter{position:absolute;left:50%;top:0;bottom:0;width:3px;transform:translateX(-11px);background:#0e1822;border-radius:3px;overflow:hidden;}
+  .fmeter i{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(#37e0cf,#1a9d92);
+            border-radius:3px;transition:height .07s linear;}
+  /* Loud enough to be near clipping — worth seeing before you hear it. */
+  .fmeter i.hot{background:linear-gradient(#ff8ba3,#e0485f);}
+  .strip.sub .fmeter i{background:linear-gradient(#ffbf6b,#b5822f);}
   .fzero{position:absolute;left:calc(50% - 13px);width:26px;top:50%;height:1px;background:#31485a;}
   .ffill{position:absolute;left:50%;width:5px;transform:translateX(-50%);background:linear-gradient(#37e0cf,#1a9d92);border-radius:4px;box-shadow:0 0 8px #37e0cf44;}
   .fhandle{position:absolute;left:50%;width:16px;height:16px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);box-shadow:0 0 10px #37e0cf88;cursor:grab;transition:transform .15s,box-shadow .15s;}
@@ -654,6 +663,10 @@
             <div class="setrow"><div class="st"><div class="stn">Launch at login</div><div class="std">Start Soundstage when Windows starts</div></div><div class="sw" data-sw="runAtLogin"><div class="k"></div></div></div>
             <div class="setrow"><div class="st"><div class="stn">Keep running in the tray when closed</div><div class="std">Closing the window leaves your sound processed. Quit from the tray icon to stop.</div></div><div class="sw" data-sw="closeToTray"><div class="k"></div></div></div>
             <div class="setrow"><div class="st"><div class="stn">Volume keys control Soundstage</div><div class="std">Your keyboard's volume keys drive this app while it's processing. Windows' own slider can't reach the audio once it's routed through the outlet.</div></div><div class="sw" data-sw="volumeKeys"><div class="k"></div></div></div>
+
+            <div class="setgroup">Plugin mode</div>
+            <div class="setrow"><div class="st"><div class="stn">Run inside Windows' audio engine<span id="apoHelp"></span></div><div class="std" id="apoNote">Checking…</div></div><button class="btn" id="apoInstall">Turn on</button></div>
+            <div class="setrow" id="apoDetail" style="display:none"><div class="st"><div class="stn">Last thing the plugin did</div><div class="std mono" id="apoActivity">—</div></div><button class="ghost" id="apoUninstall" style="border-color:#6b3a3f;color:#ff98ac">Turn off</button></div>
 
             <div class="setgroup">Audio</div>
             <div class="setrow"><div class="st"><div class="stn">Output device</div><div class="std">Where Soundstage plays your processed sound</div></div><div class="pdd" id="devDD"><button class="pddbtn"><span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div></div>
@@ -1509,6 +1522,7 @@
       strip.innerHTML =
         '<div class="cl">' + ch.key + '</div><div class="cn">' + ch.name + '</div>' +
         '<div class="fader"><div class="ftrack"></div><div class="fzero"></div>' +
+        '<div class="fmeter"><i></i></div>' +
         '<div class="ffill"></div><div class="fhandle"></div></div>' +
         '<div class="db">0.0</div>' +
         '<button class="size" data-size="' + i + '">Small</button>' +
@@ -1971,7 +1985,42 @@
     if (sp) { sp.textContent = statePath || '—'; }
     var vl = document.getElementById('verLine');
     if (vl) { vl.textContent = 'Version ' + appVersion; }
+
+    send({ t: 'apostatus' });
   }
+
+  /* Plugin mode, in three states rather than one on/off, because "registered but never loaded" is a
+     real thing that happens and the user needs to know that's where it stopped. */
+  function renderApoStatus(m) {
+    var note = document.getElementById('apoNote');
+    var btn = document.getElementById('apoInstall');
+    var detail = document.getElementById('apoDetail');
+    var act = document.getElementById('apoActivity');
+    if (!note || !btn) { return; }
+
+    var devs = m.devices || [];
+    apoActive = !!m.active;
+
+    if (m.active) {
+      /* textContent, not innerHTML — these strings come from the registry and there is no reason to
+         hand device names to the HTML parser. */
+      note.textContent = 'On — processing ' + devs.join(', ') +
+                         ' from inside Windows. No virtual cable needed.';
+      btn.textContent = 'Add another device';
+      if (detail) { detail.style.display = ''; }
+      if (act) { act.textContent = m.lastActivity || 'Nothing yet — play something to wake it.'; }
+    } else if (m.registered) {
+      note.textContent = 'Installed, but not attached to any speakers yet.';
+      btn.textContent = 'Choose a device';
+      if (detail) { detail.style.display = 'none'; }
+    } else {
+      note.textContent = 'Off — Soundstage is using the virtual-cable route instead. ' +
+                         'Turning this on needs Administrator once.';
+      btn.textContent = 'Turn on';
+      if (detail) { detail.style.display = 'none'; }
+    }
+  }
+  var apoActive = false;
 
   function bindLatencySlider() {
     var sl = document.querySelector('.sl[data-set="latency"]');
@@ -2324,12 +2373,36 @@
   }
 
   var lastLevel = 0;
+  /* Each speaker's live level, drawn into its own fader. Pass null to clear them all.
+
+     The scale is dB, not the raw peak: a linear meter sits near the floor for everything you
+     actually listen to, so it reads as broken. −54 dBFS to 0 spread over the full height matches
+     what the main meter does and what a mixing desk would show. */
+  function paintChannelMeters(levels) {
+    var strips = document.querySelectorAll('#calib .strip');
+    for (var i = 0; i < strips.length; i++) {
+      var fill = strips[i].querySelector('.fmeter i');
+      if (!fill) { continue; }
+
+      var v = (levels && levels.length > i) ? +levels[i] || 0 : 0;
+      var pct = 0;
+      if (v > 0.0002) {
+        var d = 20 * Math.log(v) / Math.LN10;
+        pct = clamp((d + 54) / 54, 0, 1) * 100;
+      }
+
+      fill.style.height = pct + '%';
+      fill.classList.toggle('hot', v > 0.89);
+    }
+  }
+
   function showLevel(msg) {
     var bars = document.getElementById('npBars');
     if (!bars) { return; }
     var kids = bars.children;
     if (!msg.live) {
       bars.classList.remove('live');
+      paintChannelMeters(null);
       for (var j = 0; j < kids.length; j++) { kids[j].style.height = ''; }
       document.getElementById('npText').textContent = S.power
         ? 'Waiting for sound…'
@@ -2342,6 +2415,7 @@
        we're actually driving. Not the device's channel count — a 5.1 outlet carrying Spotify is
        still stereo, and saying "5.1" there would be a lie. */
     setFormatBadge(msg.inCh || 0, msg.outCh || 0);
+    paintChannelMeters(msg.ch);
     bars.classList.add('live');
     /* dBFS-ish curve: a linear peak looks dead until it is almost clipping. */
     var out = +msg.out || 0;
@@ -2498,6 +2572,7 @@
       limHelp:     'Effects can add level. Push enough of them and the signal asks for more than a sample can hold — it doesn\'t get louder, it gets squared off, and that buzzes. This eases into the ceiling instead. You won\'t notice it working; you would notice it missing.',
       latHelp:     'The three buffers in the path added together — what the outlet holds, what we hold, and what your speakers hold. Under about 60 ms and you won\'t see lips out of sync.',
       panicHelp:   'Stops processing and opens the Windows sound settings so you can point the default output back at your speakers. For when there\'s no sound at all and you need it back now.',
+      apoHelp:     'Normally Soundstage has to borrow a virtual device, capture whatever your apps play into it, process that, and play it back out. Plugin mode puts the same processing directly inside Windows\' own audio engine instead, so there is nothing to route and nothing else to install. It needs Administrator once to switch on, and it can be switched off again at any time — everything it changes is saved first and put back.',
       bmHelp:      'What a receiver calls Speaker Size. A speaker marked Small has its bass taken away and handed to the subwoofer — not copied there. Copying is what makes small speakers sound boomy, because the bass then plays twice.',
       xoHelp:      'Where the handover happens. 80 Hz is the cinema standard: low enough that you can\'t tell the bass is coming from the sub, high enough to let small speakers off the hook. Raise it if your speakers are very small.',
       rvHelpType:  'The kind of space — a small room, a big hall, a plate. Sets several controls at once.',
@@ -2833,6 +2908,26 @@
       return;
     }
     if (e.target.closest('#openFolder')) { send({ t: 'openfolder' }); return; }
+
+    if (e.target.closest('#apoInstall')) {
+      send({ t: 'apoinstall' });
+      var n1 = document.getElementById('apoNote');
+      if (n1) { n1.textContent = 'Waiting for you to approve the Administrator prompt…'; }
+      /* The installer restarts the audio service, so nothing is true for a few seconds. Re-ask a
+         couple of times rather than showing a stale answer. */
+      setTimeout(function () { send({ t: 'apostatus' }); }, 6000);
+      setTimeout(function () { send({ t: 'apostatus' }); }, 14000);
+      return;
+    }
+
+    if (e.target.closest('#apoUninstall')) {
+      send({ t: 'apouninstall' });
+      var n2 = document.getElementById('apoNote');
+      if (n2) { n2.textContent = 'Removing — approve the Administrator prompt…'; }
+      setTimeout(function () { send({ t: 'apostatus' }); }, 6000);
+      setTimeout(function () { send({ t: 'apostatus' }); }, 14000);
+      return;
+    }
     if (e.target.closest('#runSetup')) { openSetup(0); return; }
     if (e.target.closest('#panicBtn')) {
       send({ t: 'panic' });
@@ -3088,6 +3183,7 @@
           renderDevices();
           return;
         }
+        if (msg.t === 'apostatus') { renderApoStatus(msg); return; }
         if (msg.t === 'level') { showLevel(msg); return; }
         if (msg.t === 'update') { showUpdate(msg); return; }
         if (msg.t === 'update-progress') {
