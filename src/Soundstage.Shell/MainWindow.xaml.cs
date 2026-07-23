@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Reflection;
 using System.Windows;
@@ -8,10 +9,13 @@ namespace Soundstage.Shell;
 /// <summary>
 /// The v1.0 app window: a frameless host that renders our approved HTML/CSS/JS UI in WebView2, so the
 /// exact design we agreed on runs natively. The UI's own title bar drives the window (min / max /
-/// close / drag) through a tiny JS→C# bridge. The audio engine is wired in behind this in later steps.
+/// close / drag) and its controls drive the real engine — both through a small JS→C# bridge that hands
+/// control messages to the <see cref="Engine.EngineController"/>.
 /// </summary>
 public partial class MainWindow : Window
 {
+    private readonly Engine.EngineController _controller = new();
+
     public MainWindow()
     {
         InitializeComponent();
@@ -38,6 +42,13 @@ public partial class MainWindow : Window
         try { message = e.TryGetWebMessageAsString(); }
         catch { return; }
 
+        // Control messages from the UI are JSON; window commands are bare strings.
+        if (message.StartsWith('{'))
+        {
+            _controller.HandleMessage(message);
+            return;
+        }
+
         switch (message)
         {
             case "min":
@@ -57,6 +68,12 @@ public partial class MainWindow : Window
                 try { DragMove(); } catch { /* mouse already released */ }
                 break;
         }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        _controller.Dispose();
+        base.OnClosed(e);
     }
 
     private static string LoadUi()
