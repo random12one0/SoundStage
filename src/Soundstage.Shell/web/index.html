@@ -141,34 +141,6 @@
   /* Live level for this speaker, sitting alongside the trim it belongs to. Set the trim and watch
      the speaker respond in the same place, instead of looking somewhere else to see if it worked.
      Its own track is always drawn, so a silent speaker reads as "silent" and not as "missing". */
-  /* ---- the room ------------------------------------------------------------------------------
-     A plan view of your speakers, sitting above the faders it controls. Deliberately restrained:
-     one ring set, one accent, and the only bright things are the speakers themselves — so the
-     loudest thing on screen is also the loudest thing in the room. */
-  .room{position:relative;margin:0 0 14px;}
-  .room svg{width:100%;height:auto;display:block;max-height:250px;}
-  .room .ring{fill:none;stroke:#1e2c3a;stroke-width:1;}
-  .room .ring.faint{stroke:#17222e;}
-  .room .you{fill:#5b6b7c;}
-  .room .youlbl{fill:#5b6b7c;font-family:ui-monospace,Consolas,monospace;font-size:9px;letter-spacing:1.6px;}
-  .room .spk{cursor:ns-resize;}
-  .room .spk .hit{fill:transparent;}
-  .room .spk .dot{fill:#37e0cf;transition:r .12s ease;}
-  .room .spk .lbl{fill:#8ea3b6;font-family:ui-monospace,Consolas,monospace;font-size:9.5px;letter-spacing:1.1px;}
-  .room .spk .trim{fill:#5b6b7c;font-family:ui-monospace,Consolas,monospace;font-size:8.5px;letter-spacing:.4px;}
-  .room .spk.sub .dot{fill:#ffbf6b;}
-  .room .spk.sub .lbl{fill:#c79a58;}
-  /* A speaker the device doesn't have is drawn, but clearly not yours — better than an empty gap,
-     which reads as a bug. */
-  .room .spk.absent{opacity:.22;pointer-events:none;}
-  .room .spk.sel .lbl{fill:#37e0cf;}
-  .room .spk.sel .ringsel{stroke:#37e0cf;stroke-width:1.2;fill:none;opacity:.85;}
-  .room .spk.sub.sel .ringsel{stroke:#ffbf6b;}
-  .room .spk .ringsel{opacity:0;transition:opacity .15s ease;}
-  .room .spk .glow{pointer-events:none;}
-  .roomhint{position:absolute;left:0;right:0;bottom:-2px;text-align:center;font-size:11px;color:#5b6b7c;pointer-events:none;}
-  @media (prefers-reduced-motion:reduce){.room .spk .dot,.room .spk .ringsel{transition:none;}}
-
   /* Plugin mode: the routing controls describe a path that no longer exists. */
   body.pluginmode #devRow, body.pluginmode #outletRow, body.pluginmode #devRow2,
   body.pluginmode #exclusiveRow, body.pluginmode #latencyRow, body.pluginmode #delayRow { display:none; }
@@ -558,39 +530,6 @@
         <div class="page" data-page="speakers">
           <section class="panel pad">
             <div class="ph"><h3 class="big">Speaker calibration</h3><span class="sub" id="calibSub">—</span><span id="calibHelp"></span><div class="rt"><button class="btn" id="testall"><svg><use href="#i-play"/></svg> Test all</button><button class="ghost" id="calibReset">Reset</button></div></div>
-
-            <!-- THE ROOM. Your speakers drawn where they actually stand, each lit by what it's
-                 playing right now. It's a view onto the same numbers as the faders below, not a
-                 replacement for them — click one to select it, drag up and down to trim it, and the
-                 fader moves with you. Everything you could do before, you can still do. -->
-            <div class="room" id="room">
-              <svg id="roomSvg" viewBox="0 0 640 250" role="img"
-                   aria-label="Your speaker layout. Each speaker's glow shows its current level.">
-                <defs>
-                  <radialGradient id="roomAir" cx="50%" cy="52%" r="52%">
-                    <stop offset="0%" stop-color="#37e0cf" stop-opacity=".10"/>
-                    <stop offset="60%" stop-color="#37e0cf" stop-opacity=".03"/>
-                    <stop offset="100%" stop-color="#37e0cf" stop-opacity="0"/>
-                  </radialGradient>
-                  <radialGradient id="spkGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#37e0cf" stop-opacity=".9"/>
-                    <stop offset="100%" stop-color="#37e0cf" stop-opacity="0"/>
-                  </radialGradient>
-                  <radialGradient id="subGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#ffbf6b" stop-opacity=".9"/>
-                    <stop offset="100%" stop-color="#ffbf6b" stop-opacity="0"/>
-                  </radialGradient>
-                </defs>
-                <ellipse cx="320" cy="122" rx="252" ry="98" fill="url(#roomAir)"/>
-                <ellipse cx="320" cy="122" rx="252" ry="98" class="ring"/>
-                <ellipse cx="320" cy="122" rx="168" ry="65" class="ring faint"/>
-                <ellipse cx="320" cy="122" rx="84"  ry="33" class="ring faint"/>
-                <circle cx="320" cy="122" r="3.5" class="you"/>
-                <text x="320" y="143" class="youlbl" text-anchor="middle">YOU</text>
-                <g id="roomSpk"></g>
-              </svg>
-              <div class="roomhint" id="roomHint">Click a speaker to hear it · drag it up or down to trim</div>
-            </div>
 
             <div class="calib" id="calib" data-build>
             </div>
@@ -1628,189 +1567,6 @@
   /* Speaker calibration faders: -12..+12 dB, centre detent at 0. */
   var TRIM_RANGE = 12;
 
-  /* ---------- the room -----------------------------------------------------------------
-     Where each speaker sits, in the plan view. Positions are the real thing: fronts ahead of you,
-     surrounds to the sides, backs behind, sub down front where a sub usually ends up. Index is the
-     Windows channel order (FL FR C LFE BL BR SL SR), so this table lines up with the faders, the
-     trims and the engine without any translation. */
-  /* Keyed by the speaker's NAME, not its channel index, and that distinction matters. On a 5.1
-     device channels 4 and 5 are the surrounds and sit at the sides; on 7.1 the same two channels
-     are the backs and sit behind you, with the sides moving to 6 and 7. Positioning by index would
-     draw a speaker labelled SL in a back position on one layout and the right place on the other —
-     the same class of mistake as the mislabelled faders. Ask the layout what each channel is
-     called and put it where that name belongs. */
-  var ROOM_POS = {
-    FL:  { x: 152, y: 62,  lx: 152, ly: 44,  below: false },
-    FR:  { x: 488, y: 62,  lx: 488, ly: 44,  below: false },
-    C:   { x: 320, y: 44,  lx: 320, ly: 27,  below: false },
-    LFE: { x: 320, y: 200, lx: 320, ly: 222, below: true  },
-    SL:  { x: 64,  y: 106, lx: 64,  ly: 88,  below: false },
-    SR:  { x: 576, y: 106, lx: 576, ly: 88,  below: false },
-    BL:  { x: 100, y: 170, lx: 100, ly: 192, below: true  },
-    BR:  { x: 540, y: 170, lx: 540, ly: 192, below: true  }
-  };
-
-  /* Anything the layout names in a way we don't recognise still gets drawn, spread along the back
-     wall, rather than vanishing. */
-  var ROOM_FALLBACK = [
-    { x: 152, y: 62 }, { x: 488, y: 62 }, { x: 320, y: 44 }, { x: 320, y: 200 },
-    { x: 100, y: 170 }, { x: 540, y: 170 }, { x: 64, y: 106 }, { x: 576, y: 106 }
-  ];
-
-  function roomPos(def, i) {
-    var key = def && def.key ? String(def.key).toUpperCase() : '';
-    var p = ROOM_POS[key];
-    if (p) { return p; }
-    var f = ROOM_FALLBACK[i] || { x: 320, y: 122 };
-    return { x: f.x, y: f.y, lx: f.x, ly: f.y - 18, below: false };
-  }
-
-  var roomSel = -1;
-
-  function buildRoom() {
-    var g = document.getElementById('roomSpk');
-    if (!g) { return; }
-    g.innerHTML = '';
-
-    var layout = channelLayout();
-    var NS = 'http://www.w3.org/2000/svg';
-
-    for (var i = 0; i < 8; i++) {
-      var def = layout[i] || { key: '?', name: '' };
-      var p = roomPos(def, i);
-      var node = document.createElementNS(NS, 'g');
-      node.setAttribute('class', 'spk' + (def.sub ? ' sub' : ''));
-      node.dataset.ch = i;
-
-      function el(tag, attrs) {
-        var e = document.createElementNS(NS, tag);
-        Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]); });
-        return e;
-      }
-
-      /* Level halo, sized every meter tick. Behind everything so it never eats the pointer. */
-      node.appendChild(el('circle', {
-        class: 'glow', cx: p.x, cy: p.y, r: 0,
-        fill: def.sub ? 'url(#subGlow)' : 'url(#spkGlow)'
-      }));
-      node.appendChild(el('circle', { class: 'ringsel', cx: p.x, cy: p.y, r: 17 }));
-      node.appendChild(el('circle', { class: 'dot', cx: p.x, cy: p.y, r: 4.5 }));
-
-      var lbl = el('text', { class: 'lbl', x: p.lx, y: p.ly, 'text-anchor': 'middle' });
-      lbl.textContent = def.key;
-      node.appendChild(lbl);
-
-      var trim = el('text', {
-        class: 'trim', x: p.lx, y: p.ly + (p.ly > p.y ? 11 : -10), 'text-anchor': 'middle'
-      });
-      node.appendChild(trim);
-
-      /* A generous invisible target. The dot is 9px across; nobody should have to hit that. */
-      node.appendChild(el('circle', { class: 'hit', cx: p.x, cy: p.y, r: 24 }));
-
-      var title = el('title', {});
-      title.textContent = def.name || def.key;
-      node.appendChild(title);
-
-      g.appendChild(node);
-      bindRoomSpeaker(node, i);
-    }
-
-    paintRoom();
-  }
-
-  /* Drag vertically to trim, click to test — the same two things the fader and its play button do,
-     in the place you're already looking. */
-  function bindRoomSpeaker(node, i) {
-    var dragging = false, startY = 0, startDb = 0, moved = 0;
-
-    node.addEventListener('pointerdown', function (e) {
-      if (i >= activeChannels(currentDevice())) { return; }
-      dragging = true; moved = 0;
-      startY = e.clientY;
-      startDb = S.spk.trims[i] || 0;
-      roomSel = i;
-      node.setPointerCapture(e.pointerId);
-      snapshot('speaker trim');
-      renderSpeakers();
-      e.preventDefault();
-    });
-
-    node.addEventListener('pointermove', function (e) {
-      if (!dragging) { return; }
-      var dy = e.clientY - startY;
-      moved = Math.max(moved, Math.abs(dy));
-      /* 130px of travel covers the whole range, matching the fader's feel. Shift for fine work. */
-      var span = e.shiftKey ? 520 : 130;
-      var db = clamp(startDb - (dy / span) * (2 * TRIM_RANGE), -TRIM_RANGE, TRIM_RANGE);
-      if (Math.abs(db) < 0.4) { db = 0; }
-      S.spk.trims[i] = db;
-      renderSpeakers();
-      send({ t: 'trim', ch: i, db: db });
-      save();
-    });
-
-    function end(e) {
-      if (!dragging) { return; }
-      dragging = false;
-      try { node.releasePointerCapture(e.pointerId); } catch (err) { /* already gone */ }
-      /* A press that didn't travel is a click, and a click auditions that speaker — the same thing
-         its play button does, routed through the same function so they can't drift apart. */
-      if (moved < 4) {
-        var strip = document.querySelector('#calib .strip[data-ch="' + i + '"]');
-        if (strip) { playOne(strip, i); }
-      }
-    }
-
-    node.addEventListener('pointerup', end);
-    node.addEventListener('pointercancel', end);
-  }
-
-  /* Labels, trims and which speakers this device actually has. Called whenever state changes —
-     the live glow is separate, because that moves at meter rate. */
-  function paintRoom() {
-    var g = document.getElementById('roomSpk');
-    if (!g) { return; }
-    var have = activeChannels(currentDevice());
-    var layout = channelLayout();
-
-    g.querySelectorAll('.spk').forEach(function (node) {
-      var i = +node.dataset.ch;
-      var def = layout[i];
-      node.classList.toggle('absent', i >= have);
-      node.classList.toggle('sel', i === roomSel);
-      node.querySelector('.ringsel').style.opacity = (i === roomSel) ? '' : '0';
-
-      if (def) {
-        node.querySelector('.lbl').textContent = def.key;
-        node.querySelector('title').textContent = def.name || def.key;
-        node.classList.toggle('sub', !!def.sub);
-      }
-
-      var db = S.spk.trims[i] || 0;
-      node.querySelector('.trim').textContent =
-        i >= have ? '' : (db > 0 ? '+' : db < 0 ? '−' : '') + Math.abs(round1(db)).toFixed(1);
-    });
-  }
-
-  /* The live part: halo radius follows the same dB curve as the fader meters, so the two agree. */
-  function paintRoomLevels(levels) {
-    var g = document.getElementById('roomSpk');
-    if (!g) { return; }
-    g.querySelectorAll('.spk').forEach(function (node) {
-      var i = +node.dataset.ch;
-      var v = (levels && levels.length > i) ? +levels[i] || 0 : 0;
-      var t = 0;
-      if (v > 0.0002) {
-        var d = 20 * Math.log(v) / Math.LN10;
-        t = clamp((d + 54) / 54, 0, 1);
-      }
-
-      node.querySelector('.glow').setAttribute('r', (t * 34).toFixed(1));
-      node.querySelector('.dot').setAttribute('r', (4.5 + t * 2.2).toFixed(1));
-    });
-  }
-
   function buildSpeakers() {
     var host = document.getElementById('calib');
     if (!host) { return; }
@@ -1857,7 +1613,6 @@
       });
       strip.querySelector('.test').addEventListener('click', function () { playOne(strip, i); });
     });
-    buildRoom();
     renderSpeakers();
   }
 
@@ -1911,8 +1666,6 @@
         }
       }
     });
-
-    paintRoom();
 
     syncToggle('upmix', S.spk.upmix);
     syncToggle('subfeed', S.spk.subfeed);
@@ -2405,6 +2158,21 @@
     return auto.when.every(function (w) {
       if (w.k === 'app') {
         var needle = (w.v || '').toLowerCase();
+
+        /* Two ways to know an app is playing, and we need BOTH — they see different things.
+           Audio sessions report the PROCESS, which for a web app is the browser: "when Netflix is
+           playing" never matches a session whose process is "comet" or "chrome". Windows' media
+           session (what drives now-playing) resolves the real app instead — it's how the header can
+           say "Netflix" for a browser tab. So an app trigger matches if EITHER source names it. */
+        var np = nowPlaying;
+        if (np && np.playing) {
+          if ((np.app || '').toLowerCase().indexOf(needle) >= 0 ||
+              (np.title || '').toLowerCase().indexOf(needle) >= 0 ||
+              (np.artist || '').toLowerCase().indexOf(needle) >= 0) {
+            return true;
+          }
+        }
+
         return sessions.some(function (s) {
           return s.active &&
                  ((s.process || '').toLowerCase().indexOf(needle) >= 0 ||
@@ -2722,10 +2490,6 @@
       fill.style.height = pct + '%';
       fill.classList.toggle('hot', v > 0.89);
     }
-
-    /* The room is a second view onto these same numbers, so it updates from the same call —
-       there is no way for the two to disagree about what a speaker is doing. */
-    paintRoomLevels(levels);
   }
 
   function showLevel(msg) {

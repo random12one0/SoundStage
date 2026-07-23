@@ -40,6 +40,7 @@ public sealed class ApoTelemetry : IDisposable
     private const int BlockSize = 256;
     private const int OffHeartbeat = 0;
     private const int OffChannels = 4;
+    private const int OffSourceChannels = 12;
     private const int OffChannelPeak = 16;   // float[8]
     private const int OffOutPeak = 52;
 
@@ -57,8 +58,12 @@ public sealed class ApoTelemetry : IDisposable
     /// <summary>Overall output level, 0..1.</summary>
     public float OutPeak { get; private set; }
 
-    /// <summary>Channels the plugin is currently running at (0 if unknown / not running).</summary>
+    /// <summary>Channels the plugin is currently running at — the endpoint/output width.</summary>
     public int Channels { get; private set; }
+
+    /// <summary>The inferred SOURCE layout (2 for stereo content, full width for real surround). This
+    /// is what the "2.0 → 5.1" badge's left side should show.</summary>
+    public int SourceChannels { get; private set; }
 
     /// <summary>
     /// True when the plugin's heartbeat has advanced recently — i.e. audio really is flowing through
@@ -112,6 +117,7 @@ public sealed class ApoTelemetry : IDisposable
         {
             uint hb = _view.ReadUInt32(OffHeartbeat);
             Channels = (int)_view.ReadUInt32(OffChannels);
+            SourceChannels = (int)_view.ReadUInt32(OffSourceChannels);
             for (int c = 0; c < 8; c++)
             {
                 ChannelPeaks[c] = _view.ReadSingle(OffChannelPeak + c * 4);

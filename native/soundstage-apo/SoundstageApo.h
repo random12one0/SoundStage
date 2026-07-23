@@ -94,9 +94,13 @@ struct SoundstageSharedState {
 /// ceremony for a display-only side channel.
 struct SoundstageTelemetry {
     unsigned heartbeat;      // ++ per processed buffer; stalls when nothing plays
-    unsigned channels;       // width the plugin is currently running at
+    unsigned channels;       // width the plugin is currently running at (the output/endpoint width)
     unsigned sampleRate;
-    unsigned _pad;
+    // What the SOURCE actually is, inferred from whether the non-front channels carry signal: the
+    // endpoint is always the full width (Windows pads a stereo app up to 5.1), so the buffer format
+    // can't tell you the source. This is 2 for stereo content, or the full width for real surround —
+    // it's what the "2.0 -> 5.1" badge should report on its left side.
+    unsigned sourceChannels;
     float    channelPeak[8]; // 0..1 linear, post-processing, decayed like a meter
     float    inPeak;         // overall input peak, 0..1
     float    outPeak;        // overall output peak, 0..1

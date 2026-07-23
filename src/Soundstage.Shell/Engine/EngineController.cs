@@ -699,14 +699,23 @@ public sealed class EngineController : IDisposable
     /// otherwise the per-speaker levels, overall level and channel count it is currently driving.
     /// This is how the app meters and detects playback when the plugin, not the app, holds the path.
     /// </summary>
-    public (IReadOnlyList<float> Channels, float Out, int ChannelCount)? PollPluginMeters()
+    /// <summary>
+    /// Re-send the whole current settings block to the plugin, bumping the sequence so the plugin
+    /// re-reads it. Called when audio starts flowing, to close a race: if the plugin locked its
+    /// stream before the app finished publishing (music started during launch), it may have read a
+    /// stale or default state, and nothing would correct it until the user changed a control. This
+    /// re-asserts the truth the instant a stream appears — the fix for "no bass until I toggled it".
+    /// </summary>
+    public void RepublishToPlugin() => _bridge?.Publish();
+
+    public (IReadOnlyList<float> Channels, float Out, int ChannelCount, int SourceChannels)? PollPluginMeters()
     {
         if (_telemetry is null || !_telemetry.Poll())
         {
             return null;
         }
 
-        return (_telemetry.ChannelPeaks, _telemetry.OutPeak, _telemetry.Channels);
+        return (_telemetry.ChannelPeaks, _telemetry.OutPeak, _telemetry.Channels, _telemetry.SourceChannels);
     }
 
     /// <summary>The layouts actually in use right now — what the content is, and what we're sending

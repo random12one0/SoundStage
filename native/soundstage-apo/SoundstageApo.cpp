@@ -493,6 +493,10 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
             telDecim_ = 0;
             telemetry_->channels = ch;
             telemetry_->sampleRate = sampleRate_;
+            // The source layout, as best we can tell: real surround content (the hold timer is up)
+            // means a genuine multichannel source; otherwise it's stereo, whatever the endpoint
+            // width. This is what makes the "2.0 -> 5.1" badge honest instead of a hardcoded guess.
+            telemetry_->sourceChannels = (ch > 2 && surroundHoldFrames_ > 0) ? ch : 2;
             for (int c = 0; c < 8; ++c) {
                 telemetry_->channelPeak[c] = (static_cast<UINT32>(c) < ch) ? telChannelPeak_[c] : 0.0f;
             }

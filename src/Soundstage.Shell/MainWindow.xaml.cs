@@ -378,6 +378,15 @@ public partial class MainWindow : Window
                 var pm = _controller.PollPluginMeters();
                 if (pm is { } m)
                 {
+                    // Audio just started flowing through the plugin? Re-assert our full settings, in
+                    // case the stream locked before the app finished publishing (music started during
+                    // launch). Cheap — once per playback start — and it self-heals any missed update.
+                    if (!_pluginWasActive)
+                    {
+                        _pluginWasActive = true;
+                        _controller.RepublishToPlugin();
+                    }
+
                     _meterWasLive = true;
                     var chJson2 = new System.Text.StringBuilder("[");
                     for (int c = 0; c < m.Channels.Count; c++)
@@ -388,12 +397,18 @@ public partial class MainWindow : Window
 
                     chJson2.Append(']');
 
+                    // The source layout is what the plugin inferred from the actual audio (2 for
+                    // stereo, full width for real surround) — not a hardcoded 2, which is what made
+                    // the badge always read "2.0" no matter what was playing.
+                    int srcCh = m.SourceChannels > 0 ? m.SourceChannels : 2;
                     NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
                         $"{{\"t\":\"level\",\"in\":{m.Out:0.####},\"out\":{m.Out:0.####}," +
-                        $"\"inCh\":{(m.ChannelCount > 2 ? 2 : m.ChannelCount)},\"outCh\":{m.ChannelCount}," +
+                        $"\"inCh\":{srcCh},\"outCh\":{m.ChannelCount}," +
                         $"\"ch\":{chJson2},\"live\":true,\"plugin\":true}}"));
                     return;
                 }
+
+                _pluginWasActive = false;   // stream ended; re-assert settings when the next one starts
 
                 if (_meterWasLive)
                 {
@@ -431,6 +446,7 @@ public partial class MainWindow : Window
 
     private System.Windows.Threading.DispatcherTimer? _meterTimer;
     private bool _meterWasLive;
+    private bool _pluginWasActive;
 
     // Now-playing is polled far more slowly than the meter — track changes are a human-speed event,
     // and the media-session API is not free.
