@@ -378,12 +378,35 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
         peakIn_ = p;
     }
 
-    // The engine takes a stereo pair in and writes the endpoint's layout out. When the source is
-    // already multichannel, the multichannel path keeps every channel instead of folding it down.
+    // Which path to take is NOT "how many channels does the buffer have" — inside an APO that is
+    // always the endpoint's full width. Windows has already padded a stereo app up to 6 or 8
+    // channels with the surrounds left silent. So the honest question is "is this actually a
+    // surround recording, or stereo wearing a 5.1 costume", and the answer is: look at whether any
+    // of the non-front channels carry signal this block.
+    //
+    // Getting this wrong is exactly the "my 5.1 is quiet" bug: the multichannel path faithfully
+    // preserves those silent surrounds, the upmix never runs, and four of five speakers stay dead.
+    bool sourceIsSurround = false;
     if (ch > 2) {
+        const size_t n = static_cast<size_t>(frames) * ch;
+        for (size_t i = 0; i < n; ++i) {
+            const int c = static_cast<int>(i % ch);
+            if (c == 0 || c == 1) { continue; }         // FL/FR are expected to be full
+            const float a = src[i] < 0.0f ? -src[i] : src[i];
+            if (a > 1.0e-4f) { sourceIsSurround = true; break; }
+        }
+    }
+
+    if (ch > 2 && sourceIsSurround) {
+        // A real surround recording — keep every channel, just process it.
         chain_.processBlockMulti(src, static_cast<int>(ch), dst, static_cast<int>(ch),
                                  static_cast<int>(frames));
     } else {
+        // Stereo, whatever the buffer width says. Feed the engine the real interleave stride so it
+        // reads the right samples — processBlock takes channels 0 and 1 as the front L/R pair, which
+        // is exactly what a padded stereo buffer has there — and let the upmix fill the centre, LFE
+        // and surrounds on the output side. Passing the true `ch` as the input stride is essential:
+        // pass 2 and it would read every third sample of a 6-wide buffer as if it were a frame.
         chain_.processBlock(src, static_cast<int>(ch), dst, static_cast<int>(ch),
                             static_cast<int>(frames));
     }
