@@ -55,10 +55,12 @@ public:
 
     double crossover() const { return crossover_; }
 
-    /// Mark a speaker Small (true) or Large (true = it needs help; false = it can handle its own bass).
-    void setSmall(int channel, bool small) {
+    /// Mark a speaker Small (true — it needs the sub's help) or Large (false — it handles its own
+    /// bass). The parameter is deliberately not named `small`: Windows' rpcndr.h defines `small` as
+    /// a macro for `char`, so that name silently breaks any translation unit that includes it.
+    void setSmall(int channel, bool isSmall) {
         if (channel < 0 || channel >= kChannels) return;
-        small_[channel] = small;
+        small_[channel] = isSmall;
     }
 
     bool isSmall(int channel) const {

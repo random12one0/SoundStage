@@ -1,0 +1,8 @@
+; The four exports COM expects from an in-process server.
+LIBRARY SoundstageApo
+
+EXPORTS
+    DllGetClassObject   PRIVATE
+    DllCanUnloadNow     PRIVATE
+    DllRegisterServer   PRIVATE
+    DllUnregisterServer PRIVATE

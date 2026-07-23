@@ -1,0 +1,17 @@
+﻿{
+  "state": "working",
+  "headline": "Backlog done — starting the APO",
+  "note": "Limiter, panic restore, latency readout, gain reduction and shift-drag are in and building clean.",
+  "updated": "backlog complete",
+  "items": [
+    { "text": "Status page for your phone", "done": true, "active": false },
+    { "text": "Limiter switch in the UI", "done": true, "active": false },
+    { "text": "Gain reduction on the Leveler dial", "done": true, "active": false },
+    { "text": "Measured latency readout", "done": true, "active": false },
+    { "text": "Panic restore", "done": true, "active": false },
+    { "text": "Shift-drag fine adjustment", "done": true, "active": false },
+    { "text": "Real bass management (Small/Large + crossover)", "done": true, "active": false },
+    { "text": "Soundstage APO - our own audio plugin", "done": false, "active": true },
+    { "text": "Full rebuild, tests and push", "done": false, "active": false }
+  ]
+}

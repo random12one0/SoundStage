@@ -26,3 +26,10 @@ Thumbs.db
 
 # Native DSP engine build output
 native/**/build/
+
+# APO build output — produced by native/soundstage-apo/build.ps1
+native/soundstage-apo/*.dll
+native/soundstage-apo/*.obj
+native/soundstage-apo/*.exp
+native/soundstage-apo/*.lib
+native/soundstage-apo/*.pdb

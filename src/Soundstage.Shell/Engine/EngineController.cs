@@ -56,6 +56,7 @@ public sealed class EngineController : IDisposable
     private const double Q10 = 1.41;
 
     private readonly SoundstageEngine? _engine;
+    private readonly ApoBridge? _bridge;
     private readonly EngineAudioHost? _host;
     private readonly Action<string>? _notify;
     private bool _disposed;
@@ -88,6 +89,12 @@ public sealed class EngineController : IDisposable
         {
             _engine = new SoundstageEngine();
             _host = new EngineAudioHost(_engine);
+
+            // Publish settings for the APO. Harmless when the plugin isn't installed — it just means
+            // nothing ever reads the file — so this is unconditional rather than gated on a setting.
+            _bridge = new ApoBridge();
+            _engine.AttachBridge(_bridge);
+
             _engine.EnableEq(true);              // the cascade always runs; flat bands are an identity
             _engine.SetEqBandCount(TotalEqBands);
             ApplyGraphicEq(10, Array.Empty<double>());   // start flat
@@ -701,5 +708,6 @@ public sealed class EngineController : IDisposable
         _speakerTest.Dispose();
         _host?.Dispose();
         _engine?.Dispose();
+        _bridge?.Dispose();
     }
 }
