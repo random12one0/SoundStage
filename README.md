@@ -1,118 +1,119 @@
 <p align="center">
-  <img src="docs/icon.png" width="96" alt="Soundstage icon" />
+  <img src="docs/icon.png" width="96" alt="Soundstage" />
 </p>
 
 <h1 align="center">Soundstage</h1>
 
 <p align="center">
-  A modern front-end and automation layer for <a href="https://sourceforge.net/projects/equalizerapo/">Equalizer APO</a> on Windows.<br/>
-  System-wide EQ, effects and safety — with the clean, calm UI this space never had.
+  <b>System-wide surround sound control for Windows.</b><br/>
+  A ten-band EQ, real effects, and per-speaker calibration for your 5.1 / 7.1 setup —
+  applied to <i>everything</i> the PC plays, with no virtual cables and no third-party drivers.
+</p>
+
+<p align="center">
+  <img alt="version" src="https://img.shields.io/badge/version-1.0.0-2dd4bf" />
+  <img alt="platform" src="https://img.shields.io/badge/Windows%2010%2F11-x64-2dd4bf" />
+  <img alt="license" src="https://img.shields.io/badge/license-MIT-2dd4bf" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/01-home.png" width="820" alt="Soundstage — equalizer and effects" />
 </p>
 
 ---
 
-Soundstage decides what goes into Equalizer APO's config file and when, and wraps that in
-an interface a normal person can use. It replaces Peace GUI with something visually clean
-and adds the automation and safety features Peace never had. It performs no DSP itself and
-deliberately stays out of the way of Dolby Atmos for Home Theater — your spatial/upmixing
-layer is untouched.
+Most PC EQ tools only touch stereo, or make you install a virtual audio cable and reroute
+your whole system through it. Soundstage doesn't. It ships its own **audio engine plugin**
+that Windows loads directly into its audio pipeline, so your EQ, effects and per-speaker
+tuning apply to every app — Spotify, browsers, games, movies — across a real **5.1 or 7.1**
+layout. Nothing sits in front of your sound. No cable, no Equalizer APO, no Voicemeeter.
+
+## Screenshots
+
+| Equalizer &amp; effects | Per-speaker calibration |
+| :---: | :---: |
+| <img src="docs/screenshots/01-home.png" width="410" alt="Equalizer and effects" /> | <img src="docs/screenshots/02-speakers.png" width="410" alt="Per-speaker calibration" /> |
 
 ## Features
 
 **Equalizer**
-- Parametric EQ plus 10-band and 31-band graphic modes, with a live frequency-response plot
-- Preset dropdown with instant apply — save, duplicate, rename, delete
-- Five curated speaker presets out of the box (Flat Reference, Music, Film & Dialogue, Gaming, Spoken Word)
-- **8,600+ headphone corrections bundled** from the [AutoEq](https://github.com/jaakkopasanen/AutoEq) project — search your model, click Add, done. No downloads.
-- Imports Peace exports and AutoEq ParametricEQ files (including comma-decimal EU locale files)
+- Ten-band graphic EQ with a live frequency-response curve
+- Preset dropdown with instant apply — plus your own saved presets
+- Curated starting points (Flat, Music, Film &amp; Dialogue, and more)
 
-**Effects** — each with one toggle and one intensity slider
-- **Night mode** — a low-shelf bass cut (bass is what travels through walls) plus a gentle overall level reduction for late-night listening. 100% native — no plugins, so it can never interrupt your audio
-- **Loudness compensation** — Equalizer APO's volume-tracking equal-loudness correction; restores bass and treble at low volume, runs happily alongside night mode
-- **Stereo width** — mid/side widening applied to the front left/right pair only, so it works on any layout (2.0/5.1/7.1) yet never touches your centre, LFE or surround channels; the safe zone is made obvious
+**Effects** — each is one toggle and one intensity dial
+- **Bass** — weight and drive on the low end
+- **Warmth / Air** — low-shelf and high-shelf tone shaping
+- **Leveler** — a gentle compressor that evens out loud and quiet passages
+- **Ambience** — a tuneable reverb for space and depth
+- **Night mode** — cuts the deep bass that travels through walls and tames sudden peaks, so late-night listening stays audible without waking the house
 
-**Safety** — the reasons "APO made my audio crackle" won't happen here
-- **Clipping protection**: the exact filter math is analyzed before every apply and the preamp is auto-trimmed so cumulative boosts can't clip; live clip indicator in the status bar
-- **Confirm-or-revert**: a new, never-before-confirmed sound must be confirmed within 10 seconds or the previous known-good config comes back — a bad EQ can never leave you without audio
-- **Backups of everything**: every replaced config is kept with one-click restore, including whatever existed before Soundstage took over
+**Surround &amp; per-speaker calibration**
+- Individual level trim for every speaker — FL, FR, C, LFE, SL, SR, BL, BR — with a per-channel test tone
+- **Upmix** stereo sources to fill your surround speakers
+- **Bass management**: mark speakers "Small" and route their low end to the subwoofer, with an adjustable crossover
+- Detects your real hardware layout (2.0 / 5.1 / 7.1) and labels channels accordingly
 
-**Automation**
-- Rules pair a trigger (time of day, app playing audio, channel-count change, device change) with actions (switch preset, toggle an effect, set intensity)
-- Evaluated top to bottom, last match wins, with a live *"why is this active?"* explanation
-- Five prebuilt rules ship disabled — night mode after 10pm, Music when Spotify plays, Film for browsers, Flat for multichannel, headphone profile on connect
-- One master kill switch pauses all automation without deleting anything
+**Everyday**
+- Live level meters on every speaker, and "now playing" pulled from Windows' media session
+- Instant A/B bypass so you can hear exactly what Soundstage is doing
+- Runs in the system tray, optional launch-on-boot, volume-key control
+- One self-contained installer — no runtime prerequisites
 
-**Per-device profiles** — speakers and headphones each keep their own presets, effects and rules; Soundstage follows the Windows default device automatically.
+## Install
 
-**Status readout** — always visible: active device, channel layout (2.0/5.1/7.1), sample rate/bit depth, spatial-audio (Atmos) state, active preset and which rule set it, headroom.
+1. Download **`Soundstage-1.0.0-Setup.exe`** from the [latest release](https://github.com/random12one0/SoundStage/releases/latest).
+2. Run it. It installs to your user folder (no admin needed) and adds Start Menu / desktop shortcuts.
+3. Launch Soundstage. To process your audio, open **Settings → Run inside Windows' audio engine → Install**. This is a one-time step that needs Administrator (it registers the audio plugin), and it's the only time you'll be asked.
 
-Plus: instant A/B bypass (button + global hotkey `Ctrl+Alt+B`), system tray with quick toggles, launch-on-boot, single portable EXE.
+That's it — pick a preset, tune your speakers, done.
 
-## Getting started
-
-1. Install [Equalizer APO](https://sourceforge.net/projects/equalizerapo/) on the output device(s) you want to control, and reboot.
-2. Download `Soundstage.exe` from the latest CI build artifact (or build from source, below) and run it.
-3. Click **Take control** — your existing config.txt is backed up first, always.
-4. Pick a preset. Done.
-
-> **Dolby Atmos users — do this once:** open **Diagnostics → Start 8-second test** while
-> music plays. If the sound clearly muffles, APO is genuinely in your signal path with
-> Atmos active. If not, the same page walks you through APO's SFX/EFX install-mode fix.
-> Details in [docs/ATMOS-VALIDATION.md](docs/ATMOS-VALIDATION.md).
-
-## Staying up to date
-
-Soundstage checks GitHub for a newer release a few seconds after launch (toggle it off in
-**Settings → Updates**) and shows a banner when one is available. **Settings → Updates**
-also has a **Check for updates** button and a one-click **Download & install** that fetches
-the new installer, verifies its SHA-256, runs it, and closes the app so it can update in
-place — no manual GitHub visit needed.
-
-> The in-app updater reads the repository's public Releases API. For it to work, this
-> repository must be **public** (Settings → General → Change visibility on GitHub). If it's
-> private, the updater will say so and you can still download releases manually.
+> **Removing it:** uninstall from Windows "Apps" like any program. To detach just the audio
+> plugin, open **Settings → Plugin mode → Uninstall** (or run `install-apo.ps1 -Uninstall`
+> from the install folder). Your original audio setup is restored exactly.
 
 ## How it works
 
-Soundstage owns `config.txt` with a three-line stub and keeps everything it generates in
-its own subfolder:
+Soundstage is two pieces that stay cleanly separated:
 
-```
-config.txt                  ← stub: Include: Soundstage\app.txt   (original backed up)
-config\Soundstage\app.txt   ← tiny switch file — bypass rewrites only this
-config\Soundstage\user.txt  ← yours forever; hand-written lines that survive everything
-config\Soundstage\chain.txt ← the generated processing chain (one section per device)
-config\Soundstage\backups\  ← timestamped history
-```
+- **The app** (WPF host + a WebView2 UI) — what you see and click. It never touches the audio stream itself.
+- **The audio plugin** (`SoundstageApo.dll`, a Windows Audio Processing Object) — a tiny DSP module Windows loads *inside its own audio engine*, on the way to your speakers. This is what actually applies the EQ, effects, calibration and bass management.
 
-Equalizer APO watches included files, so every change applies live — bypass toggles by
-rewriting ~100 bytes. Uninstalling Soundstage's control is one click (Diagnostics → Hand
-back control) and restores your original config exactly.
+The two talk through a small shared-memory bridge: move a dial and the app publishes the new
+settings; the plugin reads them at the top of its next audio buffer. Because the plugin lives
+in Windows' pipeline rather than in front of it, there's no capture-and-replay, no added
+device, and nothing to route — which is exactly why it can't break your audio path.
+
+## Requirements
+
+- Windows 10 (1809+) or Windows 11, 64-bit
+- A playback device with the surround layout you want to control (e.g. an AV receiver over HDMI, configured for 5.1/7.1 in Windows)
 
 ## Building from source
 
+The app is a self-contained single-file build; the native DSP engine (CMake/MSVC) and the
+audio plugin build alongside it.
+
+```powershell
+# App + bundled native engine → publish\Soundstage.exe (fully standalone)
+dotnet publish src\Soundstage.Shell\Soundstage.Shell.csproj -c Release -r win-x64 `
+  --self-contained true -p:PublishSingleFile=true -o publish
+
+# The audio plugin (needs the VS C++ build tools) → native\soundstage-apo\SoundstageApo.dll
+pwsh native\soundstage-apo\build.ps1
+
+# The installer (needs Inno Setup 6) → dist\Soundstage-1.0.0-Setup.exe
+iscc installer\Soundstage.iss
 ```
-dotnet build Soundstage.sln
-dotnet test tests/Soundstage.Core.Tests        # runs anywhere, including Linux
-dotnet test Soundstage.sln                     # full suite (Windows)
-dotnet publish src/Soundstage.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
-```
 
-The core logic (config compilation, DSP analysis, automation engine) is an OS-neutral
-library with 165+ unit tests; the WPF layer stays thin. See
-[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+## Troubleshooting
 
-To regenerate the bundled AutoEq database: `tools/AutoEqPacker` (sparse-clones the AutoEq
-repo and packs ParametricEQ files into one JSON).
-
-## Out of scope, on purpose
-
-Upmixing/surround synthesis (Dolby Access does this), virtual 3D headphone surround, pitch
-shifting, per-app volume, media playback, and anything involving bitstream passthrough.
+- **Effects don't seem to do anything** — check the top-right switch isn't on **Bypassed**, and that plugin mode shows **installed** in Settings.
+- **Audio stopped after toggling Dolby Atmos / spatial sound** — Windows can disable the effects chain when spatial audio changes. Settings has a **Repair** button that re-enables it; failing that, uninstall/reinstall plugin mode.
+- **Speaker test says a channel isn't there** — set your device to 5.1/7.1 in Windows (Sound → your device → Configure), then reopen Soundstage.
 
 ## License
 
-MIT. Bundled headphone correction data from [AutoEq](https://github.com/jaakkopasanen/AutoEq)
-(MIT, © Jaakko Pasanen). Built with [WPF-UI](https://github.com/lepoco/wpfui),
-[NAudio](https://github.com/naudio/NAudio), [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet),
-and [Hardcodet NotifyIcon](https://github.com/hardcodet/wpf-notifyicon).
+[MIT](LICENSE). Built with [NAudio](https://github.com/naudio/NAudio),
+[WebView2](https://developer.microsoft.com/microsoft-edge/webview2/), and
+[Hardcodet NotifyIcon](https://github.com/hardcodet/wpf-notifyicon).
