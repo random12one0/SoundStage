@@ -808,7 +808,7 @@
 
 <div id="modal"><div class="box">
   <h4 id="modalTitle">Name this preset</h4>
-  <p id="modalHint">It saves your EQ curve, every effect dial and the ambience settings.</p>
+  <p id="modalHint">Saves the whole sound: EQ, every effect, ambience, volume and your speaker levels.</p>
   <input id="modalInput" maxlength="40" />
   <div class="row"><button class="ghost" id="modalCancel">Cancel</button><button class="btn" id="modalOk">Save</button></div>
 </div></div>
@@ -889,7 +889,7 @@
     power:   'A/B switch. On, you hear Soundstage. Off, you hear the original untouched — the sound keeps playing either way. Flip it to judge whether an effect is actually helping.',
     volume:  'Soundstage\'s own output level, on top of the Windows volume.',
     eq:      'Shapes the tone across the frequency range. Drag a handle up to boost that band, down to cut it. Double-click a band to reset it.',
-    preset:  'Ready-made tone curves. Picking one replaces your EQ; "Yours" saves everything — EQ, dials and ambience — under a name.',
+    preset:  'Ready-made tone curves. Picking one replaces your EQ; "Yours" saves the whole sound — EQ, effects, ambience, volume and speaker levels — under a name.',
     output:  'Where Soundstage sends the finished sound. This is the one to change when you switch to headphones.',
     outlet:  'The virtual device your apps play into, which Soundstage captures. Normally the CABLE device.',
     calib:   'Trim each speaker so they sound equally loud from where you sit. Press a speaker\'s play button to hear just that one.',
@@ -2147,14 +2147,25 @@
   }
 
   /* "Yours": a full snapshot — EQ curve, every dial, and the ambience settings. */
+  /* A saved preset is a whole "scene": the entire sound in one recall — EQ, every effect, ambience,
+     the master volume, the loaded sound mode, AND the speaker trims. Capturing the speaker levels is
+     what makes "centre up for films, bass channel down for music" a one-tap thing. */
   function saveMyPreset(name) {
+    var existing = S.presets[name] || {};
     S.presets[name] = {
-      eq: { gains: S.eq.gains.slice() },
+      eq: { gains: S.eq.gains.slice(), preset: S.eq.preset },
       fx: JSON.parse(JSON.stringify(S.fx)),
-      rv: JSON.parse(JSON.stringify(S.rv))
+      rv: JSON.parse(JSON.stringify(S.rv)),
+      spk: JSON.parse(JSON.stringify(S.spk)),
+      volume: S.volume,
+      mode: S.mode,
+      /* keep any trigger already attached to a scene of this name */
+      when: existing.when || null,
+      on: existing.on || false
     };
     S.eq.mine = name;
     renderMyPresets();
+    renderAutomations();
     save();
     toast('Saved “' + name + '”.');
   }
@@ -2164,10 +2175,14 @@
     if (!p) { return; }
     /* Presets saved before the 31-band mode was dropped still carry gains10. */
     S.eq.gains = (p.eq.gains || p.eq.gains10 || S.eq.gains).slice();
-    S.eq.preset = 'Custom';
+    S.eq.preset = (p.eq && p.eq.preset) || 'Custom';
     S.eq.mine = name;
     S.fx = JSON.parse(JSON.stringify(p.fx));
     S.rv = JSON.parse(JSON.stringify(p.rv));
+    /* Older presets predate the whole-scene snapshot — apply the new fields only when present. */
+    if (p.spk) { S.spk = JSON.parse(JSON.stringify(p.spk)); }
+    if (typeof p.volume === 'number') { S.volume = p.volume; }
+    S.mode = p.mode || 'Custom';
     renderEverything();
     pushAll();
     save();
@@ -3597,7 +3612,7 @@
       else if (owner.id === 'myPresetDD') {
         if (v === '__save') {
           askName('Name this preset',
-                  'It saves your EQ curve, every effect dial and the ambience settings.',
+                  'Saves the whole sound: EQ, every effect, ambience, volume and your speaker levels.',
                   S.eq.mine || 'My preset', saveMyPreset);
         } else if (v === '__del') {
           var target = S.eq.mine || Object.keys(S.presets)[0];
