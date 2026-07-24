@@ -58,6 +58,7 @@ public sealed class EngineController : IDisposable
     private readonly SoundstageEngine? _engine;
     private readonly ApoBridge? _bridge;
     private readonly ApoTelemetry? _telemetry;
+    private readonly NativeMonitor? _monitor;
     private readonly EngineAudioHost? _host;
     private readonly Action<string>? _notify;
     private bool _disposed;
@@ -86,6 +87,20 @@ public sealed class EngineController : IDisposable
     public EngineController(Action<string>? notify = null)
     {
         _notify = notify;
+
+        // The safe, always-on path: watch the speakers and set per-speaker volume through Windows'
+        // own APIs. Needs no plugin and touches nothing in the audio stream, so it works — and can't
+        // break anything — whether or not the DSP engine below loads.
+        try
+        {
+            _monitor = new NativeMonitor();
+            _monitor.Start();
+        }
+        catch
+        {
+            _monitor = null;
+        }
+
         try
         {
             _engine = new SoundstageEngine();
@@ -199,6 +214,15 @@ public sealed class EngineController : IDisposable
                     return;
                 case "aporepair":
                     ApoStatus.RunInstaller(uninstall: false, repair: true);
+                    return;
+                case "nativevol":
+                    // A calibration fader, set through Windows' own per-speaker volume — no plugin,
+                    // no audio path. Works whether or not the DSP engine is present.
+                    SetNativeChannelVolume((int)Num(root, "ch", -1), Num(root, "v", 1.0));
+                    return;
+                case "nativevols":
+                    // The UI asking where the per-speaker volumes currently sit, to seat its faders.
+                    SendNativeVolumes();
                     return;
             }
 
@@ -703,6 +727,64 @@ public sealed class EngineController : IDisposable
     /// This is how the app meters and detects playback when the plugin, not the app, holds the path.
     /// </summary>
     /// <summary>
+    /// Live per-speaker meters and channel count from the passive monitor — the safe path that works
+    /// with no plugin. Returns null only if nothing is playing.
+    /// </summary>
+    public (IReadOnlyList<float> Channels, int ChannelCount)? PollNativeMeters()
+    {
+        if (_monitor is null || !_monitor.IsMonitoring)
+        {
+            return null;
+        }
+
+        // Any signal above the noise floor means audio is flowing.
+        bool anyLevel = false;
+        foreach (float p in _monitor.Peaks)
+        {
+            if (p > 0.0004f) { anyLevel = true; break; }
+        }
+
+        return anyLevel ? (_monitor.Peaks, _monitor.Channels) : null;
+    }
+
+    /// <summary>Set one speaker's volume (0..1) through Windows' native per-channel control. Used by
+    /// the calibration faders when running without the plugin — no audio path involved.</summary>
+    public void SetNativeChannelVolume(int channel, double scalar)
+        => _monitor?.SetChannelVolume(channel, (float)Math.Clamp(scalar, 0.0, 1.0));
+
+    /// <summary>The current native per-speaker volumes (0..1), so the faders can show where they are.</summary>
+    public IReadOnlyList<float> NativeChannelVolumes =>
+        _monitor?.GetChannelVolumes() ?? (IReadOnlyList<float>)Array.Empty<float>();
+
+    /// <summary>How many per-speaker volumes Windows lets us set on the current device.</summary>
+    public int NativeVolumeChannels => _monitor?.VolumeChannelCount ?? 0;
+
+    /// <summary>Point the passive monitor at a device (or the default when null).</summary>
+    public void SetMonitorDevice(string? deviceId) => _monitor?.Start(deviceId);
+
+    /// <summary>Tell the UI the current per-speaker volumes so its faders sit in the right place.</summary>
+    public void SendNativeVolumes()
+    {
+        try
+        {
+            var vols = NativeChannelVolumes;
+            var sb = new System.Text.StringBuilder("[");
+            for (int i = 0; i < vols.Count; i++)
+            {
+                if (i > 0) { sb.Append(','); }
+                sb.Append(vols[i].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+            }
+
+            sb.Append(']');
+            _notify?.Invoke($"{{\"t\":\"nativevols\",\"v\":{sb},\"count\":{NativeVolumeChannels}}}");
+        }
+        catch
+        {
+            // Metering and volume are best-effort niceties; never let them break the message loop.
+        }
+    }
+
+    /// <summary>
     /// Re-send the whole current settings block to the plugin, bumping the sequence so the plugin
     /// re-reads it. Called when audio starts flowing, to close a race: if the plugin locked its
     /// stream before the app finished publishing (music started during launch), it may have read a
@@ -807,5 +889,6 @@ public sealed class EngineController : IDisposable
         _engine?.Dispose();
         _bridge?.Dispose();
         _telemetry?.Dispose();
+        _monitor?.Dispose();
     }
 }

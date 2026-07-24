@@ -410,6 +410,38 @@ public partial class MainWindow : Window
 
                 _pluginWasActive = false;   // stream ended; re-assert settings when the next one starts
 
+                // No plugin in the path? Meter passively from Windows' loopback — the safe way to
+                // watch the speakers that can't touch the audio. This is the primary meter source
+                // now that the plugin is optional.
+                var nm = _controller.PollNativeMeters();
+                if (nm is { } n)
+                {
+                    _meterWasLive = true;
+                    float peak = 0f;
+                    var chJson3 = new System.Text.StringBuilder("[");
+                    for (int c = 0; c < n.Channels.Count; c++)
+                    {
+                        if (c > 0) { chJson3.Append(','); }
+                        chJson3.Append(n.Channels[c].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+                        if (n.Channels[c] > peak) { peak = n.Channels[c]; }
+                    }
+
+                    chJson3.Append(']');
+
+                    // Source layout inferred from whether the non-front channels carry signal.
+                    int srcCh2 = 2;
+                    for (int c = 2; c < n.Channels.Count; c++)
+                    {
+                        if (n.Channels[c] > 0.004f) { srcCh2 = n.ChannelCount; break; }
+                    }
+
+                    NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
+                        $"{{\"t\":\"level\",\"in\":{peak:0.####},\"out\":{peak:0.####}," +
+                        $"\"inCh\":{srcCh2},\"outCh\":{n.ChannelCount}," +
+                        $"\"ch\":{chJson3},\"live\":true,\"native\":true}}"));
+                    return;
+                }
+
                 if (_meterWasLive)
                 {
                     _meterWasLive = false;
