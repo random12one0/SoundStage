@@ -311,18 +311,23 @@ public sealed class EngineController : IDisposable
                 break;
             case "leveler":
                 _engine.EnableCompressor(on);
-                _engine.SetCompressor(-10.0 - v * 20.0, 1.5 + v * 3.0, 6.0, v * 4.0, 15.0, 150.0);
+                // Attack/release are fine-tune (character) controls; the amount dial still drives
+                // threshold, ratio and makeup. Absent → today's fixed timing.
+                _engine.SetCompressor(-10.0 - v * 20.0, 1.5 + v * 3.0, 6.0, v * 4.0,
+                                      Num(root, "attack", 15.0), Num(root, "release", 150.0));
                 break;
             case "warmth":
                 _engine.EnableEq(true);   // the tone shelves live in the EQ cascade — it must be live
-                _engine.SetEqBand(WarmthSlot, BandType.LowShelf, 200.0, on ? v * 8.0 : 0.0, 0.707);
+                _engine.SetEqBand(WarmthSlot, BandType.LowShelf, Num(root, "freq", 200.0),
+                                  on ? v * 8.0 : 0.0, 0.707);
                 break;
             case "air":
                 _engine.EnableEq(true);
-                _engine.SetEqBand(AirSlot, BandType.HighShelf, 10000.0, on ? v * 8.0 : 0.0, 0.707);
+                _engine.SetEqBand(AirSlot, BandType.HighShelf, Num(root, "freq", 10000.0),
+                                  on ? v * 8.0 : 0.0, 0.707);
                 break;
             case "night":
-                ApplyNight(on, v);
+                ApplyNight(on, v, Num(root, "rumble", 40.0));
                 break;
         }
     }
@@ -335,7 +340,7 @@ public sealed class EngineController : IDisposable
     /// bass that travels and squashes the peaks that startle, while leaving speech alone — the point
     /// is to keep everything audible at a lower ceiling, not to make the whole film quieter.
     /// </summary>
-    private void ApplyNight(bool on, double v)
+    private void ApplyNight(bool on, double v, double rumbleHz = 40.0)
     {
         if (_engine is null)
         {
@@ -344,10 +349,11 @@ public sealed class EngineController : IDisposable
 
         // Two stages on the low end, because a shelf alone is too gentle where it matters. The shelf
         // thins the upper bass; the high-pass removes the deep rumble underneath it, which is the
-        // part that actually travels through a floor.
+        // part that actually travels through a floor. The high-pass corner is a fine-tune control
+        // (how deep the rumble cut reaches); it defaults to a sensible 40 Hz when not set.
         _engine.SetEqBand(NightSlot, BandType.LowShelf, 150.0, on ? -12.0 * v : 0.0, 0.707);
         _engine.SetEqBand(NightHighPassSlot, BandType.Highpass,
-            on ? 30.0 + (v * 50.0) : 5.0,   // effectively out of the way when off
+            on ? rumbleHz : 5.0,   // effectively out of the way when off
             0.0, 0.707);
 
         // Dynamics: bring the ceiling down, and lift the quiet parts slightly so dialogue doesn't

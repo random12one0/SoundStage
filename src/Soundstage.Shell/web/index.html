@@ -589,6 +589,23 @@
             <div class="lrow"><span class="ll">Drive</span><div class="sl" data-fxt="bass.drive"></div><span class="val"></span></div>
           </section>
           <section class="panel pad">
+            <div class="ph"><h3 class="big">Warmth</h3><span class="sub">low-shelf tone — turn Warmth on from the Home page</span></div>
+            <div class="lrow"><span class="ll">Frequency</span><div class="sl" data-fxt="warmth.freq"></div><span class="val"></span></div>
+          </section>
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Air</h3><span class="sub">high-shelf sparkle — turn Air on from the Home page</span></div>
+            <div class="lrow"><span class="ll">Frequency</span><div class="sl" data-fxt="air.freq"></div><span class="val"></span></div>
+          </section>
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Leveler</h3><span class="sub">compressor timing — turn Leveler on from the Home page</span></div>
+            <div class="lrow"><span class="ll">Attack</span><div class="sl" data-fxt="leveler.attack"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Release</span><div class="sl" data-fxt="leveler.release"></div><span class="val"></span></div>
+          </section>
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Night</h3><span class="sub">how deep the rumble cut reaches — turn Night on from the Home page</span></div>
+            <div class="lrow"><span class="ll">Rumble filter</span><div class="sl" data-fxt="night.rumble"></div><span class="val"></span></div>
+          </section>
+          <section class="panel pad">
             <div class="ph"><h3 class="big">Ambience</h3><span class="sub">our own reverb — depth &amp; space for your speakers</span><div class="rt">
               <div class="pdd" id="rvPresetDD"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
               <div class="sw" data-sw="ambience"><div class="k"></div></div>
@@ -883,8 +900,13 @@
      sliders above — how the slider position maps to a real engine value, and how it reads out. Each
      effect's dashboard dial stays the "amount"; these are the character controls underneath it. */
   var FXP = {
-    'bass.crossover': { min: 40, max: 200, log: true, fmt: hz },
-    'bass.drive':     { min: 1,  max: 6,   fmt: function (v) { return round1(v) + '×'; } }
+    'bass.crossover':  { min: 40,   max: 200,   log: true, fmt: hz },
+    'bass.drive':      { min: 1,    max: 6,      fmt: function (v) { return round1(v) + '×'; } },
+    'warmth.freq':     { min: 80,   max: 400,    log: true, fmt: hz },
+    'air.freq':        { min: 4000, max: 16000,  log: true, fmt: hz },
+    'leveler.attack':  { min: 1,    max: 100,    log: true, fmt: function (v) { return round1(v) + ' ms'; } },
+    'leveler.release': { min: 30,   max: 500,    log: true, fmt: function (v) { return Math.round(v) + ' ms'; } },
+    'night.rumble':    { min: 20,   max: 120,    log: true, fmt: hz }
   };
 
   /* Self-contained twins of bindSliders/renderReverb, for the .sl[data-fxt="effect.param"] sliders.
@@ -936,9 +958,12 @@
       volume: 68,
       eq: { gains: FREQ10.map(function () { return 0; }), preset: 'Flat', mine: null },
       fx: {
-        bass:     { on: false, v: 40, crossover: 90, drive: 3 }, air:      { on: false, v: 35 },
-        warmth:   { on: false, v: 30 }, leveler:  { on: false, v: 45 },
-        ambience: { on: false, v: 30 }, night:    { on: false, v: 40 }
+        bass:     { on: false, v: 40, crossover: 90, drive: 3 },
+        air:      { on: false, v: 35, freq: 10000 },
+        warmth:   { on: false, v: 30, freq: 200 },
+        leveler:  { on: false, v: 45, attack: 15, release: 150 },
+        ambience: { on: false, v: 30 },
+        night:    { on: false, v: 40, rumble: 40 }
       },
       rv: { on: false, type: 'Hall', preset: 'Cinema Hall',
             size: 0.6, decay: 1.8, predelay: 22, diffusion: 0.75,
@@ -1126,6 +1151,9 @@
     /* Fine-tune ("specialties" tab) parameters ride along for the effects that expose them. Harmless
        for the others — the engine only reads what it recognises. */
     if (id === 'bass') { m.crossover = f.crossover; m.drive = f.drive; }
+    else if (id === 'warmth' || id === 'air') { m.freq = f.freq; }
+    else if (id === 'leveler') { m.attack = f.attack; m.release = f.release; }
+    else if (id === 'night') { m.rumble = f.rumble; }
     send(m);
   }
   function pushEq() {
