@@ -903,20 +903,20 @@
 
   /* Ambience parameters: how each slider maps to a real engine value, and how it reads out. */
   var RV = {
-    size:      { min: 0.05, max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    size:      { min: 0.05, max: 1,  pct: true, fmt: function (v) { return Math.round(v * 100) + '%'; } },
     decay:     { min: 0.2,  max: 8,     fmt: function (v) { return round1(v) + ' s'; } },
     predelay:  { min: 0,    max: 200,   fmt: function (v) { return Math.round(v) + ' ms'; } },
-    diffusion: { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    diffusion: { min: 0,    max: 1,  pct: true, fmt: function (v) { return Math.round(v * 100) + '%'; } },
     /* Shown as "Brightness" because that's what people hear, but the engine parameter is damping —
        more damping is a darker tail — so the slider runs backwards against the stored value. */
-    damping:   { min: 0,    max: 1,     inv: true,
+    damping:   { min: 0,    max: 1,  pct: true, inv: true,
                  fmt: function (v) { return Math.round((1 - v) * 100) + '%'; } },
-    early:     { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
-    mod:       { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    early:     { min: 0,    max: 1,  pct: true, fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    mod:       { min: 0,    max: 1,  pct: true, fmt: function (v) { return Math.round(v * 100) + '%'; } },
     lowcut:    { min: 20,   max: 1000,  log: true, fmt: hz },
     highcut:   { min: 1000, max: 20000, log: true, fmt: hz },
-    width:     { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } },
-    mix:       { min: 0,    max: 1,     fmt: function (v) { return Math.round(v * 100) + '%'; } }
+    width:     { min: 0,    max: 1,  pct: true, fmt: function (v) { return Math.round(v * 100) + '%'; } },
+    mix:       { min: 0,    max: 1,  pct: true, fmt: function (v) { return Math.round(v * 100) + '%'; } }
   };
   function hz(v) { return v >= 1000 ? round1(v / 1000) + ' kHz' : Math.round(v) + ' Hz'; }
 
@@ -955,6 +955,9 @@
       draggable(handle, null, function (e) { setFromX(e.clientX); }, null);
       draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
                     function (e) { setFromX(e.clientX); }, null);
+      bindValEdit(sl.parentNode.querySelector('.val'), spec,
+        function () { return S.fx[id][param]; },
+        function (v) { S.fx[id][param] = v; renderFxt(); pushFx(id); save(); });
     });
   }
   function renderFxt() {
@@ -1296,16 +1299,24 @@
 
   /* Type an exact value. Click the read-out under any dial and enter a number — the first thing
      anyone precise reaches for, and impossible with a knob alone. */
-  function bindTypeToEdit(readout, get, set, suffix) {
+  /* Make any numeric readout click-to-type. `opts.toDisp` turns the stored value into the number the
+     box should show (e.g. 0.5 -> 50 for a percentage); `opts.fromDisp` turns the typed number back.
+     Defaults show/parse the raw value rounded to a tenth, which is right for dials, dB and volume. */
+  function bindTypeToEdit(readout, get, set, opts) {
+    opts = opts || {};
+    var toDisp = opts.toDisp || function (v) { return Math.round(v * 10) / 10; };
+    var fromDisp = opts.fromDisp || function (x) { return x; };
     readout.style.cursor = 'text';
     readout.title = 'Click to type an exact value';
+    /* Swallow pointerdown so pressing the number never starts a parent drag (EQ band, fader). */
+    readout.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
     readout.addEventListener('click', function (e) {
       e.stopPropagation();
       if (readout.querySelector('input')) { return; }
 
       var input = document.createElement('input');
       input.type = 'text';
-      input.value = String(Math.round(get()));
+      input.value = String(toDisp(get()));
       input.setAttribute('style',
         'width:44px;font:inherit;text-align:center;color:var(--glow-ink);background:#0b1119;' +
         'border:1px solid var(--glow);border-radius:6px;padding:1px 3px;');
@@ -1316,9 +1327,9 @@
       input.select();
 
       function finish(commit) {
-        var v = parseFloat(input.value);
+        var x = parseFloat(input.value);
         readout.textContent = previous;
-        if (commit && !isNaN(v)) { snapshot('type'); set(v); }
+        if (commit && !isNaN(x)) { snapshot('type'); set(fromDisp(x)); }
       }
       input.addEventListener('keydown', function (ev) {
         ev.stopPropagation();
@@ -1327,6 +1338,23 @@
       });
       input.addEventListener('blur', function () { finish(true); });
       input.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
+    });
+  }
+
+  /* Click-to-type for a slider readout that follows an RV/FXP-style spec (min/max, optional pct/inv).
+     Percentage sliders store 0..1 but read out as 0..100, so the box types in whole percents. */
+  function bindValEdit(valEl, spec, getRaw, setRaw) {
+    if (!valEl || valEl._typed) { return; }
+    valEl._typed = true;
+    bindTypeToEdit(valEl, getRaw, function (raw) {
+      setRaw(clamp(raw, spec.min, spec.max));
+    }, {
+      toDisp: function (v) {
+        return spec.pct ? Math.round((spec.inv ? 1 - v : v) * 100) : Math.round(v * 10) / 10;
+      },
+      fromDisp: function (x) {
+        return spec.pct ? (spec.inv ? 1 - x / 100 : x / 100) : x;
+      }
     });
   }
 
@@ -1641,6 +1669,13 @@
     band.addEventListener('dblclick', function () {
       eqGains()[i] = 0; renderEq(); pushEq(); save();
     });
+    bindTypeToEdit(band.querySelector('.bdb'),
+      function () { return eqGains()[i] || 0; },
+      function (v) {
+        eqGains()[i] = clamp(v, -EQ_RANGE, EQ_RANGE);
+        S.eq.preset = 'Custom';
+        renderEq(); renderEqPresetLabel(); pushEq(); save();
+      });
   }
 
 
@@ -1670,6 +1705,9 @@
       draggable(handle, null, function (e) { setFromX(e.clientX); }, null);
       draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
                     function (e) { setFromX(e.clientX); }, null);
+      bindValEdit(sl.parentNode.querySelector('.val'), spec,
+        function () { return S.rv[key]; },
+        function (v) { S.rv[key] = v; S.rv.preset = 'Custom'; renderReverb(); pushReverb(); save(); });
     });
   }
 
@@ -1742,6 +1780,13 @@
       fader.addEventListener('dblclick', function () {
         S.spk.trims[i] = 0; renderSpeakers(); send({ t: 'trim', ch: i, db: 0 }); save();
       });
+      bindTypeToEdit(strip.querySelector('.db'),
+        function () { return S.spk.trims[i] || 0; },
+        function (v) {
+          v = clamp(v, -TRIM_RANGE, TRIM_RANGE);
+          if (Math.abs(v) < 0.4) { v = 0; }
+          S.spk.trims[i] = v; renderSpeakers(); send({ t: 'trim', ch: i, db: v }); save();
+        });
       strip.querySelector('.test').addEventListener('click', function () { playOne(strip, i); });
     });
     renderSpeakers();
@@ -2068,6 +2113,13 @@
   }
 
   function currentDevice() {
+    /* In plugin mode the plugin follows whatever Windows is playing to, so the "current device" is the
+       actual default output — not a device pinned in Settings (a cable-mode idea). Following that pin
+       is exactly why the name stayed "AV Receiver" after switching to headphones. */
+    if (pluginMode || apoActive) {
+      var def = devices.filter(function (d) { return d.isDefault && !d.isCable; })[0];
+      if (def) { return def; }
+    }
     var sel = devices.filter(function (d) { return d.id === S.settings.deviceId; })[0];
     if (!sel) { sel = devices.filter(function (d) { return d.isDefault && !d.isCable; })[0]; }
     if (!sel) { sel = devices.filter(function (d) { return !d.isCable; })[0]; }
