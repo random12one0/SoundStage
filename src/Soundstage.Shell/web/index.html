@@ -541,7 +541,9 @@
               <section class="panel out" id="outRow"><div class="oi"><svg class="ico"><use href="#i-spk"/></svg></div><div><div class="on-name" id="outName">Detecting output…</div><div class="os" id="outSub">Default output · all system audio</div></div><div class="badge" id="outBadge">—</div><svg class="ico cv" style="width:17px"><use href="#i-chev"/></svg></section>
             </div>
             <section class="panel pad fxpanel">
-              <div class="ph"><h3>Effects</h3></div>
+              <div class="ph"><h3>Effects</h3><div class="rt">
+                <div class="pdd" id="modeDD"><button class="pddbtn"><span class="pfx">Sound mode</span> <span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
+              </div></div>
               <div class="fxgrid">
                 <div class="radial" data-dial="fx" data-fx="bass" data-label="Bass"></div>
                 <div class="radial" data-dial="fx" data-fx="air" data-label="Air"></div>
@@ -950,14 +952,14 @@
         S.fx[id][param] = spec.log
           ? spec.min * Math.pow(spec.max / spec.min, t)
           : spec.min + t * (spec.max - spec.min);
-        renderFxt(); pushFx(id); save();
+        markCustom(); renderFxt(); pushFx(id); save();
       }
       draggable(handle, null, function (e) { setFromX(e.clientX); }, null);
       draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
                     function (e) { setFromX(e.clientX); }, null);
       bindValEdit(sl.parentNode.querySelector('.val'), spec,
         function () { return S.fx[id][param]; },
-        function (v) { S.fx[id][param] = v; renderFxt(); pushFx(id); save(); });
+        function (v) { S.fx[id][param] = v; markCustom(); renderFxt(); pushFx(id); save(); });
     });
   }
   function renderFxt() {
@@ -987,6 +989,7 @@
     return {
       power: false,
       volume: 68,
+      mode: '—',   /* the loaded full sound mode (EQ + effects); '—' = none, 'Custom' = hand-tweaked */
       eq: { gains: FREQ10.map(function () { return 0; }), preset: 'Flat', mine: null },
       fx: {
         bass:     { on: false, v: 40, crossover: 90, drive: 3 },
@@ -1023,7 +1026,7 @@
   /* The four examples the design ships with, as real automations rather than pictures of them. */
   function seedAutomations() {
     return [
-      { id: 'a1', on: true,  when: [{ k: 'app', v: 'Netflix' }],     then: [{ k: 'preset', v: 'Cinema' }] },
+      { id: 'a1', on: true,  when: [{ k: 'app', v: 'Netflix' }],     then: [{ k: 'preset', v: 'Movie Night' }] },
       { id: 'a2', on: true,  when: [{ k: 'time', v: '10:00 PM' }],   then: [{ k: 'fxtoggle', v: 'Night', on: true }] },
       { id: 'a3', on: true,  when: [{ k: 'app', v: 'Spotify' }],     then: [{ k: 'preset', v: 'Music' }] },
       { id: 'a4', on: false, when: [{ k: 'device', v: 'Headphones' }], then: [{ k: 'fxalloff' }] }
@@ -1436,6 +1439,7 @@
           fx.v = v;
           if (!fx.on) { fx.on = true; }          /* turning a dial turns its effect on */
           if (id === 'ambience') { S.rv.mix = v / 100; renderReverb(); }
+          markCustom();
           renderFxDial(el);
           pushFx(id);
           save();
@@ -1444,6 +1448,7 @@
           var fx = S.fx[id];
           fx.on = !fx.on;
           if (id === 'ambience') { S.rv.on = fx.on; pushReverb(); renderReverb(); }
+          markCustom();
           renderFxDial(el);
           pushFx(id);
           save();
@@ -1651,6 +1656,7 @@
       if (Math.abs(db) < 0.35) { db = 0; }        /* a small detent at flat */
       eqGains()[i] = db;
       S.eq.preset = 'Custom';
+      markCustom();
       renderEq();
       renderEqPresetLabel();
       pushEq();
@@ -1674,6 +1680,7 @@
       function (v) {
         eqGains()[i] = clamp(v, -EQ_RANGE, EQ_RANGE);
         S.eq.preset = 'Custom';
+        markCustom();
         renderEq(); renderEqPresetLabel(); pushEq(); save();
       });
   }
@@ -1697,6 +1704,7 @@
           ? spec.min * Math.pow(spec.max / spec.min, t)
           : spec.min + t * (spec.max - spec.min);
         S.rv.preset = 'Custom';
+        markCustom();
         renderReverb();
         pushReverb();
         save();
@@ -1707,7 +1715,7 @@
                     function (e) { setFromX(e.clientX); }, null);
       bindValEdit(sl.parentNode.querySelector('.val'), spec,
         function () { return S.rv[key]; },
-        function (v) { S.rv[key] = v; S.rv.preset = 'Custom'; renderReverb(); pushReverb(); save(); });
+        function (v) { S.rv[key] = v; S.rv.preset = 'Custom'; markCustom(); renderReverb(); pushReverb(); save(); });
     });
   }
 
@@ -1890,12 +1898,12 @@
         toast('Bass management on — speakers marked Small hand their low end to the sub.');
       }
     }
-    else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
+    else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; markCustom(); pushReverb(); renderAllDials(); }
     else if (key && key.indexOf('fx-') === 0) {
       /* An effect's on/off from its Fine-tune section — keeps it self-contained, no trip back to Home.
          Same effect the dashboard dial drives, so re-render the dials to stay in step. */
       var fid = key.slice(3);
-      if (S.fx[fid]) { S.fx[fid].on = on; pushFx(fid); renderAllDials(); }
+      if (S.fx[fid]) { S.fx[fid].on = on; markCustom(); pushFx(fid); renderAllDials(); }
     }
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
     else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
@@ -1949,34 +1957,38 @@
     /* Reference. Every other preset is a departure from this. */
     'Flat':    [],
 
-    /* Films: weight underneath, dialogue lifted slightly out of the mix, top gently eased so long
-       viewing doesn't fatigue. The centre channel carries speech, so the 2–4 kHz lift is modest. */
-    'Cinema':  [[31, 3.5], [63, 3], [125, 1.5], [250, -0.5], [500, -0.5],
-                [1000, 0.5], [2000, 1.5], [4000, 1.5], [8000, 0], [16000, -1]],
+    /* Films: weight underneath, dialogue consonants (2–3 kHz) lifted out of the mix, top gently
+       eased so long viewing doesn't fatigue. Home-theatre dialogue guides put the presence lift at
+       2–3 kHz and roll off above 6–8 kHz to avoid harshness. */
+    'Cinema':  [[31, 3], [63, 2.5], [125, 1.5], [250, 0], [500, 0],
+                [1000, 1], [2000, 2.5], [4000, 2], [8000, -0.5], [16000, -1.5]],
 
-    /* Music: the in-room preference curve, roughly — a real bass shelf, honest mids, and a slow
-       tilt down rather than a treble spike. */
+    /* Music: the Harman in-room preference — a real bass shelf and a slow downward tilt to the top,
+       not a treble spike. Toole/Olive's work shows listeners prefer this gentle slope in a room. */
     'Music':   [[31, 3.5], [63, 3], [125, 1.5], [250, 0], [500, -0.5],
                 [1000, 0], [2000, 0.5], [4000, 0.5], [8000, -0.5], [16000, -1.5]],
 
-    /* Speech: rumble and handling noise cut below 100, presence lifted where intelligibility lives,
-       sibilance held back so it never turns hissy. */
-    'Podcast': [[31, -6], [63, -4.5], [125, -1], [250, -1], [500, 0.5],
-                [1000, 2], [2000, 3], [4000, 2.5], [8000, -0.5], [16000, -2]],
+    /* Speech: high-pass the rumble/handling noise (~80 Hz), cut 200–400 Hz mud, lift the 2–5 kHz
+       presence where intelligibility lives, and roll off >10 kHz so sibilance never turns hissy —
+       straight from broadcast/podcast EQ practice. */
+    'Podcast': [[31, -7], [63, -5], [125, -1.5], [250, -2], [500, 0.5],
+                [1000, 2], [2000, 3], [4000, 2.5], [8000, -1], [16000, -2.5]],
 
-    /* Bass: weight without mud — the cut at 250–400 is what stops a big low shelf sounding boomy. */
-    'Bass':    [[31, 6], [63, 5.5], [125, 3], [250, -1], [500, -1.5],
-                [1000, 0], [2000, 0], [4000, 0], [8000, 0], [16000, 0]],
+    /* Bass: depth from a peak up at 60–100 Hz (not wasted subsonic energy at 31), with a firm cut
+       at 250–400 Hz — the single move that stops a big low end sounding boomy/muddy. */
+    'Bass':    [[31, 4], [63, 6], [125, 4], [250, -2], [500, -1.5],
+                [1000, 0], [2000, 0.5], [4000, 0], [8000, 0], [16000, 0]],
 
     /* Late night: the companion to Night mode. Deep bass out (it travels through walls), speech
        lifted so you can follow dialogue at a low level without reaching for the volume. */
     'Late night': [[31, -8], [63, -6], [125, -2.5], [250, -0.5], [500, 1],
                    [1000, 2], [2000, 3], [4000, 2.5], [8000, 0.5], [16000, -1]],
 
-    /* Games: positional cues — footsteps and reloads sit around 3–6 kHz — with the low-mid clutter
-       pulled back so they aren't buried, and enough sub left for explosions to land. */
-    'Gaming':  [[31, 2.5], [63, 2], [125, 0], [250, -2], [500, -1.5],
-                [1000, 0.5], [2000, 2], [4000, 3], [8000, 1.5], [16000, 0]]
+    /* Games: the footstep "scuff" transient lives at 2–4 kHz — lift it — while the 200–300 Hz mud
+       (explosions, gunfire body, ambience that masks cues) is pulled back hard. Top eased above
+       8 kHz to keep long sessions from fatiguing. Competitive-FPS EQ guides converge here. */
+    'Gaming':  [[31, 1.5], [63, 1], [125, -1], [250, -4], [500, -2],
+                [1000, 0.5], [2000, 3], [4000, 3.5], [8000, 0.5], [16000, -1]]
   };
 
   function sampleCurve(anchors, f) {
@@ -1998,6 +2010,7 @@
     var anchors = EQ_PRESETS[name] || [];
     S.eq.gains = FREQ10.map(function (f) { return round1(sampleCurve(anchors, f)); });
     S.eq.preset = name;
+    markCustom();          /* a pure-EQ preset is no longer the full sound mode */
     renderEq();
     renderEqPresetLabel();
     pushEq();
@@ -2026,6 +2039,7 @@
     if (!p) { return; }
     Object.keys(p).forEach(function (k) { S.rv[k] = p[k]; });
     S.rv.preset = name;
+    markCustom();
     renderReverb();
     pushReverb();
     save();
@@ -2037,9 +2051,99 @@
     Object.keys(p).forEach(function (k) { S.rv[k] = p[k]; });
     S.rv.type = name;
     S.rv.preset = 'Custom';
+    markCustom();
     renderReverb();
     pushReverb();
     save();
+  }
+
+  /* ---------- 8b. sound modes -----------------------------------------------------------
+   *
+   * A sound mode is a whole tone-and-effects profile in one pick, where the EQ presets above only
+   * touch the equalizer. Effect amounts are on the 0..100 dial scale, tuned to the rescaled effects
+   * where ~50 is the sweet spot. Each mode's choices are grounded in the same research the EQ curves
+   * are — not taste:
+   *
+   *  - Movie Night: a Leveler (dynamic-range compression) so dialogue stays intelligible over loud
+   *    action is exactly what receiver "dialogue/night" modes do; a touch of hall for depth.
+   *  - Music: the Harman curve with light bass/air, and NO compression — mastering practice is to
+   *    preserve dynamics, so the Leveler stays off.
+   *  - Gaming: footstep-tuned EQ + a Leveler to lift quiet positional cues and tame gunfire, and
+   *    deliberately NO reverb, which would smear directional information.
+   *  - Podcast/Voice: broadcast-style presence + gentle leveling for an even spoken level.
+   *  - Late Night: Night mode + leveling for low-level listening without waking anyone.
+   *  - Immersive: a concert-hall reverb with air and bass up, for a big spacious wash.
+   *  - Bass Boost: the clean bass curve with drive, and a Leveler to keep the low end from clipping.
+   */
+  var SOUND_MODES = {
+    'Movie Night': { eq: 'Cinema', rv: 'Cinema Hall',
+      fx: { bass:{on:true,v:35}, warmth:{on:true,v:35}, air:{on:false,v:30},
+            leveler:{on:true,v:55}, ambience:{on:true,v:18}, night:{on:false,v:40} } },
+    'Music':       { eq: 'Music',
+      fx: { bass:{on:true,v:40}, warmth:{on:true,v:30}, air:{on:true,v:35},
+            leveler:{on:false,v:45}, ambience:{on:false,v:15}, night:{on:false,v:40} } },
+    'Gaming':      { eq: 'Gaming',
+      fx: { bass:{on:true,v:22}, warmth:{on:false,v:30}, air:{on:true,v:30},
+            leveler:{on:true,v:55}, ambience:{on:false,v:12}, night:{on:false,v:40} } },
+    'Immersive':   { eq: 'Music', rv: 'Concert',
+      fx: { bass:{on:true,v:45}, warmth:{on:true,v:30}, air:{on:true,v:40},
+            leveler:{on:false,v:45}, ambience:{on:true,v:40}, night:{on:false,v:40} } },
+    'Podcast / Voice': { eq: 'Podcast',
+      fx: { bass:{on:false,v:20}, warmth:{on:true,v:25}, air:{on:true,v:20},
+            leveler:{on:true,v:50}, ambience:{on:false,v:12}, night:{on:false,v:40} } },
+    'Late Night':  { eq: 'Late night',
+      fx: { bass:{on:false,v:20}, warmth:{on:true,v:25}, air:{on:false,v:20},
+            leveler:{on:true,v:55}, ambience:{on:false,v:12}, night:{on:true,v:50} } },
+    'Bass Boost':  { eq: 'Bass',
+      fx: { bass:{on:true,v:55}, warmth:{on:true,v:35}, air:{on:false,v:30},
+            leveler:{on:true,v:40}, ambience:{on:false,v:12}, night:{on:false,v:40} } }
+  };
+
+  function applySoundMode(name) {
+    var m = SOUND_MODES[name];
+    if (!m) { return; }
+    snapshot('sound mode ' + name);
+
+    /* Equalizer curve. */
+    var anchors = EQ_PRESETS[m.eq] || [];
+    S.eq.gains = FREQ10.map(function (f) { return round1(sampleCurve(anchors, f)); });
+    S.eq.preset = m.eq;
+
+    /* Reverb character first, so the ambience amount below sets the mix on top of it. */
+    if (m.rv && RV_PRESETS[m.rv]) {
+      var p = RV_PRESETS[m.rv];
+      Object.keys(p).forEach(function (k) { S.rv[k] = p[k]; });
+      S.rv.preset = m.rv;
+    }
+
+    /* Effect amounts and on/off. */
+    Object.keys(m.fx).forEach(function (id) {
+      if (!S.fx[id]) { return; }
+      S.fx[id].on = m.fx[id].on;
+      S.fx[id].v = m.fx[id].v;
+    });
+    /* Ambience is the reverb: its dial is the wet mix and it owns the master reverb enable. */
+    S.rv.on = !!(m.fx.ambience && m.fx.ambience.on);
+    S.rv.mix = (m.fx.ambience ? m.fx.ambience.v : 0) / 100;
+
+    S.mode = name;
+
+    /* Push everything the mode touched, then repaint. */
+    pushEq();
+    ['bass', 'warmth', 'air', 'leveler', 'night'].forEach(function (id) { pushFx(id); });
+    pushReverb();
+    renderAllDials(); renderEq(); renderEqPresetLabel(); renderReverb();
+    setDD('modeDD', name);
+    save();
+    toast(name + ' mode');
+  }
+
+  /* Any manual change to the EQ or effects means the loaded mode no longer describes the sound. */
+  function markCustom() {
+    if (S.mode && S.mode !== 'Custom' && S.mode !== '—') {
+      S.mode = 'Custom';
+      setDD('modeDD', 'Custom');
+    }
   }
 
   /* "Yours": a full snapshot — EQ curve, every dial, and the ambience settings. */
@@ -2098,6 +2202,7 @@
      own preset list changes, which is why it lives in renderMyPresets instead. */
   function fillStaticMenus() {
     fillDD('eqPresetDD', Object.keys(EQ_PRESETS).map(function (n) { return { label: n }; }), S.eq.preset);
+    fillDD('modeDD', Object.keys(SOUND_MODES).map(function (n) { return { label: n }; }), S.mode);
     fillDD('rvPresetDD', Object.keys(RV_PRESETS).map(function (n) { return { label: n }; }), S.rv.preset);
     fillDD('rvTypeDD', Object.keys(RV_TYPES).map(function (n) { return { label: n }; }), S.rv.type);
   }
@@ -2409,7 +2514,8 @@
 
   function runAction(a) {
     if (a.k === 'preset') {
-      if (EQ_PRESETS[a.v]) { applyEqPreset(a.v); }
+      if (SOUND_MODES[a.v]) { applySoundMode(a.v); }
+      else if (EQ_PRESETS[a.v]) { applyEqPreset(a.v); }
       else if (S.presets[a.v]) { loadMyPreset(a.v); }
     } else if (a.k === 'volume') {
       S.volume = clamp(+a.v || 0, 0, 100);
@@ -3063,13 +3169,16 @@
   var VALUES = {
     apps: { title: 'Which app?', detected: '', items: ['Netflix', 'Spotify', 'YouTube', 'Disney+', 'Prime Video', 'Apple Music', 'VLC', 'Twitch', 'Chrome', 'A Steam game', 'Discord call', 'Zoom', 'Any game'] },
     devices: { title: 'Which device?', detected: '', items: ['Headphones', 'HDMI TV', 'USB DAC', 'Bluetooth speaker', 'Optical / SPDIF', 'Line out', 'Any headphones'] },
-    presets: { title: 'Which preset?', detected: '', items: ['Flat', 'Cinema', 'Music', 'Podcast', 'Bass', 'Vocal'] }
+    /* Full sound modes first (EQ + effects), then the pure-EQ presets — both are valid targets and
+       runAction() resolves a mode before a preset, so either works here. */
+    presets: { title: 'Which mode or preset?', detected: '',
+               items: Object.keys(SOUND_MODES).concat(Object.keys(EQ_PRESETS)) }
   };
 
   /* The quick-start cards, as real automations. */
   var QUICK = {
-    discord: { when: [{ k: 'app', v: 'Discord' }], then: [{ k: 'preset', v: 'Vocal' }] },
-    youtube: { when: [{ k: 'app', v: 'chrome' }],  then: [{ k: 'preset', v: 'Cinema' }] },
+    discord: { when: [{ k: 'app', v: 'Discord' }], then: [{ k: 'preset', v: 'Podcast / Voice' }] },
+    youtube: { when: [{ k: 'app', v: 'chrome' }],  then: [{ k: 'preset', v: 'Movie Night' }] },
     morning: { when: [{ k: 'time', v: '7:00 AM' }], then: [{ k: 'fxtoggle', v: 'Night', on: false }] }
   };
 
@@ -3470,6 +3579,7 @@
       var v = pi.dataset.v !== undefined ? pi.dataset.v : pi.textContent;
       owner.classList.remove('open');
       if (owner.id === 'eqPresetDD')      { applyEqPreset(pi.textContent); }
+      else if (owner.id === 'modeDD')     { applySoundMode(pi.textContent); }
       else if (owner.id === 'rvPresetDD') { applyRvPreset(pi.textContent); }
       else if (owner.id === 'rvTypeDD')   { applyRvType(pi.textContent); }
       else if (owner.id === 'devDD' || owner.id === 'devDD2') {
