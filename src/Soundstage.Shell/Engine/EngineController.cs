@@ -211,9 +211,13 @@ public sealed class EngineController : IDisposable
                         // This is an A/B bypass, not a stop button. Audio keeps flowing either way;
                         // what changes is whether you're hearing Soundstage or the original. Stopping
                         // the path would mean silence, since everything is routed through the outlet.
-                        bool on = Bool(root, "on");
-                        StartProcessing();        // idempotent — keeps the path open
-                        _engine.SetEnabled(on);
+                        //
+                        // It deliberately does NOT open the audio path — that's "engage"'s job, done
+                        // once on boot. Opening it here caused an infinite loop: with no outlet (no
+                        // cable, no plugin) StartProcessing replied "no-cable", the UI answered by
+                        // flipping power off, which sent another "power" straight back — and every lap
+                        // re-enumerated every audio device on the UI thread, freezing the window.
+                        _engine.SetEnabled(Bool(root, "on"));
                     }
 
                     break;
