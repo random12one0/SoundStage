@@ -306,7 +306,10 @@ public sealed class EngineController : IDisposable
                 // Crossover and drive are fine-tune parameters (the "specialties" tab). When the UI
                 // sends them, use them; otherwise fall back to the values the amount dial derives, so
                 // the dashboard knob alone still works exactly as before.
-                _engine.SetBass(v, Num(root, "crossover", 90.0), Num(root, "drive", 1.5 + v * 2.5));
+                // Intensity is scaled so ~50% is the pleasing "sweet spot" and 100% is deliberately
+                // over the top. The amount still spans the full 0..1; the extra push at the top comes
+                // from harmonic drive climbing to 6× (was 4×).
+                _engine.SetBass(v, Num(root, "crossover", 90.0), Num(root, "drive", 1.0 + v * 5.0));
                 break;
             case "ambience":
                 // The dial is the mix; the Ambience page owns the character of the reverb.
@@ -322,18 +325,21 @@ public sealed class EngineController : IDisposable
                 _engine.EnableCompressor(on);
                 // Attack/release are fine-tune (character) controls; the amount dial still drives
                 // threshold, ratio and makeup. Absent → today's fixed timing.
-                _engine.SetCompressor(-10.0 - v * 20.0, 1.5 + v * 3.0, 6.0, v * 4.0,
+                // ~50% = musical leveling; 100% = heavily squashed / pumping (intentionally too much).
+                _engine.SetCompressor(-8.0 - v * 32.0, 1.5 + v * 6.5, 6.0, v * 6.0,
                                       Num(root, "attack", 15.0), Num(root, "release", 150.0));
                 break;
             case "warmth":
                 _engine.EnableEq(true);   // the tone shelves live in the EQ cascade — it must be live
+                // ~50% ≈ +7.5 dB (the old maximum, i.e. the sweet spot); 100% = +15 dB (too much).
                 _engine.SetEqBand(WarmthSlot, BandType.LowShelf, Num(root, "freq", 200.0),
-                                  on ? v * 8.0 : 0.0, 0.707);
+                                  on ? v * 15.0 : 0.0, 0.707);
                 break;
             case "air":
                 _engine.EnableEq(true);
+                // ~50% ≈ +7.5 dB (the old maximum, i.e. the sweet spot); 100% = +15 dB (too much).
                 _engine.SetEqBand(AirSlot, BandType.HighShelf, Num(root, "freq", 10000.0),
-                                  on ? v * 8.0 : 0.0, 0.707);
+                                  on ? v * 15.0 : 0.0, 0.707);
                 break;
             case "night":
                 ApplyNight(on, v, Num(root, "rumble", 40.0));
