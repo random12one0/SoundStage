@@ -31,7 +31,6 @@ namespace Soundstage.Shell.Audio;
 public sealed class NativeMonitor : IDisposable
 {
     private readonly object _gate = new();
-    private MMDeviceEnumerator _enum = new();
     private MMDevice? _device;
     private WasapiLoopbackCapture? _capture;
     private bool _disposed;
@@ -55,16 +54,36 @@ public sealed class NativeMonitor : IDisposable
     /// Point the monitor at a device (by id) or, when id is null, whatever Windows' default output is.
     /// Safe to call repeatedly — it tears down any previous capture first.
     /// </summary>
+    /// <remarks>
+    /// All of this runs on a dedicated background MTA thread, NEVER the caller's (UI) thread. That is
+    /// not a nicety — the audio COM objects take on the apartment of the thread that creates them, and
+    /// if they're born on the UI thread (STA) the capture's own worker thread has to marshal every
+    /// buffer call back through the UI message pump, which floods it and freezes the window. Creating
+    /// them in an MTA keeps all that traffic off the UI thread entirely.
+    /// </remarks>
     public void Start(string? deviceId = null)
+    {
+        var t = new Thread(() => StartOnComThread(deviceId))
+        {
+            IsBackground = true,
+            Name = "Soundstage native monitor",
+        };
+        t.SetApartmentState(ApartmentState.MTA);
+        t.Start();
+    }
+
+    private void StartOnComThread(string? deviceId)
     {
         lock (_gate)
         {
             StopInternal();
+            if (_disposed) { return; }
             try
             {
+                using var en = new MMDeviceEnumerator();
                 _device = deviceId is null
-                    ? _enum.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)
-                    : _enum.GetDevice(deviceId);
+                    ? en.GetDefaultAudioEndpoint(DataFlow.Render, Role.Multimedia)
+                    : en.GetDevice(deviceId);
                 if (_device is null) { return; }
 
                 DeviceName = _device.FriendlyName;
@@ -187,8 +206,8 @@ public sealed class NativeMonitor : IDisposable
         lock (_gate)
         {
             StopInternal();
-            _device?.Dispose();
-            _enum.Dispose();
+            try { _device?.Dispose(); } catch { }
+            _device = null;
         }
     }
 }
