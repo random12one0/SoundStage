@@ -601,25 +601,25 @@
         <!-- ============ AMBIENCE ============ -->
         <div class="page" data-page="ambience">
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Bass</h3><span class="sub">weight &amp; drive on the low end — turn Bass on from the Home page</span></div>
+            <div class="ph"><h3 class="big">Bass</h3><span class="sub">weight &amp; drive on the low end</span><div class="rt"><div class="sw" data-sw="fx-bass"><div class="k"></div></div></div></div>
             <div class="lrow"><span class="ll">Crossover</span><div class="sl" data-fxt="bass.crossover"></div><span class="val"></span></div>
             <div class="lrow"><span class="ll">Drive</span><div class="sl" data-fxt="bass.drive"></div><span class="val"></span></div>
           </section>
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Warmth</h3><span class="sub">low-shelf tone — turn Warmth on from the Home page</span></div>
+            <div class="ph"><h3 class="big">Warmth</h3><span class="sub">low-shelf tone</span><div class="rt"><div class="sw" data-sw="fx-warmth"><div class="k"></div></div></div></div>
             <div class="lrow"><span class="ll">Frequency</span><div class="sl" data-fxt="warmth.freq"></div><span class="val"></span></div>
           </section>
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Air</h3><span class="sub">high-shelf sparkle — turn Air on from the Home page</span></div>
+            <div class="ph"><h3 class="big">Air</h3><span class="sub">high-shelf sparkle</span><div class="rt"><div class="sw" data-sw="fx-air"><div class="k"></div></div></div></div>
             <div class="lrow"><span class="ll">Frequency</span><div class="sl" data-fxt="air.freq"></div><span class="val"></span></div>
           </section>
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Leveler</h3><span class="sub">compressor timing — turn Leveler on from the Home page</span></div>
+            <div class="ph"><h3 class="big">Leveler</h3><span class="sub">compressor timing</span><div class="rt"><div class="sw" data-sw="fx-leveler"><div class="k"></div></div></div></div>
             <div class="lrow"><span class="ll">Attack</span><div class="sl" data-fxt="leveler.attack"></div><span class="val"></span></div>
             <div class="lrow"><span class="ll">Release</span><div class="sl" data-fxt="leveler.release"></div><span class="val"></span></div>
           </section>
           <section class="panel pad">
-            <div class="ph"><h3 class="big">Night</h3><span class="sub">how deep the rumble cut reaches — turn Night on from the Home page</span></div>
+            <div class="ph"><h3 class="big">Night</h3><span class="sub">how deep the rumble cut reaches</span><div class="rt"><div class="sw" data-sw="fx-night"><div class="k"></div></div></div></div>
             <div class="lrow"><span class="ll">Rumble filter</span><div class="sl" data-fxt="night.rumble"></div><span class="val"></span></div>
           </section>
           <section class="panel pad">
@@ -856,7 +856,12 @@
     { key: 'SL',  name: 'Surround L' }, { key: 'SR',  name: 'Surround R' },
     { key: 'BL',  name: 'Back L'  },    { key: 'BR',  name: 'Back R' }
   ];
-  function channelLayout() { return activeChannels(currentDevice()) >= 8 ? CHANNELS_71 : CHANNELS_51; }
+  /* How many speakers to show on the calibration page. Prefer the count the PLUGIN is actually
+     driving right now (it reports it live in showLevel) over the configured device — that's what
+     makes the faders follow you when you switch to stereo headphones instead of staying stuck on the
+     receiver's 5.1. Falls back to the device layout before any audio has played. */
+  function activeOutCh() { return liveOutCh > 0 ? liveOutCh : activeChannels(currentDevice()); }
+  function channelLayout() { return activeOutCh() >= 8 ? CHANNELS_71 : CHANNELS_51; }
 
   /* Plain-language descriptions. Someone opening this for the first time shouldn't have to guess
      what "Leveler" is, so every effect carries its own explanation in the UI. */
@@ -967,6 +972,10 @@
       var val = sl.parentNode.querySelector('.val');
       if (val) { val.textContent = spec.fmt(v); }
     });
+    /* Keep each Fine-tune section's on/off toggle in step with the effect's state. */
+    ['bass', 'warmth', 'air', 'leveler', 'night'].forEach(function (id) {
+      syncToggle('fx-' + id, S.fx[id] && S.fx[id].on);
+    });
   }
 
   function defaults() {
@@ -1026,6 +1035,7 @@
   var appVersion = '1.0.0';
   var statePath = '';
   var liveIn = 0;            /* channels actually arriving from the outlet while running */
+  var liveOutCh = 0;         /* channels the plugin is actually driving now — follows device switches */
   var outletChannels = 0;    /* channels the outlet is configured for — the ceiling on everything */
 
   /* ---------- 2. bridge --------------------------------------------------------------- */
@@ -1460,6 +1470,7 @@
   function renderAllDials() {
     document.querySelectorAll('[data-dial="fx"]').forEach(renderFxDial);
     renderVolDial();
+    renderFxt();   /* keep the Fine-tune sections' on/off toggles in step with the dashboard dials */
   }
 
   /* ---------- 6. EQ ------------------------------------------------------------------- */
@@ -1736,8 +1747,9 @@
 
   function renderSpeakers() {
     /* Dim the channels this device doesn't have, rather than offering faders for speakers that
-       aren't there. */
-    var ch = activeChannels(currentDevice());
+       aren't there. Uses the count the plugin is actually driving, so switching to stereo headphones
+       collapses this to two faders instead of leaving all eight showing. */
+    var ch = activeOutCh();
     var layout = channelLayout();
     document.querySelectorAll('#calib .strip').forEach(function (strip) {
       var idx = +strip.dataset.ch;
@@ -1831,6 +1843,12 @@
       }
     }
     else if (key === 'ambience') { S.rv.on = on; S.fx.ambience.on = on; pushReverb(); renderAllDials(); }
+    else if (key && key.indexOf('fx-') === 0) {
+      /* An effect's on/off from its Fine-tune section — keeps it self-contained, no trip back to Home.
+         Same effect the dashboard dial drives, so re-render the dials to stay in step. */
+      var fid = key.slice(3);
+      if (S.fx[fid]) { S.fx[fid].on = on; pushFx(fid); renderAllDials(); }
+    }
     else if (key === 'runAtLogin') { S.settings.runAtLogin = on; send({ t: 'startup', on: on }); }
     else if (key === 'closeToTray') { S.settings.closeToTray = on; send({ t: 'tray', closeToTray: on }); }
     else if (key === 'autoUpdate') { S.settings.autoUpdate = on; }
@@ -2721,6 +2739,12 @@
        we're actually driving. Not the device's channel count — a 5.1 outlet carrying Spotify is
        still stereo, and saying "5.1" there would be a lie. */
     setFormatBadge(msg.inCh || 0, msg.outCh || 0);
+    /* Follow the device we're actually driving: if the plugin's output channel count changes (you
+       switched from the 5.1 receiver to stereo headphones), re-lay the calibration faders to match. */
+    if (msg.outCh && msg.outCh !== liveOutCh) {
+      liveOutCh = msg.outCh;
+      renderSpeakers();
+    }
     paintChannelMeters(msg.ch);
     bars.classList.add('live');
     /* dBFS-ish curve: a linear peak looks dead until it is almost clipping. */
