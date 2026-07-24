@@ -11,7 +11,12 @@
     <UseWindowsForms>true</UseWindowsForms>
     <RootNamespace>Soundstage.Shell</RootNamespace>
     <AssemblyName>Soundstage</AssemblyName>
-    <Version>1.1.0</Version>
+    <Version>1.0.0</Version>
+    <!-- Embed the native libraries (WebView2 loader, WPF's D3DCompiler/PenImc/PresentationNative,
+         the engine DLL) INTO the single-file exe and self-extract them at runtime. Without this the
+         published .exe still needs those DLLs sitting beside it, so a bundle that ships only the .exe
+         (as the installer does) launches fine from the publish folder but fails once installed. -->
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <ApplicationIcon>..\..\assets\soundstage.ico</ApplicationIcon>
     <AssemblyTitle>Soundstage</AssemblyTitle>
     <Product>Soundstage</Product>
