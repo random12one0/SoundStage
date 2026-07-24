@@ -72,6 +72,16 @@
   .histbtn svg{width:15px;height:15px;}
   .histbtn:hover{color:var(--ink);background:#ffffff10;border-color:var(--soft-line);}
   .histbtn:disabled{opacity:.32;cursor:default;background:transparent;}
+  /* First-run call-to-action on Home: shown only while Soundstage isn't actually processing, so the
+     one important setup step (turn the plugin on) can't be missed the way it was buried in Settings. */
+  .setupcta{display:flex;align-items:center;gap:16px;padding:14px 18px;margin-bottom:14px;border-radius:var(--r);
+            background:linear-gradient(90deg,#12292b,#0f1e28);border:1px solid #2b5a57;box-shadow:0 0 22px #37e0cf12;}
+  .setupcta .cta-t{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .setupcta .cta-t b{color:var(--glow);font-size:14px;}
+  .setupcta .cta-t span{color:var(--faint);font-size:12.5px;}
+  .setupcta .btn{margin-left:auto;flex:none;}
+  .setrow.flash{animation:flashrow 1.7s ease;border-radius:9px;}
+  @keyframes flashrow{0%,100%{background:transparent;}22%{background:#37e0cf22;}}
   .voldial{display:flex;align-items:center;gap:9px;}
   .voldial .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);}
   .vd{width:50px;height:50px;cursor:ns-resize;}
@@ -512,6 +522,10 @@
 
         <!-- ============ DASHBOARD ============ -->
         <div class="page show" data-page="dashboard">
+          <div class="setupcta" id="setupCta" style="display:none">
+            <div class="cta-t"><b>Soundstage isn't processing your sound yet</b><span>Turn it on to apply your EQ, effects and speaker tuning to everything you play. One-time setup — needs Administrator once.</span></div>
+            <button class="btn" id="ctaTurnOn">Turn Soundstage on →</button>
+          </div>
           <div class="row">
             <div class="colL">
               <section class="panel pad eqpanel">
@@ -715,7 +729,7 @@
             <div class="setrow"><div class="st"><div class="stn">Volume keys control Soundstage</div><div class="std">Your keyboard's volume keys drive this app while it's processing. Windows' own slider can't reach the audio once it's routed through the outlet.</div></div><div class="sw" data-sw="volumeKeys"><div class="k"></div></div></div>
 
             <div class="setgroup">Plugin mode</div>
-            <div class="setrow"><div class="st"><div class="stn">Run inside Windows' audio engine<span id="apoHelp"></span></div><div class="std" id="apoNote">Checking…</div></div><button class="btn" id="apoInstall">Turn on</button></div>
+            <div class="setrow" id="pluginRow"><div class="st"><div class="stn">Run inside Windows' audio engine<span id="apoHelp"></span></div><div class="std" id="apoNote">Checking…</div></div><button class="btn" id="apoInstall">Turn on</button></div>
             <div class="setrow" id="apoDetail" style="display:none"><div class="st"><div class="stn">Last thing the plugin did</div><div class="std mono" id="apoActivity">—</div></div></div>
             <div class="setrow" id="apoRemoveRow" style="display:none"><div class="st"><div class="stn">Remove the plugin</div><div class="std" id="apoRemoveNote">Takes Soundstage back out of Windows and restores what your sound card had before. Needs Administrator, and your audio will cut out for a moment. To stop processing without removing anything, use the power button on the main page instead.</div></div><button class="ghost" id="apoUninstall" style="border-color:#6b3a3f;color:#ff98ac">Remove</button></div>
 
@@ -2181,6 +2195,11 @@
     var removeRow = document.getElementById('apoRemoveRow');
     apoActive = !!m.active;
 
+    /* The Home call-to-action is the on-switch made unmissable: visible whenever we're not actually
+       processing, gone the moment we are. */
+    var cta = document.getElementById('setupCta');
+    if (cta) { cta.style.display = m.active ? 'none' : 'flex'; }
+
     if (m.active) {
       /* textContent, not innerHTML — these strings come from the registry and there is no reason to
          hand device names to the HTML parser. */
@@ -3203,6 +3222,20 @@
       var flat = document.getElementById('eqReset');
       if (flat) { flat.click(); }
       toast('Equaliser flattened.');
+      return;
+    }
+
+    if (e.target.closest('#ctaTurnOn')) {
+      /* Take them straight to the one setup control and flag it, instead of leaving them to hunt. */
+      setPage('settings');
+      var pr = document.getElementById('pluginRow');
+      if (pr) {
+        setTimeout(function () {
+          pr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          pr.classList.add('flash');
+          setTimeout(function () { pr.classList.remove('flash'); }, 1700);
+        }, 80);
+      }
       return;
     }
 
