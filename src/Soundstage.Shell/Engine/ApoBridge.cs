@@ -81,7 +81,7 @@ public sealed class ApoBridge : IDisposable
                                                    HandleInheritability.None, leaveOpen: false);
             _view = _mmf.CreateViewAccessor(0, BlockSize, MemoryMappedFileAccess.ReadWrite);
 
-            GrantReadToEveryone();
+            GrantWriteToEveryone();
         }
         catch (Exception ex)
         {
@@ -91,16 +91,25 @@ public sealed class ApoBridge : IDisposable
     }
 
     /// <summary>
-    /// Let any account read the state file.
+    /// Let any account read AND write the state file.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The reader is <c>audiodg.exe</c>, which runs under a stripped-down token that is not
     /// necessarily a member of Users, so inheriting ProgramData's default permissions is not enough
-    /// to guarantee it can open the file. Read access is granted explicitly and write access is not:
-    /// the file holds tone controls, so the exposure is that another account on this PC could see
-    /// what the EQ is set to.
+    /// to guarantee it can open the file.
+    /// </para>
+    /// <para>
+    /// Write is granted too, not just read — and this matters. If the file was ever created by an
+    /// elevated process it is owned by Administrators and a normal (non-elevated) run of this app gets
+    /// only the inherited Users read access, so it cannot open the file for writing. The bridge then
+    /// silently fails and the plugin is stuck on stale settings: audio still plays, meters still move,
+    /// but no EQ or effect change ever reaches it. Granting Modify (exactly as the telemetry file
+    /// does) keeps the channel writable regardless of who created the file. The exposure is only that
+    /// another local account could change the EQ — the same trade the telemetry file already makes.
+    /// </para>
     /// </remarks>
-    private static void GrantReadToEveryone()
+    private static void GrantWriteToEveryone()
     {
         try
         {
@@ -108,7 +117,7 @@ public sealed class ApoBridge : IDisposable
             var acl = info.GetAccessControl();
             acl.AddAccessRule(new FileSystemAccessRule(
                 new SecurityIdentifier(WellKnownSidType.WorldSid, null),
-                FileSystemRights.Read,
+                FileSystemRights.Modify,
                 AccessControlType.Allow));
             info.SetAccessControl(acl);
         }
