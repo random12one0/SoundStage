@@ -63,6 +63,13 @@
   .power{font:inherit;font-weight:600;font-size:12px;letter-spacing:.06em;color:var(--glow);background:#0e1c1f;border:1px solid #2b5a57;border-radius:11px;padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;}
   .power .d{width:8px;height:8px;border-radius:50%;background:var(--glow);box-shadow:0 0 8px var(--glow);}
   .power.off{color:var(--faint);border-color:var(--line);background:#0e1620;}.power.off .d{background:var(--faint);box-shadow:none;}
+  /* App-wide undo/redo — compact icon buttons in the persistent status strip. Fixed box so they
+     never reflow the layout the way a padded text button did. */
+  .histbtn{width:30px;height:30px;flex:none;border-radius:9px;display:grid;place-items:center;padding:0;
+           color:var(--faint);background:transparent;border:1px solid var(--line);cursor:pointer;}
+  .histbtn svg{width:15px;height:15px;}
+  .histbtn:hover{color:var(--ink);background:#ffffff10;border-color:var(--soft-line);}
+  .histbtn:disabled{opacity:.32;cursor:default;background:transparent;}
   .voldial{display:flex;align-items:center;gap:9px;}
   .voldial .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);}
   .vd{width:50px;height:50px;cursor:ns-resize;}
@@ -311,7 +318,7 @@
   .hzrow.dense span{font-size:7.5px;}
   .pddmenu a.del{color:#ff98ac;border-top:1px solid var(--line);margin-top:4px;}
   .out{cursor:pointer;}
-  .rail a,.wb b,.power,.pddbtn,.seg button,.ghost,.btn{-webkit-app-region:no-drag;app-region:no-drag;}
+  .rail a,.wb b,.power,.pddbtn,.seg button,.ghost,.btn,.histbtn{-webkit-app-region:no-drag;app-region:no-drag;}
   /* While real audio is flowing the bars are a meter, not decoration — stop the idle animation
      so the heights we set are what you see. */
   .bars.live i{animation:none;transition:height .08s linear;}
@@ -494,6 +501,8 @@
             <b id="eqChipName">EQ</b> · <b id="eqChipPeak"></b>
           </span>
           <div class="tools">
+            <button class="histbtn" id="appUndo" title="Undo (Ctrl+Z)"><svg><use href="#i-back"/></svg></button>
+            <button class="histbtn" id="appRedo" title="Redo (Ctrl+Shift+Z)"><svg style="transform:scaleX(-1)"><use href="#i-back"/></svg></button>
             <button class="power off" data-power><span class="d"></span> Off</button>
             <div class="voldial"><span class="lab">Vol</span><div class="vd" data-dial="volume"></div><span class="vn" id="volNum">68</span></div>
           </div>
@@ -3220,6 +3229,8 @@
       });
       return;
     }
+    if (e.target.closest('#appUndo')) { undo(); return; }
+    if (e.target.closest('#appRedo')) { redo(); return; }
     if (e.target.closest('#outRow')) { setPage('settings'); return; }
 
     var pb = e.target.closest('.cfg-pills button');
