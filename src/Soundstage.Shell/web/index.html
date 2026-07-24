@@ -171,8 +171,8 @@
   /* The live level, drawn each frame by JS. It fills the whole box; a soft radial mask feathers the
      edges so it reads as light welling up rather than a hard-edged rectangle. */
   .fliquid{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;
-    -webkit-mask-image:radial-gradient(132% 118% at 50% 52%,#000 80%,transparent 100%);
-            mask-image:radial-gradient(132% 118% at 50% 52%,#000 80%,transparent 100%);}
+    -webkit-mask-image:radial-gradient(150% 135% at 50% 50%,#000 55%,transparent 100%);
+            mask-image:radial-gradient(150% 135% at 50% 50%,#000 55%,transparent 100%);}
   .fzero{position:absolute;left:calc(50% - 13px);width:26px;top:50%;height:1px;background:#31485a;z-index:2;}
   .ffill{position:absolute;left:50%;width:5px;transform:translateX(-50%);background:linear-gradient(#37e0cf,#1a9d92);border-radius:4px;box-shadow:0 0 8px #37e0cf44;z-index:3;}
   .fhandle{position:absolute;left:50%;width:16px;height:16px;border-radius:50%;background:#0d141d;border:2.5px solid var(--glow);transform:translate(-50%,-50%);box-shadow:0 0 10px #37e0cf88;cursor:grab;transition:transform .15s,box-shadow .15s;z-index:4;}
@@ -2642,8 +2642,8 @@
     var amp = flat ? 0 : (2.2 + lvl * 6) * LIQUID_DPR;
 
     var bot, top;
-    if (lvl > 0.9)        { bot = '#e0485f'; top = '#ff8ba3'; }   /* clipping — red */
-    else if (lvl > 0.78)  { bot = '#c98a2f'; top = '#ffbf6b'; }   /* hot — amber */
+    if (lvl > 0.97)       { bot = '#e0485f'; top = '#ff8ba3'; }   /* genuinely near clip — red (rare) */
+    else if (lvl > 0.88)  { bot = '#c98a2f'; top = '#ffbf6b'; }   /* hot — amber */
     else if (isSub)       { bot = '#b5822f'; top = '#ffd08a'; }   /* the sub is always amber */
     else                  { bot = '#1a9d92'; top = '#37e0cf'; }   /* normal — teal */
 
@@ -2666,8 +2666,8 @@
     ctx.globalAlpha = 0.5;   /* a calm backdrop behind the controls, not a bold fill */
     ctx.fill();
 
-    /* a brighter crest line rides the surface — reads as the "top" of the level */
-    ctx.globalAlpha = 0.42;
+    /* a faint crest just hints at the surface — soft, not a hard line */
+    ctx.globalAlpha = 0.2;
     ctx.strokeStyle = top;
     ctx.lineWidth = 1.4 * LIQUID_DPR;
     ctx.stroke();
@@ -2712,7 +2712,10 @@
       var pct = 0;
       if (v > 0.0002) {
         var d = 20 * Math.log(v) / Math.LN10;
-        pct = clamp((d + 54) / 54, 0, 1);
+        /* Eased scale with a few dB of headroom at the top, so full-scale content sits high but not
+           pegged — and paired with the raised colour thresholds, it stops slamming red. (The proper
+           fix is measuring after Windows' volume, which needs a plugin change.) */
+        pct = clamp((d + 54) / 62, 0, 1);
       }
 
       strips[i]._lvlTarget = pct;
