@@ -294,7 +294,10 @@ public sealed class EngineController : IDisposable
         {
             case "bass":
                 _engine.EnableBass(on);
-                _engine.SetBass(v, 90.0, 1.5 + v * 2.5);
+                // Crossover and drive are fine-tune parameters (the "specialties" tab). When the UI
+                // sends them, use them; otherwise fall back to the values the amount dial derives, so
+                // the dashboard knob alone still works exactly as before.
+                _engine.SetBass(v, Num(root, "crossover", 90.0), Num(root, "drive", 1.5 + v * 2.5));
                 break;
             case "ambience":
                 // The dial is the mix; the Ambience page owns the character of the reverb.

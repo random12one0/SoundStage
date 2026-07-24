@@ -472,7 +472,7 @@
       <nav class="rail">
         <a data-nav="dashboard" class="on" title="Dashboard"><svg class="ico"><use href="#i-home"/></svg></a>
         <a data-nav="speakers" title="Speakers"><svg class="ico"><use href="#i-spk"/></svg></a>
-        <a data-nav="ambience" title="Ambience"><svg class="ico"><use href="#i-wave"/></svg></a>
+        <a data-nav="ambience" title="Fine-tune"><svg class="ico"><use href="#i-wave"/></svg></a>
         <a data-nav="automations" title="Automations"><svg class="ico"><use href="#i-clock"/></svg></a>
         <span class="sp"></span>
         <a data-nav="settings" title="Settings"><svg class="ico"><use href="#i-gear"/></svg></a>
@@ -583,6 +583,11 @@
 
         <!-- ============ AMBIENCE ============ -->
         <div class="page" data-page="ambience">
+          <section class="panel pad">
+            <div class="ph"><h3 class="big">Bass</h3><span class="sub">weight &amp; drive on the low end — turn Bass on from the Home page</span></div>
+            <div class="lrow"><span class="ll">Crossover</span><div class="sl" data-fxt="bass.crossover"></div><span class="val"></span></div>
+            <div class="lrow"><span class="ll">Drive</span><div class="sl" data-fxt="bass.drive"></div><span class="val"></span></div>
+          </section>
           <section class="panel pad">
             <div class="ph"><h3 class="big">Ambience</h3><span class="sub">our own reverb — depth &amp; space for your speakers</span><div class="rt">
               <div class="pdd" id="rvPresetDD"><button class="pddbtn"><span class="pfx">Preset</span> <span class="pn">Cinema Hall</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
@@ -874,13 +879,64 @@
   };
   function hz(v) { return v >= 1000 ? round1(v / 1000) + ' kHz' : Math.round(v) + ' Hz'; }
 
+  /* Fine-tune ("specialties") parameters, keyed "effect.param". Same spec shape as the ambience
+     sliders above — how the slider position maps to a real engine value, and how it reads out. Each
+     effect's dashboard dial stays the "amount"; these are the character controls underneath it. */
+  var FXP = {
+    'bass.crossover': { min: 40, max: 200, log: true, fmt: hz },
+    'bass.drive':     { min: 1,  max: 6,   fmt: function (v) { return round1(v) + '×'; } }
+  };
+
+  /* Self-contained twins of bindSliders/renderReverb, for the .sl[data-fxt="effect.param"] sliders.
+     Kept separate on purpose so the fine-tune tab can never disturb the reverb sliders. */
+  function bindFxt() {
+    document.querySelectorAll('.sl[data-fxt]').forEach(function (sl) {
+      var key = sl.dataset.fxt, spec = FXP[key];
+      if (!spec) { return; }
+      var parts = key.split('.'), id = parts[0], param = parts[1];
+      sl.innerHTML = '<i></i><b></b>';
+      var handle = sl.querySelector('b');
+      function setFromX(clientX) {
+        var box = sl.getBoundingClientRect();
+        if (!box.width) { return; }
+        var t = clamp((clientX - box.left) / box.width, 0, 1);
+        if (spec.inv) { t = 1 - t; }
+        S.fx[id][param] = spec.log
+          ? spec.min * Math.pow(spec.max / spec.min, t)
+          : spec.min + t * (spec.max - spec.min);
+        renderFxt(); pushFx(id); save();
+      }
+      draggable(handle, null, function (e) { setFromX(e.clientX); }, null);
+      draggable(sl, function (e) { if (e.target !== handle) { setFromX(e.clientX); } },
+                    function (e) { setFromX(e.clientX); }, null);
+    });
+  }
+  function renderFxt() {
+    document.querySelectorAll('.sl[data-fxt]').forEach(function (sl) {
+      var key = sl.dataset.fxt, spec = FXP[key];
+      if (!spec) { return; }
+      var parts = key.split('.'), v = (S.fx[parts[0]] || {})[parts[1]];
+      var bar = sl.querySelector('i'), hand = sl.querySelector('b');
+      if (v == null || !bar || !hand) { return; }
+      var t = spec.log
+        ? Math.log(v / spec.min) / Math.log(spec.max / spec.min)
+        : (v - spec.min) / (spec.max - spec.min);
+      if (spec.inv) { t = 1 - t; }
+      t = clamp(t, 0, 1) * 100;
+      bar.style.width = t + '%';
+      hand.style.left = t + '%';
+      var val = sl.parentNode.querySelector('.val');
+      if (val) { val.textContent = spec.fmt(v); }
+    });
+  }
+
   function defaults() {
     return {
       power: false,
       volume: 68,
       eq: { gains: FREQ10.map(function () { return 0; }), preset: 'Flat', mine: null },
       fx: {
-        bass:     { on: false, v: 40 }, air:      { on: false, v: 35 },
+        bass:     { on: false, v: 40, crossover: 90, drive: 3 }, air:      { on: false, v: 35 },
         warmth:   { on: false, v: 30 }, leveler:  { on: false, v: 45 },
         ambience: { on: false, v: 30 }, night:    { on: false, v: 40 }
       },
@@ -1066,7 +1122,11 @@
   function pushVolume() { send({ t: 'volume', v: S.volume / 100 }); }
   function pushFx(id) {
     var f = S.fx[id];
-    send({ t: 'effect', id: id, on: !!f.on, v: f.v / 100 });
+    var m = { t: 'effect', id: id, on: !!f.on, v: f.v / 100 };
+    /* Fine-tune ("specialties" tab) parameters ride along for the effects that expose them. Harmless
+       for the others — the engine only reads what it recognises. */
+    if (id === 'bass') { m.crossover = f.crossover; m.drive = f.drive; }
+    send(m);
   }
   function pushEq() {
     send({ t: 'eq', mode: 10, gains: S.eq.gains, on: true });
@@ -1572,6 +1632,7 @@
     setDD('rvPresetDD', S.rv.preset);
     syncToggle('ambience', S.rv.on);
     syncToggle('subfeed', S.spk.subfeed);
+    renderFxt();   /* the fine-tune sliders live on the same page — keep them in step */
   }
 
   /* Speaker calibration faders: -12..+12 dB, centre detent at 0. */
@@ -3362,7 +3423,11 @@
                 S.eq.gains = FREQ10.map(function () { return 0; });
               }
               delete S.eq.gains10; delete S.eq.gains31; delete S.eq.mode;
-              S.fx = Object.assign(defaults().fx, loaded.fx || {});
+              /* Merge per effect, not per fx-object: an older save has fx.bass = {on,v} with no
+                 fine-tune params, and a shallow assign would drop the defaults (crossover/drive). */
+              var dfx = defaults().fx, lfx = loaded.fx || {};
+              S.fx = {};
+              Object.keys(dfx).forEach(function (k) { S.fx[k] = Object.assign({}, dfx[k], lfx[k] || {}); });
               S.rv = Object.assign(defaults().rv, loaded.rv || {});
               S.spk = Object.assign(defaults().spk, loaded.spk || {});
               S.settings = Object.assign(defaults().settings, loaded.settings || {});
@@ -3496,6 +3561,7 @@
 
   initDials();
   bindSliders();
+  bindFxt();
   bindLatencySlider();
   buildSpeakers();
   renderEverything();
