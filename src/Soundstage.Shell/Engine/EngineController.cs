@@ -222,13 +222,22 @@ public sealed class EngineController : IDisposable
 
                     break;
                 case "panic":
-                    // Get out of the way. Stop processing and open the Windows sound dialog so the
-                    // default device can be pointed back at real speakers. Deliberately does not try
-                    // to change the default itself — when someone reaches for this, the last thing
-                    // they need is the app making one more decision on their behalf.
-                    StopProcessing();
-                    AudioDevices.OpenWindowsSpeakerSetup();
-                    _notify?.Invoke(JsonSerializer.Serialize(new { t = "panicked" }));
+                    // "Restore audio" — the get-my-sound-back button. In plugin mode the only thing
+                    // that actually restores audio is taking the plugin back out of the path, so detach
+                    // it (which restores exactly what the sound card had before). The old behaviour —
+                    // nagging you to change the default device — did nothing in plugin mode, which is
+                    // the very state where you'd reach for this. Needs Administrator, so the UI warns.
+                    if (ApoStatus.AttachedDevices().Count > 0)
+                    {
+                        ApoStatus.RunInstaller(uninstall: true);
+                        _notify?.Invoke(JsonSerializer.Serialize(new { t = "panicked", removed = true }));
+                    }
+                    else
+                    {
+                        StopProcessing();
+                        AudioDevices.OpenWindowsSpeakerSetup();
+                        _notify?.Invoke(JsonSerializer.Serialize(new { t = "panicked" }));
+                    }
                     return;
                 case "engage":
                     // Actually open or release the audio path. Separate from bypass on purpose.

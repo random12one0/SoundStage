@@ -240,15 +240,16 @@ STDMETHODIMP SoundstageApo::IsInputFormatSupported(IAudioMediaType* /*pOppositeF
         return APOERR_FORMAT_NOT_SUPPORTED;
     }
 
-    // Remember what the engine offered. This is the only chance we get: Windows asks
-    // GetInputChannelCount BEFORE it ever calls LockForProcess, and answering with a stale default
-    // is enough for it to decide we are the wrong shape for this endpoint and skip us entirely.
-    // That is why the plugin ran on a stereo output but never locked a stream on a 5.1 receiver —
-    // it kept saying "2" while the endpoint was asking about six.
-    negotiatedChannels_ = fmt->nChannels;
+    // Report the WIDEST layout Windows has probed, not merely the most recent one. Windows probes
+    // several formats before it starts us — the log shows both 6ch and 2ch on a 5.1 receiver — and if
+    // the last probe happened to be the 2-channel one, echoing it told Windows "I'm a stereo plugin"
+    // on a six-channel endpoint. Windows then decided we were the wrong shape and never started us:
+    // the construct → accept-format → never-lock loop. Keeping the maximum is stable regardless of the
+    // order Windows probes in, and an endpoint's true width is the widest format it ever asks about.
+    if (fmt->nChannels > negotiatedChannels_) { negotiatedChannels_ = fmt->nChannels; }
 
-    SoundstageLog("[format] accepted: %u ch @ %lu Hz",
-                  fmt->nChannels, static_cast<unsigned long>(fmt->nSamplesPerSec));
+    SoundstageLog("[format] accepted: %u ch @ %lu Hz (reporting %u ch to Windows)",
+                  fmt->nChannels, static_cast<unsigned long>(fmt->nSamplesPerSec), negotiatedChannels_);
     return S_OK;
 }
 
@@ -275,41 +276,52 @@ STDMETHODIMP SoundstageApo::LockForProcess(UINT32 u32NumInputConnections,
                                            APO_CONNECTION_DESCRIPTOR** ppInputConnections,
                                            UINT32 u32NumOutputConnections,
                                            APO_CONNECTION_DESCRIPTOR** ppOutputConnections) {
+    SoundstageLog("[lock]   attempt: inConns=%u outConns=%u",
+                  u32NumInputConnections, u32NumOutputConnections);
+
+    // A topology we genuinely can't process in place. This should never happen for a mode effect, but
+    // if it does we must say so rather than accept and then read invalid buffers on the real-time
+    // thread — that would crash audiodg and kill sound for the whole machine.
     if (u32NumInputConnections != 1 || u32NumOutputConnections != 1 ||
         !ppInputConnections || !ppOutputConnections ||
         !ppInputConnections[0] || !ppOutputConnections[0]) {
+        SoundstageLog("[lock]   FAILED: unexpected connection topology (in=%u out=%u)",
+                      u32NumInputConnections, u32NumOutputConnections);
         return E_INVALIDARG;
     }
 
     const WAVEFORMATEX* inFmt = FormatOf(ppInputConnections[0]->pFormat);
-    if (!IsFloat32(inFmt)) {
-        SoundstageLog("[lock]   REFUSED: not float32 (tag=%u bits=%u ch=%u)",
-            inFmt ? inFmt->wFormatTag : 0, inFmt ? inFmt->wBitsPerSample : 0,
-            inFmt ? inFmt->nChannels : 0);
-        return APOERR_FORMAT_NOT_SUPPORTED;
-    }
+    channels_   = inFmt ? inFmt->nChannels : negotiatedChannels_;
+    sampleRate_ = inFmt ? inFmt->nSamplesPerSec : 48000;
+    maxFrames_  = ppInputConnections[0]->u32MaxFrameCount;
 
-    channels_ = inFmt->nChannels;
-    sampleRate_ = inFmt->nSamplesPerSec;
-    maxFrames_ = ppInputConnections[0]->u32MaxFrameCount;
+    // Fail-safe: if we can't actually process this stream — a format we don't handle, an implausible
+    // channel count — run as a transparent PASS-THROUGH instead of refusing the lock. Refusing takes
+    // the WHOLE device down (no audio at all): that is exactly how this plugin used to wedge playback
+    // after a device switch. An effect must never be able to silence your speakers — worst case is
+    // "no effects", never "no sound".
+    passthrough_ = !IsFloat32(inFmt) || channels_ < 1 || channels_ > 8;
 
-    // Everything the real-time path could ever need, reserved now. APOProcess must not allocate.
     const size_t widest = static_cast<size_t>(maxFrames_) * 8;
     try {
         scratchIn_.assign(widest, 0.0f);
         scratchOut_.assign(widest, 0.0f);
     } catch (...) {
-        return E_OUTOFMEMORY;
+        passthrough_ = true;   // even out of memory just means "pass it through", never "no sound"
     }
 
-    chain_.prepare(static_cast<double>(sampleRate_));
-    OpenSharedState();
-    OpenTelemetry();   // set up the meter back-channel here, off the real-time path
-    SyncSettings();
+    if (!passthrough_) {
+        chain_.prepare(static_cast<double>(sampleRate_));
+        OpenSharedState();
+        OpenTelemetry();   // the meter back-channel, set up here off the real-time path
+        SyncSettings();
+    }
 
     locked_ = true;
-    SoundstageLog("[lock]   RUNNING: %u ch @ %u Hz, max %u frames/buffer, settings=%s",
-        channels_, sampleRate_, maxFrames_, shared_ ? "connected" : "not found");
+    SoundstageLog("[lock]   RUNNING: %u ch @ %u Hz, max %u frames/buffer, passthrough=%s, settings=%s",
+        channels_, sampleRate_, maxFrames_,
+        passthrough_ ? "yes (audio flows, effects off)" : "no",
+        shared_ ? "connected" : "not found");
     return S_OK;
 }
 
@@ -382,8 +394,9 @@ STDMETHODIMP_(void) SoundstageApo::APOProcess(UINT32 u32NumInputConnections,
 
     const UINT32 ch = channels_;
 
-    if (!locked_ || ch < 1 || ch > 8 || frames > maxFrames_) {
-        // Not in a state we understand — hand the audio through untouched.
+    if (passthrough_ || !locked_ || ch < 1 || ch > 8 || frames > maxFrames_) {
+        // Pass-through mode, or a state we don't understand — hand the audio through untouched. This
+        // is the fail-safe: audio always flows even when we can't (or shouldn't) process it.
         if (src != dst) { memcpy(dst, src, static_cast<size_t>(frames) * ch * sizeof(float)); }
         out->u32ValidFrameCount = frames;
         out->u32BufferFlags = in->u32BufferFlags;

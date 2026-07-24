@@ -230,6 +230,11 @@ private:
 
     soundstage::EngineChain chain_;
     bool   locked_ = false;
+    /// When true, the lock succeeded but we can't actually process this stream (a format we don't
+    /// handle, or setup failed), so APOProcess hands audio straight through untouched. The point is
+    /// that a failed lock must NEVER take the device down — worst case is "no effects", never "no
+    /// sound". Set in LockForProcess, honoured in APOProcess.
+    bool   passthrough_ = false;
     UINT32 channels_ = 2;
     /// The channel count the engine most recently offered during format negotiation. Answered to
     /// GetInputChannelCount until a stream is locked — see IsInputFormatSupported for why.

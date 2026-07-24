@@ -505,7 +505,7 @@
         <!-- STATUS (persistent) -->
         <div class="screen" id="statusStrip">
           <div class="np"><div class="bars" id="npBars"><i></i><i></i><i></i><i></i></div><div><div class="src">Soundstage</div><div class="trk" id="npText">Ready — press power to start</div></div></div>
-          <span class="fmt" id="fmtChip"><b>2.0 → 2.0</b> · <b>48</b> kHz</span>
+          <span class="fmt" id="fmtChip" title="Channels coming in → channels sent to your speakers, and the sample rate"><b>2.0 → 2.0</b> · <b>48</b> kHz</span>
           <!-- The equaliser is a separate stage that runs whether or not any effect tile is on, so a
                loaded preset shapes your sound with everything else switched off. Without this chip
                that is invisible, and the app sounds like it's doing something you didn't ask for. -->
@@ -571,6 +571,7 @@
           </div>
 
           <section class="panel pad">
+            <div class="ph"><h3 class="big">Surround routing</h3><span class="sub">how sound is spread across your speakers</span></div>
             <div class="setrow" id="devRow2" style="border-bottom:1px solid var(--soft-line)">
               <div class="st"><div class="stn">Playing to<span id="outHelp2"></span></div><div class="std">Switch between your speakers, headphones or receiver</div></div>
               <div class="pdd" id="devDD2"><button class="pddbtn"><span class="pn">—</span> <svg><use href="#i-chev"/></svg></button><div class="pddmenu"></div></div>
@@ -753,7 +754,7 @@
             <div class="setrow"><div class="st"><div class="stn">Protect against clipping<span id="limHelp"></span></div><div class="std">Catches peaks that a big boost pushes past full scale. Without it they square off, which buzzes.</div></div><div class="sw" data-sw="limiter"><div class="k"></div></div></div>
             <div class="setrow"><div class="st"><div class="stn">Delay<span id="latHelp"></span></div><div class="std" id="latencyReadout">—</div></div><span class="statusok mono" id="latencyBig">—</span></div>
             <div class="setrow"><div class="st"><div class="stn">Engine</div><div class="std" id="engineStatus">Checking…</div></div><button class="ghost" id="refreshDevices">Rescan devices</button></div>
-            <div class="setrow"><div class="st"><div class="stn">Something's wrong — put it back<span id="panicHelp"></span></div><div class="std">Steps out of the audio path and hands your speakers back to Windows. For when there's no sound and you need it working now.</div></div><button class="ghost" id="panicBtn" style="border-color:#6b3a3f;color:#ff98ac">Restore audio</button></div>
+            <div class="setrow"><div class="st"><div class="stn">Something's wrong — put it back<span id="panicHelp"></span></div><div class="std">Takes Soundstage back out of your audio and restores exactly what your sound card had before — for when there's no sound and you need it working now. Needs Administrator; your audio cuts out for a moment.</div></div><button class="ghost" id="panicBtn" style="border-color:#6b3a3f;color:#ff98ac">Restore audio</button></div>
 
             <div class="setgroup">Updates</div>
             <div class="setrow"><div class="st"><div class="stn" id="verLine">Version 1.0.0</div><div class="std" id="updateStatus">Not checked yet</div></div><button class="btn" id="checkUpdate"><svg><use href="#i-refresh"/></svg> Check now</button></div>
@@ -3282,7 +3283,9 @@
       send({ t: 'panic' });
       audioRunning = false;
       renderNowPlaying();
-      toast('Stepped out of the audio path. Set your speakers as the default output in the window that just opened.');
+      toast(apoActive
+        ? 'Restoring your audio — approve the Administrator prompt. Taking Soundstage back out of your sound so it plays normally again. Your audio will cut out for a moment.'
+        : 'Stepped out of the audio path. Set your speakers as the default output in the window that just opened.');
       return;
     }
     if (e.target.closest('#rvAdvToggle')) {
