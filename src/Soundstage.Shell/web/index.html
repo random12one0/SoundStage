@@ -234,6 +234,8 @@
   .acard.scene:hover .playbtn{background:#37e0cf24;}
   .whenbtn{flex:none;font:inherit;font-size:12px;font-weight:560;color:var(--dim);background:#0e1620;border:1px solid #2b3a48;border-radius:9px;padding:7px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
   .whenbtn:hover{border-color:var(--glow);color:var(--ink);}.whenbtn svg{stroke:currentColor;}
+  .updbtn{flex:none;font:inherit;font-size:12px;font-weight:560;color:var(--glow-ink);background:#37e0cf14;border:1px solid #37e0cf3a;border-radius:9px;padding:7px 11px;cursor:pointer;}
+  .updbtn:hover{background:#37e0cf28;border-color:var(--glow);}
   /* Always visible — a scene's delete shouldn't hide until you happen to hover. */
   .scdel{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#ff98ac;background:#ff6b8b12;border:1px solid #ff6b8b3a;cursor:pointer;}
   .scdel:hover{background:#ff6b8b26;border-color:#ff98ac;}.scdel svg{width:14px;height:14px;stroke:currentColor;pointer-events:none;}
@@ -668,7 +670,7 @@
         <div class="page" data-page="automations">
           <section class="panel pad"><div class="ahd"><div class="t"><h2>Scenes</h2><div class="s">A scene is your whole sound saved in one place — EQ, effects, ambience, volume and speaker levels. Tap one to apply it, or set it to apply itself automatically.</div></div><button class="newbtn" id="saveScene"><svg class="ico"><use href="#i-plus"/></svg> Save current setup</button></div></section>
           <div class="seclab">Your scenes</div>
-          <div class="autos" id="yourScenes"></div>
+          <div class="autos" id="yourScenes" style="grid-template-columns:1fr"></div>
           <div class="seclab mt">Ready-made — tap to apply</div>
           <div class="autos" id="readyScenes"></div>
         </div>
@@ -2666,6 +2668,7 @@
           return '<div class="acard scene" data-scene="' + i + '">' +
             '<div class="atile ' + (trig ? 't-green' : 't-cyan') + '"><svg class="ico"><use href="#i-layers"/></svg></div>' +
             '<div class="abody"><div class="scname">' + name + '</div><div class="scsub">' + status + '</div></div>' +
+            '<button class="updbtn" data-scene-upd="' + i + '" title="Save your current sound into this scene">Update</button>' +
             '<button class="whenbtn" data-scene-when="' + i + '"><svg class="ico" style="width:13px"><use href="#i-clock"/></svg> ' +
               (trig ? 'Edit when' : 'Set when…') + '</button>' +
             '<button class="scdel" data-scene-del="' + i + '" title="Delete scene"><svg><use href="#i-x"/></svg></button></div>';
@@ -3486,9 +3489,15 @@
       if (whenName) { editSceneWhen(whenName); }
       return;
     }
-    /* Tap a saved-scene card (but not its When/delete buttons) to apply it. */
+    var scUpd = e.target.closest('[data-scene-upd]');
+    if (scUpd) {
+      var updName = Object.keys(S.presets)[+scUpd.dataset.sceneUpd];
+      if (updName) { saveMyPreset(updName); toast('Updated “' + updName + '”.'); }
+      return;
+    }
+    /* Tap a saved-scene card (but not its Update/When/delete buttons) to apply it. */
     var scCard = e.target.closest('[data-scene]');
-    if (scCard && !e.target.closest('.whenbtn') && !e.target.closest('[data-scene-del]')) {
+    if (scCard && !e.target.closest('.whenbtn') && !e.target.closest('.updbtn') && !e.target.closest('[data-scene-del]')) {
       var applyName = Object.keys(S.presets)[+scCard.dataset.scene];
       if (applyName) { loadMyPreset(applyName); }
       return;
