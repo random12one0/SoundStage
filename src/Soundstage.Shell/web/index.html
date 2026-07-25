@@ -236,6 +236,12 @@
   .whenbtn:hover{border-color:var(--glow);color:var(--ink);}.whenbtn svg{stroke:currentColor;}
   .updbtn{flex:none;font:inherit;font-size:12px;font-weight:560;color:var(--glow-ink);background:#37e0cf14;border:1px solid #37e0cf3a;border-radius:9px;padding:7px 11px;cursor:pointer;}
   .updbtn:hover{background:#37e0cf28;border-color:var(--glow);}
+  .draghandle{flex:none;color:var(--faint);cursor:grab;font-size:15px;letter-spacing:-2px;user-select:none;padding:0 2px;}
+  .draghandle:active{cursor:grabbing;}
+  .acard.scene.dragging{opacity:.45;}
+  .acard.scene.dragover{border-color:var(--glow);}
+  .scname{cursor:text;}.scname:hover{color:var(--glow-ink);}
+  .scname input{font:inherit;font-weight:600;color:var(--glow-ink);background:#0b1119;border:1px solid var(--glow);border-radius:6px;padding:1px 5px;width:150px;}
   /* Always visible — a scene's delete shouldn't hide until you happen to hover. */
   .scdel{flex:none;width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:#ff98ac;background:#ff6b8b12;border:1px solid #ff6b8b3a;cursor:pointer;}
   .scdel:hover{background:#ff6b8b26;border-color:#ff98ac;}.scdel svg{width:14px;height:14px;stroke:currentColor;pointer-events:none;}
@@ -684,14 +690,6 @@
             <div class="stack" id="trigStack"></div>
             <button class="andbtn" id="addCond" data-open="trigger" style="display:none"><svg class="ico"><use href="#i-plus"/></svg> Add condition</button>
             <div class="emptyhint" style="margin-top:14px">Leave this empty and the scene stays manual — apply it any time by tapping its card.</div>
-            <!-- The old "Do" section is retired: a scene's action is simply "apply the whole scene".
-                 The elements stay in the DOM (hidden) so the shared builder JS keeps working. -->
-            <div id="doSection" style="display:none">
-              <div class="seclab mt">Do</div>
-              <div class="emptyhint" id="emptyDo">Nothing yet — add what should happen.</div>
-              <div class="stack" id="actStack"></div>
-              <button class="addact" data-open="actions"><svg class="ico"><use href="#i-plus"/></svg> Add action</button>
-            </div>
           </div>
           <div class="scr" id="scr-trigger">
             <div class="phd"><div class="back" data-back><svg class="ico" style="width:16px"><use href="#i-back"/></svg></div><h2>When this runs</h2></div>
@@ -702,25 +700,6 @@
               <div class="pitem" data-trig="startup"><span class="pt t-green"><svg class="ico"><use href="#i-power"/></svg></span><div><div class="pn">When Soundstage starts</div><div class="pd">On launch</div></div></div></div>
             <div class="pgroup">Devices</div><div class="pgrid">
               <div class="pitem" data-trig="device"><span class="pt t-blue"><svg class="ico"><use href="#i-plug"/></svg></span><div><div class="pn">When a device connects</div><div class="pd">Headphones, HDMI, USB DAC</div></div></div></div>
-          </div>
-          <div class="scr" id="scr-actions">
-            <div class="phd"><div class="back" data-back><svg class="ico" style="width:16px"><use href="#i-back"/></svg></div><h2>Add action</h2><input class="search" id="actSearch" placeholder="Search actions…" /></div>
-            <div id="actList">
-              <div class="pgroup">Audio</div><div class="pgrid">
-                <div class="pitem" data-act="preset"><span class="pt t-cyan"><svg class="ico"><use href="#i-layers"/></svg></span><div><div class="pn">Switch preset</div><div class="pd">Cinema, Music, one of yours…</div></div></div>
-                <div class="pitem" data-act="volume"><span class="pt t-blue"><svg class="ico"><use href="#i-spk"/></svg></span><div><div class="pn">Set volume</div><div class="pd">To an exact level</div></div></div></div>
-              <div class="pgroup">Effects</div><div class="pgrid">
-                <div class="pitem" data-act="fxamount"><span class="pt t-green"><svg class="ico"><use href="#i-wave"/></svg></span><div><div class="pn">Set effect amount</div><div class="pd">Bass, Ambience, Air…</div></div></div>
-                <div class="pitem" data-act="fxtoggle"><span class="pt t-green"><svg class="ico"><use href="#i-eq"/></svg></span><div><div class="pn">Turn effect on / off</div><div class="pd">Any single effect</div></div></div>
-                <div class="pitem" data-act="fxalloff"><span class="pt t-rose"><svg class="ico"><use href="#i-x"/></svg></span><div><div class="pn">Turn all effects off</div><div class="pd">Back to clean</div></div></div></div>
-              <div class="pgroup">Speakers</div><div class="pgrid">
-                <div class="pitem" data-act="spklevel"><span class="pt t-amber"><svg class="ico"><use href="#i-spk"/></svg></span><div><div class="pn">Set speaker level</div><div class="pd">Trim one channel</div></div></div>
-                <div class="pitem" data-act="upmix"><span class="pt t-cyan"><svg class="ico"><use href="#i-wave"/></svg></span><div><div class="pn">Toggle upmix</div><div class="pd">Stereo → surround</div></div></div></div>
-              <div class="pgroup">System &amp; control</div><div class="pgrid">
-                <div class="pitem" data-act="notify"><span class="pt t-violet"><svg class="ico"><use href="#i-bell"/></svg></span><div><div class="pn">Show a notification</div><div class="pd">Tell you what happened</div></div></div>
-                <div class="pitem" data-act="wait"><span class="pt t-blue"><svg class="ico"><use href="#i-clock"/></svg></span><div><div class="pn">Wait</div><div class="pd">Pause before the next step</div></div></div>
-                <div class="pitem" data-act="ifcond"><span class="pt t-amber"><svg class="ico"><use href="#i-branch"/></svg></span><div><div class="pn">If…</div><div class="pd">Only run next steps when true</div></div></div></div>
-            </div>
           </div>
           <div class="scr" id="scr-value">
             <div class="phd"><div class="back" data-back><svg class="ico" style="width:16px"><use href="#i-back"/></svg></div><h2 id="valTitle">Choose</h2><input class="search" id="valSearch" placeholder="Search…" /></div>
@@ -2461,18 +2440,7 @@
     return 'When…';
   }
 
-  function describeThen(a) {
-    if (a.k === 'preset')   { return '→ ' + a.v; }
-    if (a.k === 'volume')   { return '→ Volume ' + Math.round(a.v) + '%'; }
-    if (a.k === 'fxamount') { return '→ ' + a.v + ' at ' + Math.round(a.amount) + '%'; }
-    if (a.k === 'fxtoggle') { return '→ ' + a.v + (a.on ? ' on' : ' off'); }
-    if (a.k === 'fxalloff') { return '→ All effects off'; }
-    if (a.k === 'upmix')    { return '→ Upmix ' + (a.on ? 'on' : 'off'); }
-    if (a.k === 'notify')   { return '→ Notify'; }
-    return '→ …';
-  }
-
-  /* Is this automation's condition true right now? */
+  /* Is this scene's trigger condition true right now? */
   function conditionMet(auto) {
     if (!auto.when || !auto.when.length) { return false; }
     return auto.when.every(function (w) {
@@ -2520,45 +2488,6 @@
     var mn = (now.getHours() * 60) + now.getMinutes();
     var target = (h * 60) + mins;
     return mn >= target && mn < target + 60;
-  }
-
-  function runActions(list) {
-    var delay = 0;
-    (list || []).forEach(function (a) {
-      setTimeout(function () { runAction(a); }, delay);
-      if (a.k === 'wait') { delay += (a.seconds || 2) * 1000; }
-    });
-  }
-
-  function runAction(a) {
-    if (a.k === 'preset') {
-      if (SOUND_MODES[a.v]) { applySoundMode(a.v); }
-      else if (EQ_PRESETS[a.v]) { applyEqPreset(a.v); }
-      else if (S.presets[a.v]) { loadMyPreset(a.v); }
-    } else if (a.k === 'volume') {
-      S.volume = clamp(+a.v || 0, 0, 100);
-      renderVolDial(); pushVolume();
-    } else if (a.k === 'fxamount') {
-      var id1 = fxIdFromLabel(a.v);
-      if (id1) { S.fx[id1].v = clamp(+a.amount || 0, 0, 100); S.fx[id1].on = true; pushFx(id1); renderAllDials(); }
-    } else if (a.k === 'fxtoggle') {
-      var id2 = fxIdFromLabel(a.v);
-      if (id2) { S.fx[id2].on = !!a.on; pushFx(id2); renderAllDials(); }
-    } else if (a.k === 'fxalloff') {
-      FX.forEach(function (f) { S.fx[f.id].on = false; pushFx(f.id); });
-      renderAllDials();
-    } else if (a.k === 'upmix') {
-      S.spk.upmix = !!a.on; pushUpmix(); syncToggle('upmix', S.spk.upmix);
-    } else if (a.k === 'notify') {
-      toast(a.v || 'Automation ran.');
-    }
-    save();
-  }
-
-  function fxIdFromLabel(label) {
-    var want = (label || '').toLowerCase().replace(' mode', '');
-    var hit = FX.filter(function (f) { return f.label.toLowerCase() === want || f.id === want; })[0];
-    return hit ? hit.id : null;
   }
 
   /* The scenes that carry an active auto-apply trigger. Shaped like the old automations
@@ -2633,23 +2562,60 @@
     save();
   }
 
-  /* Concrete auto-apply triggers offered per scene. Kept to the ones the firing engine can actually
-     detect (app / time / device) so no option is a dead end. */
-  var TRIGGER_CHOICES = [
-    { label: 'Apply manually only', when: null },
-    { label: 'When Netflix plays',  when: { k: 'app', v: 'Netflix' } },
-    { label: 'When Spotify plays',  when: { k: 'app', v: 'Spotify' } },
-    { label: 'When Disney+ plays',  when: { k: 'app', v: 'Disney' } },
-    { label: 'When YouTube plays',  when: { k: 'app', v: 'YouTube' } },
-    { label: 'When VLC plays',      when: { k: 'app', v: 'vlc' } },
-    { label: 'After 10:00 PM',      when: { k: 'time', v: '10:00 PM' } },
-    { label: 'After 7:00 AM',       when: { k: 'time', v: '7:00 AM' } },
-    { label: 'On headphones',       when: { k: 'device', v: 'Headphones' } }
-  ];
-  function triggerMatches(a, b) {
-    if (!a && !b) { return true; }
-    if (!a || !b) { return false; }
-    return a.k === b.k && a.v === b.v;
+  /* Rebuild S.presets from an ordered list of [name, scene] pairs so key order — which is the display
+     order — survives a rename or a reorder (plain objects keep insertion order). */
+  function rebuildScenes(pairs) {
+    var out = {};
+    pairs.forEach(function (p) { out[p[0]] = p[1]; });
+    S.presets = out;
+  }
+
+  function renameScene(oldName, newName) {
+    newName = (newName || '').trim();
+    if (!newName || newName === oldName) { return; }
+    if (S.presets[newName]) { toast('A scene called “' + newName + '” already exists.'); return; }
+    rebuildScenes(Object.keys(S.presets).map(function (k) {
+      return [k === oldName ? newName : k, S.presets[k]];
+    }));
+    if (S.eq.mine === oldName) { S.eq.mine = newName; }
+    renderAutomations(); renderMyPresets(); save();
+    toast('Renamed to “' + newName + '”.');
+  }
+
+  function reorderScene(from, to) {
+    var keys = Object.keys(S.presets);
+    if (from < 0 || to < 0 || from >= keys.length || to >= keys.length || from === to) { return; }
+    var moved = keys.splice(from, 1)[0];
+    keys.splice(to, 0, moved);
+    rebuildScenes(keys.map(function (k) { return [k, S.presets[k]]; }));
+    renderAutomations(); save();
+  }
+
+  /* Turn a scene's name into an inline text field to rename it in place. */
+  function beginRename(el, oldName) {
+    if (el.querySelector('input')) { return; }
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = oldName;
+    el.textContent = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+    var done = false;
+    function finish(commit) {
+      if (done) { return; }
+      done = true;
+      if (commit) { renameScene(oldName, input.value); }
+      else { renderAutomations(); }
+    }
+    input.addEventListener('keydown', function (ev) {
+      ev.stopPropagation();
+      if (ev.key === 'Enter') { finish(true); }
+      else if (ev.key === 'Escape') { finish(false); }
+    });
+    input.addEventListener('blur', function () { finish(true); });
+    input.addEventListener('click', function (ev) { ev.stopPropagation(); });
+    input.addEventListener('pointerdown', function (ev) { ev.stopPropagation(); });
   }
 
   /* The Scenes page is the reworked Automations tab: renderEverything() still calls this name. */
@@ -2665,9 +2631,10 @@
           var sc = S.presets[name];
           var trig = (sc.when && sc.when.length) ? sc.when : null;
           var status = trig ? ('Auto · ' + trig.map(describeWhen).join(' + ')) : 'Tap to apply · manual';
-          return '<div class="acard scene" data-scene="' + i + '">' +
+          return '<div class="acard scene" data-scene="' + i + '" draggable="true">' +
+            '<span class="draghandle" title="Drag to reorder">⋮⋮</span>' +
             '<div class="atile ' + (trig ? 't-green' : 't-cyan') + '"><svg class="ico"><use href="#i-layers"/></svg></div>' +
-            '<div class="abody"><div class="scname">' + name + '</div><div class="scsub">' + status + '</div></div>' +
+            '<div class="abody"><div class="scname" data-rename="' + i + '" title="Click to rename">' + name + '</div><div class="scsub">' + status + '</div></div>' +
             '<button class="updbtn" data-scene-upd="' + i + '" title="Save your current sound into this scene">Update</button>' +
             '<button class="whenbtn" data-scene-when="' + i + '"><svg class="ico" style="width:13px"><use href="#i-clock"/></svg> ' +
               (trig ? 'Edit when' : 'Set when…') + '</button>' +
@@ -3235,7 +3202,7 @@
   /* ---------- automations builder (unchanged shape, still a designer) ------------------ */
 
   function showScr(id) {
-    document.querySelectorAll('#scr-canvas,#scr-trigger,#scr-actions,#scr-value').forEach(function (s) {
+    document.querySelectorAll('#scr-canvas,#scr-trigger,#scr-value').forEach(function (s) {
       s.classList.toggle('show', s.id === id);
     });
     closeMenus();
@@ -3248,37 +3215,13 @@
     startup: { t: 't-green', ic: 'i-power', html: '<span class="btitle">When Soundstage starts</span>' },
     device: { t: 't-blue', ic: 'i-plug', html: '<span class="btitle">When</span><span class="cfg-dd" data-pick-cat="devices">Headphones ' + chev + '</span><span class="cfg-word">connect</span>' }
   };
-  var ACT = {
-    preset: { t: 't-cyan', ic: 'i-layers', html: '<span class="btitle">Switch preset to</span><span class="cfg-dd" data-pick-cat="presets">Cinema ' + chev + '</span>' },
-    volume: { t: 't-blue', ic: 'i-spk', html: '<span class="btitle">Set volume to</span><div class="cfg-sl"><i style="width:60%"></i><b style="left:60%"></b></div><span class="cfg-pct">60%</span>' },
-    fxamount: { t: 't-green', ic: 'i-wave', html: '<span class="btitle">Set</span><span class="cfg-dd" data-opts="Ambience,Bass,Air,Warmth,Leveler,Night">Bass ' + chev + '</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:50%"></i><b style="left:50%"></b></div><span class="cfg-pct">50%</span>' },
-    fxtoggle: { t: 't-green', ic: 'i-eq', html: '<span class="btitle">Turn</span><span class="cfg-dd" data-opts="Night mode,Bass,Air,Warmth,Leveler,Ambience">Night mode ' + chev + '</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>' },
-    fxalloff: { t: 't-rose', ic: 'i-x', html: '<span class="btitle">Turn all effects off</span>' },
-    spklevel: { t: 't-amber', ic: 'i-spk', html: '<span class="btitle">Set</span><span class="cfg-dd" data-opts="Front L,Front R,Center,Sub,Side L,Side R,Back L,Back R">Center ' + chev + '</span><span class="cfg-word">to</span><div class="cfg-sl"><i style="width:45%"></i><b style="left:45%"></b></div><span class="cfg-pct">−2 dB</span>' },
-    upmix: { t: 't-cyan', ic: 'i-wave', html: '<span class="btitle">Upmix stereo to surround</span><div class="cfg-pills"><button class="on">On</button><button>Off</button></div>' },
-    notify: { t: 't-violet', ic: 'i-bell', html: '<span class="btitle">Show a notification</span><input class="cfg-in" placeholder="e.g. Switched to Cinema" />' },
-    wait: { t: 't-blue', ic: 'i-clock', html: '<span class="btitle">Wait</span><span class="cfg-dd" data-opts="1 second,2 seconds,5 seconds,10 seconds">2 seconds ' + chev + '</span>' },
-    ifcond: { t: 't-amber', ic: 'i-branch', html: '<span class="btitle">If</span><span class="cfg-dd" data-opts="the source is 5.1,it\'s after 10 PM,headphones are connected">the source is 5.1 ' + chev + '</span><span class="bsub">Steps below run only when this is true</span>' }
-  };
   var VALUES = {
     apps: { title: 'Which app?', detected: '', items: ['Netflix', 'Spotify', 'YouTube', 'Disney+', 'Prime Video', 'Apple Music', 'VLC', 'Twitch', 'Chrome', 'A Steam game', 'Discord call', 'Zoom', 'Any game'] },
-    devices: { title: 'Which device?', detected: '', items: ['Headphones', 'HDMI TV', 'USB DAC', 'Bluetooth speaker', 'Optical / SPDIF', 'Line out', 'Any headphones'] },
-    /* Full sound modes first (EQ + effects), then the pure-EQ presets — both are valid targets and
-       runAction() resolves a mode before a preset, so either works here. */
-    presets: { title: 'Which mode or preset?', detected: '',
-               items: Object.keys(SOUND_MODES).concat(Object.keys(EQ_PRESETS)) }
-  };
-
-  /* The quick-start cards, as real automations. */
-  var QUICK = {
-    discord: { when: [{ k: 'app', v: 'Discord' }], then: [{ k: 'preset', v: 'Podcast / Voice' }] },
-    youtube: { when: [{ k: 'app', v: 'chrome' }],  then: [{ k: 'preset', v: 'Movie Night' }] },
-    morning: { when: [{ k: 'time', v: '7:00 AM' }], then: [{ k: 'fxtoggle', v: 'Night', on: false }] }
+    devices: { title: 'Which device?', detected: '', items: ['Headphones', 'HDMI TV', 'USB DAC', 'Bluetooth speaker', 'Optical / SPDIF', 'Line out', 'Any headphones'] }
   };
 
   var activeDD = null;
   var trigStack = document.getElementById('trigStack');
-  var actStack = document.getElementById('actStack');
 
   function bar(def, h, kind) {
     var el = document.createElement('div');
@@ -3319,24 +3262,15 @@
     document.querySelector('#scr-canvas .emptyrow').style.display = has ? 'none' : 'flex';
     document.getElementById('addCond').style.display = has ? 'flex' : 'none';
   }
-  function refreshDo() { document.getElementById('emptyDo').style.display = actStack.children.length ? 'none' : 'block'; }
   function addTrigger(k) {
     if (trigStack.children.length) {
       var l = document.createElement('div'); l.className = 'andlabel'; l.textContent = 'AND'; trigStack.appendChild(l);
     }
     trigStack.appendChild(bar(TRIG[k], false, k)); refreshWhen();
   }
-  function addAction(k) {
-    if (actStack.children.length) {
-      var c = document.createElement('div'); c.className = 'conn'; actStack.appendChild(c);
-    }
-    actStack.appendChild(bar(ACT[k], true, k)); refreshDo();
-  }
   function resetBuilder() {
     trigStack.innerHTML = '';
-    if (actStack) { actStack.innerHTML = ''; }
     refreshWhen();
-    refreshDo();
   }
 
   /* Open the shared "When" GUI to edit a scene's auto-apply trigger (no "Do" — the action is simply
@@ -3357,58 +3291,22 @@
     setPage('builder');
   }
 
-  /* Read the bars the user built back out of the DOM and store them as a real automation. The
-     builder's controls already carry their values (dropdown text, slider width), so this walks
-     them rather than keeping a parallel model in sync on every keystroke. */
+  /* Read the trigger bars the user built back out of the DOM and store them as the scene's
+     auto-apply "when". The action is implicit — applying the whole scene — so there is no "Do". */
   function saveBuilder() {
-    var when = [], then = [];
-
+    if (!builderScene) { return; }
+    var when = [];
     [].forEach.call(trigStack.querySelectorAll('.barrow'), function (row) {
-      var kind = row.dataset.kind;
       var dd = row.querySelector('.cfg-dd');
-      var value = dd ? dd.textContent.trim() : '';
-      when.push({ k: kind, v: value });
+      when.push({ k: row.dataset.kind, v: dd ? dd.textContent.trim() : '' });
     });
-
-    /* Scene mode: the trigger belongs to a scene, and its action is implicit (apply the scene). */
-    if (builderScene) {
-      var sc = S.presets[builderScene];
-      if (sc) { sc.when = when; sc.on = when.length > 0; }
-      var nm = builderScene;
-      builderScene = null;
-      renderAutomations();
-      save();
-      toast(when.length ? ('“' + nm + '” will apply automatically now.') : ('“' + nm + '” is manual now.'));
-      return;
-    }
-
-    [].forEach.call(actStack.querySelectorAll('.barrow'), function (row) {
-      var kind = row.dataset.kind;
-      var dds = row.querySelectorAll('.cfg-dd');
-      var pct = row.querySelector('.cfg-pct');
-      var pill = row.querySelector('.cfg-pills button.on');
-      var input = row.querySelector('.cfg-in');
-      var a = { k: kind };
-      if (dds.length) { a.v = dds[0].textContent.trim(); }
-      if (pct) {
-        var n = parseFloat(pct.textContent.replace(/[^0-9.\-]/g, ''));
-        if (!isNaN(n)) { if (kind === 'volume') { a.v = n; } else { a.amount = n; } }
-      }
-      if (pill) { a.on = pill.textContent.trim().toLowerCase() === 'on'; }
-      if (input) { a.v = input.value; }
-      if (kind === 'wait') { a.seconds = parseFloat(a.v) || 2; }
-      then.push(a);
-    });
-
-    if (!when.length || !then.length) {
-      toast('An automation needs at least one “when” and one “do”.');
-      return;
-    }
-
-    S.autos.push({ id: 'a' + nowMs(), on: true, when: when, then: then });
+    var sc = S.presets[builderScene];
+    if (sc) { sc.when = when; sc.on = when.length > 0; }
+    var nm = builderScene;
+    builderScene = null;
     renderAutomations();
     save();
-    toast('Automation saved — it’s live now.');
+    toast(when.length ? ('“' + nm + '” will apply automatically now.') : ('“' + nm + '” is manual now.'));
   }
   function openValuePicker(cat, dd) {
     activeDD = dd;
@@ -3451,7 +3349,7 @@
 
   document.addEventListener('click', function (e) {
     var op = e.target.closest('[data-open]');
-    if (op) { showScr(op.getAttribute('data-open') === 'trigger' ? 'scr-trigger' : 'scr-actions'); return; }
+    if (op) { showScr('scr-trigger'); return; }
     var ex = e.target.closest('[data-exit]');
     if (ex) {
       if (ex.classList.contains('done')) { saveBuilder(); }
@@ -3495,16 +3393,23 @@
       if (updName) { saveMyPreset(updName); toast('Updated “' + updName + '”.'); }
       return;
     }
-    /* Tap a saved-scene card (but not its Update/When/delete buttons) to apply it. */
+    var scRen = e.target.closest('[data-rename]');
+    if (scRen) {
+      var renName = Object.keys(S.presets)[+scRen.dataset.rename];
+      if (renName) { beginRename(scRen, renName); }
+      return;
+    }
+    /* Tap a saved-scene card (but not its handle, name or buttons) to apply it. */
     var scCard = e.target.closest('[data-scene]');
-    if (scCard && !e.target.closest('.whenbtn') && !e.target.closest('.updbtn') && !e.target.closest('[data-scene-del]')) {
+    if (scCard && !e.target.closest('.whenbtn') && !e.target.closest('.updbtn') &&
+        !e.target.closest('[data-scene-del]') && !e.target.closest('[data-rename]') &&
+        !e.target.closest('.draghandle')) {
       var applyName = Object.keys(S.presets)[+scCard.dataset.scene];
       if (applyName) { loadMyPreset(applyName); }
       return;
     }
     var bk = e.target.closest('[data-back]'); if (bk) { showScr('scr-canvas'); return; }
     var tr = e.target.closest('[data-trig]'); if (tr) { addTrigger(tr.getAttribute('data-trig')); showScr('scr-canvas'); return; }
-    var ac = e.target.closest('[data-act]'); if (ac) { addAction(ac.getAttribute('data-act')); showScr('scr-canvas'); return; }
     var vi = e.target.closest('.vitem'); if (vi) { setActive(vi.textContent); return; }
     var ct = e.target.closest('#customToggle');
     if (ct) { document.getElementById('customInput').style.display = 'flex'; document.getElementById('customField').focus(); return; }
@@ -3522,7 +3427,7 @@
         var n = row.nextElementSibling;
         if (n && (n.classList.contains('conn') || n.classList.contains('andlabel'))) { n.remove(); }
       }
-      row.remove(); refreshWhen(); refreshDo(); return;
+      row.remove(); refreshWhen(); return;
     }
 
     var pw = e.target.closest('[data-power]'); if (pw) { setPower(pw.classList.contains('off')); return; }
@@ -3743,21 +3648,7 @@
         send({ t: 'outlet', id: v || null });
         renderDevices(); save();
       }
-      else if (owner.id === 'myPresetDD') {
-        if (v === '__save') {
-          askName('Name this preset',
-                  'Saves the whole sound: EQ, every effect, ambience, volume and your speaker levels.',
-                  S.eq.mine || 'My preset', saveMyPreset);
-        } else if (v === '__del') {
-          var target = S.eq.mine || Object.keys(S.presets)[0];
-          if (target && S.presets[target]) {
-            delete S.presets[target];
-            S.eq.mine = Object.keys(S.presets)[0] || null;
-            renderMyPresets(); save();
-            toast('Deleted “' + target + '”.');
-          }
-        } else { loadMyPreset(pi.textContent); }
-      } else {
+      else {
         owner.querySelectorAll('a').forEach(function (x) { x.classList.remove('on'); });
         pi.classList.add('on');
         var pn = owner.querySelector('.pddbtn .pn');
@@ -3766,18 +3657,6 @@
       return;
     }
 
-    /* Quick-start cards create a working automation rather than just lighting up. */
-    var sug = e.target.closest('.sug');
-    if (sug) {
-      var recipe = QUICK[sug.dataset.quick];
-      if (recipe) {
-        S.autos.push({ id: 'a' + nowMs(), on: true, when: recipe.when, then: recipe.then });
-        renderAutomations();
-        save();
-        toast('Added — ' + describeWhen(recipe.when[0]) + '.');
-      }
-      return;
-    }
     closeMenus();
   });
 
@@ -3793,33 +3672,40 @@
     });
   }
 
-  /* Attach / clear a scene's auto-apply trigger from its dropdown. */
-  document.addEventListener('change', function (e) {
-    var sel = e.target.closest('.trigsel');
-    if (!sel) { return; }
-    var name = Object.keys(S.presets)[+sel.dataset.scene];
-    var sc = S.presets[name];
-    if (!sc) { return; }
-    var choice = TRIGGER_CHOICES[+(sel.value.split(':')[1])];
-    if (choice && choice.when) {
-      sc.when = [choice.when]; sc.on = true;
-      toast('“' + name + '” will apply ' + describeWhen(choice.when).toLowerCase() + '.');
-    } else {
-      sc.when = []; sc.on = false;
-      toast('“' + name + '” is manual now.');
-    }
-    renderAutomations(); save();
+  /* Drag a scene card to reorder it. Only "Your scenes" cards are draggable (they carry data-scene);
+     the ready-made cards use data-ready and stay put. */
+  var _dragFrom = -1;
+  document.addEventListener('dragstart', function (e) {
+    var card = e.target.closest('.acard.scene[data-scene]');
+    if (!card) { return; }
+    _dragFrom = +card.dataset.scene;
+    card.classList.add('dragging');
+    if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(_dragFrom)); }
+  });
+  document.addEventListener('dragover', function (e) {
+    if (_dragFrom < 0) { return; }
+    var card = e.target.closest('.acard.scene[data-scene]');
+    if (!card) { return; }
+    e.preventDefault();
+    if (e.dataTransfer) { e.dataTransfer.dropEffect = 'move'; }
+    document.querySelectorAll('#yourScenes .dragover').forEach(function (c) { c.classList.remove('dragover'); });
+    card.classList.add('dragover');
+  });
+  document.addEventListener('drop', function (e) {
+    if (_dragFrom < 0) { return; }
+    var card = e.target.closest('.acard.scene[data-scene]');
+    if (!card) { return; }
+    e.preventDefault();
+    reorderScene(_dragFrom, +card.dataset.scene);
+    _dragFrom = -1;
+  });
+  document.addEventListener('dragend', function () {
+    _dragFrom = -1;
+    document.querySelectorAll('#yourScenes .dragging,#yourScenes .dragover').forEach(function (c) {
+      c.classList.remove('dragging'); c.classList.remove('dragover');
+    });
   });
 
-  var as = document.getElementById('actSearch');
-  if (as) {
-    as.addEventListener('input', function () {
-      var q = this.value.toLowerCase();
-      document.querySelectorAll('#actList .pitem').forEach(function (it) {
-        it.style.display = it.textContent.toLowerCase().indexOf(q) >= 0 ? '' : 'none';
-      });
-    });
-  }
   var vs = document.getElementById('valSearch');
   if (vs) {
     vs.addEventListener('input', function () {
@@ -4002,7 +3888,6 @@
   buildSpeakers();
   renderEverything();
   refreshWhen();
-  refreshDo();
   setPage('dashboard');
 
   if (haveHost) {
