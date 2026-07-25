@@ -371,6 +371,12 @@ public partial class MainWindow : Window
             // "nothing playing" while Spotify is clearly running.
             PollNowPlaying();
 
+            // The plugin (and the engine) meter the signal at full scale, BEFORE Windows applies the
+            // output-device volume — so at a low Windows volume the bars still read hot. Scale every
+            // level by the current endpoint volume so the meter shows the loudness actually leaving the
+            // speakers, which is what the user hears and sets from the Windows slider.
+            float outVol = CurrentOutputVolumeScalar();
+
             if (!_controller.IsRunning)
             {
                 // The app isn't capturing — but the PLUGIN might be doing the work. Ask it for live
@@ -379,17 +385,18 @@ public partial class MainWindow : Window
                 if (pm is { } m)
                 {
                     _meterWasLive = true;
+                    float pOut = m.Out * outVol;
                     var chJson2 = new System.Text.StringBuilder("[");
                     for (int c = 0; c < m.Channels.Count; c++)
                     {
                         if (c > 0) { chJson2.Append(','); }
-                        chJson2.Append(m.Channels[c].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+                        chJson2.Append((m.Channels[c] * outVol).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
                     }
 
                     chJson2.Append(']');
 
                     NotifyUi(string.Create(System.Globalization.CultureInfo.InvariantCulture,
-                        $"{{\"t\":\"level\",\"in\":{m.Out:0.####},\"out\":{m.Out:0.####}," +
+                        $"{{\"t\":\"level\",\"in\":{pOut:0.####},\"out\":{pOut:0.####}," +
                         $"\"inCh\":{(m.ChannelCount > 2 ? 2 : m.ChannelCount)},\"outCh\":{m.ChannelCount}," +
                         $"\"ch\":{chJson2},\"live\":true,\"plugin\":true}}"));
                     return;
@@ -408,6 +415,7 @@ public partial class MainWindow : Window
             (float inPeak, float outPeak) = _controller.Levels;
             (int inCh, int outCh) = _controller.ActiveLayouts;
             (int latency, double levelerDb, double limiterDb) = _controller.Meters;
+            outPeak *= outVol;   // show loudness after the Windows output volume, not full scale
             // Per-speaker levels ride along on the meter tick rather than getting their own timer —
             // it's eight small numbers, and they should move in step with the main meter.
             var chLevels = _controller.ChannelLevels;
@@ -415,7 +423,7 @@ public partial class MainWindow : Window
             for (int c = 0; c < chLevels.Count; c++)
             {
                 if (c > 0) { chJson.Append(','); }
-                chJson.Append(chLevels[c].ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
+                chJson.Append((chLevels[c] * outVol).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture));
             }
 
             chJson.Append(']');
@@ -431,6 +439,41 @@ public partial class MainWindow : Window
 
     private System.Windows.Threading.DispatcherTimer? _meterTimer;
     private bool _meterWasLive;
+
+    // Cached handle to the default output endpoint's volume, so the meter can scale by the Windows
+    // output level without building a COM enumerator every 80 ms tick.
+    private NAudio.CoreAudioApi.MMDeviceEnumerator? _volEnum;
+    private NAudio.CoreAudioApi.MMDevice? _volDevice;
+    private int _volRefreshTick;
+
+    /// <summary>
+    /// The current Windows output-device volume as a 0..1 scalar (0 when muted). The default endpoint
+    /// is re-resolved every ~2 s so switching output device is picked up without per-tick COM cost.
+    /// Fails open (returns 1) so a transient error never zeroes the meter.
+    /// </summary>
+    private float CurrentOutputVolumeScalar()
+    {
+        try
+        {
+            if (_volDevice is null || --_volRefreshTick <= 0)
+            {
+                _volRefreshTick = 25;   // ~2 s at the 80 ms meter tick
+                _volEnum ??= new NAudio.CoreAudioApi.MMDeviceEnumerator();
+                var dev = _volEnum.GetDefaultAudioEndpoint(
+                    NAudio.CoreAudioApi.DataFlow.Render, NAudio.CoreAudioApi.Role.Multimedia);
+                _volDevice?.Dispose();
+                _volDevice = dev;
+            }
+
+            var epv = _volDevice.AudioEndpointVolume;
+            return epv.Mute ? 0f : epv.MasterVolumeLevelScalar;
+        }
+        catch
+        {
+            _volDevice = null;   // force a fresh resolve next tick
+            return 1f;
+        }
+    }
 
     // Now-playing is polled far more slowly than the meter — track changes are a human-speed event,
     // and the media-session API is not free.
@@ -487,6 +530,8 @@ public partial class MainWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         _meterTimer?.Stop();
+        _volDevice?.Dispose();
+        _volEnum?.Dispose();
         _volumeKeys?.Dispose();
         _tray?.Dispose();
         _controller.Dispose();
